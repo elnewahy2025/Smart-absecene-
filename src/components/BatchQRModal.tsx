@@ -55,8 +55,8 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 print:p-0 print:bg-white print:static print:block">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:overflow-visible">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden">
           <div className="flex items-center gap-2.5">
@@ -80,9 +80,13 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
               className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 cursor-pointer"
             >
               <option value="all">جميع الفصول ({students.length} طالب)</option>
-              <option value="10 / أ">فصل 10 / أ</option>
-              <option value="10 / ب">فصل 10 / ب</option>
-              <option value="11 / أ">فصل 11 / أ</option>
+              {Array.from(new Set(students.map((s) => s.className).filter(Boolean)))
+                .sort()
+                .map((cName) => (
+                  <option key={cName} value={cName}>
+                    فصل {cName}
+                  </option>
+                ))}
             </select>
 
             <button

@@ -15,17 +15,24 @@ import {
   Menu,
   X,
   Languages,
+  LogIn,
+  LogOut,
+  Flame,
+  Bell,
+  Mail,
 } from 'lucide-react';
 
 export type ActiveTab =
   | 'sessions'
   | 'justifications'
+  | 'digest'
   | 'chatbot'
   | 'emergency'
   | 'outbox'
   | 'reports'
   | 'students'
-  | 'settings';
+  | 'settings'
+  | 'parent_portal';
 
 interface HeaderNavProps {
   activeTab: ActiveTab;
@@ -43,9 +50,13 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
     setLang,
     notifications,
     justifications,
+    firebaseUser,
+    signInWithGoogle,
+    signOutGoogle,
   } = useAttendance();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
   const pendingJustificationsCount = justifications.filter((j) => j.status === 'pending').length;
   const failedNotificationsCount = notifications.filter((n) => n.status === 'failed').length;
@@ -70,6 +81,12 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
       labelEn: 'Excuses & AI Analysis',
       icon: <FileCheck2 className="w-4 h-4" />,
       badge: pendingJustificationsCount > 0 ? pendingJustificationsCount : undefined,
+    },
+    {
+      id: 'digest',
+      labelAr: 'نشرة الصباح الاستباقية',
+      labelEn: 'Morning Daily Digest',
+      icon: <Mail className="w-4 h-4 text-emerald-500" />,
     },
     {
       id: 'chatbot',
@@ -108,7 +125,34 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
       labelEn: 'Audit & Settings',
       icon: <Settings2 className="w-4 h-4" />,
     },
+    {
+      id: 'parent_portal',
+      labelAr: 'بوابة وإشعارات ولي الأمر',
+      labelEn: 'Parent Portal & Alerts',
+      icon: <Bell className="w-4 h-4 text-amber-500" />,
+    },
   ];
+
+  const isParent = currentUser.role === 'parent';
+
+  // Parents must NEVER see administrative tabs or roster of other students
+  const visibleNavItems = navItems
+    .filter((item) => {
+      if (isParent) {
+        return item.id === 'parent_portal' || item.id === 'justifications' || item.id === 'chatbot';
+      }
+      return true;
+    })
+    .map((item) => {
+      if (isParent && item.id === 'justifications') {
+        return {
+          ...item,
+          labelAr: 'أعذار واستئذان الأبناء',
+          labelEn: 'Child Excuses',
+        };
+      }
+      return item;
+    });
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
@@ -149,7 +193,12 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
               return (
                 <button
                   key={r}
-                  onClick={() => setUserRole(r)}
+                  onClick={() => {
+                    setUserRole(r);
+                    if (r === 'parent') {
+                      setActiveTab('parent_portal');
+                    }
+                  }}
                   className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                     active
                       ? 'bg-white text-slate-900 shadow-xs font-semibold'
@@ -171,6 +220,53 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
             <Languages className="w-3.5 h-3.5" />
             <span>{lang === 'ar' ? 'English' : 'عربي'}</span>
           </button>
+
+          {/* Firebase Authentication Status & Google Login */}
+          {firebaseUser ? (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-emerald-900">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] font-semibold max-w-[130px] truncate" title={firebaseUser.email || ''}>
+                  {firebaseUser.displayName || firebaseUser.email}
+                </span>
+                <span className="text-[10px] bg-emerald-200/80 text-emerald-800 px-1 py-0.2 rounded font-mono">
+                  Firebase
+                </span>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    await signOutGoogle();
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                className="text-emerald-700 hover:text-red-600 p-0.5 transition-colors cursor-pointer"
+                title={lang === 'ar' ? 'تسجيل الخروج' : 'Sign out'}
+              >
+                <LogOut className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              disabled={authLoading}
+              onClick={async () => {
+                setAuthLoading(true);
+                try {
+                  await signInWithGoogle();
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setAuthLoading(false);
+                }
+              }}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded-md text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              title={lang === 'ar' ? 'تسجيل الدخول عبر حساب Google وحفظ البيانات سحابياً في Firebase' : 'Sign in with Google to sync to Firebase Firestore'}
+            >
+              <Flame className="w-3.5 h-3.5 text-white" />
+              <span>{lang === 'ar' ? 'دخول عبر Google (Firebase)' : 'Sign in (Firebase)'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -198,7 +294,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
@@ -240,7 +336,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-4 space-y-1 shadow-lg">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button

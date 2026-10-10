@@ -15,16 +15,28 @@ import {
   Check,
   ChevronDown,
   Sparkles,
+  Send,
 } from 'lucide-react';
 import { OfficialReportModal } from './OfficialReportModal';
+import { GradeAbsencePatternsSection } from './GradeAbsencePatternsSection';
 
 export const ReportsView: React.FC = () => {
-  const { students, sessions, justifications, lang, currentTenant } = useAttendance();
+  const {
+    students,
+    sessions,
+    justifications,
+    lang,
+    currentTenant,
+    sendChronicWarningNotification,
+    sendAllChronicWarningNotifications,
+  } = useAttendance();
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [reportType, setReportType] = useState<'full' | 'chronic_only' | 'sessions'>('full');
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
+  const [sentWarningIds, setSentWarningIds] = useState<string[]>([]);
+  const [batchWarningAlert, setBatchWarningAlert] = useState<string | null>(null);
 
   // Filtered dataset
   const filteredStudents = students.filter((s) => {
@@ -268,10 +280,16 @@ export const ReportsView: React.FC = () => {
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="bg-transparent text-white font-bold focus:outline-hidden cursor-pointer"
               >
-                <option value="all" className="text-slate-900">جميع الفصول</option>
-                <option value="10 / أ" className="text-slate-900">10 / أ</option>
-                <option value="10 / ب" className="text-slate-900">10 / ب</option>
-                <option value="11 / أ" className="text-slate-900">11 / أ</option>
+                <option value="all" className="text-slate-900">
+                  {lang === 'ar' ? 'جميع الفصول' : 'All Classes'}
+                </option>
+                {Array.from(new Set(students.map((s) => s.className).filter(Boolean)))
+                  .sort()
+                  .map((cName) => (
+                    <option key={cName} value={cName} className="text-slate-900">
+                      {cName}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -372,6 +390,22 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Grade-Level Absence Patterns Comparative Analysis (Bar Chart Visualization) */}
+      <GradeAbsencePatternsSection
+        students={students}
+        justifications={justifications}
+        lang={lang}
+        onFilterByGrade={(gradeName) => {
+          // If clicked grade has classes, find first matching class
+          const matchingStudent = students.find((s) => s.grade === gradeName);
+          if (matchingStudent && selectedClass !== matchingStudent.className) {
+            setSelectedClass(matchingStudent.className);
+          } else {
+            setSelectedClass('all');
+          }
+        }}
+      />
+
       {/* Class Comparison and Risk Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Class Attendance Breakdown Bar visualization */}
@@ -409,13 +443,38 @@ export const ReportsView: React.FC = () => {
 
         {/* Chronic Absence Warning Table */}
         <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
-              <span>{lang === 'ar' ? 'سجل متابعة الغياب المتكرر والإنذارات' : 'Chronic Absence Interventions'}</span>
-            </h3>
-            <span className="text-[11px] text-slate-500">حسب لائحة المواظبة</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <span>{lang === 'ar' ? 'سجل متابعة الغياب المتكرر والإنذارات' : 'Chronic Absence Interventions'}</span>
+              </h3>
+              <p className="text-[11px] text-slate-500">حسب لائحة المواظبة وقواعد الإشعار الرسمية</p>
+            </div>
+
+            {students.filter((s) => s.totalAbsences >= 3).length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const count = sendAllChronicWarningNotifications(3);
+                  setBatchWarningAlert(`تم بنجاح إرسال وبث ${count} إنذار رسمي لجميع أولياء الأمور المستحقين وتوثيقها في طابور الرسائل.`);
+                  setTimeout(() => setBatchWarningAlert(null), 5000);
+                }}
+                className="flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
+                title="إرسال رسائل إنذار فورية لجميع الطلاب الذين لديهم 3 أيام غياب فأكثر"
+              >
+                <Send className="w-3 h-3" />
+                <span>{lang === 'ar' ? 'إرسال إنذارات للجميع' : 'Broadcast All Warnings'}</span>
+              </button>
+            )}
           </div>
+
+          {batchWarningAlert && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg p-2.5 text-xs font-semibold flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>{batchWarningAlert}</span>
+            </div>
+          )}
 
           <div className="divide-y divide-slate-100 text-xs">
             {students
@@ -424,35 +483,65 @@ export const ReportsView: React.FC = () => {
               .map((s) => {
                 const isCritical = s.totalAbsences >= 8;
                 const isWarning = s.totalAbsences >= 5;
+                const isAlreadySent = sentWarningIds.includes(s.id);
+                const tierNumber = isCritical ? 3 : isWarning ? 2 : 1;
 
                 return (
                   <div key={s.id} className="py-2.5 flex items-center justify-between gap-3">
-                    <div>
+                    <div className="space-y-0.5">
                       <div className="font-bold text-slate-900">{s.fullName}</div>
                       <div className="text-[11px] text-slate-500">
                         {s.className} · ولي الأمر: {s.guardianName} ({s.guardianPhone})
                       </div>
                     </div>
 
-                    <div className="text-left shrink-0">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold border ${
-                          isCritical
-                            ? 'bg-rose-50 border-rose-300 text-rose-800'
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-left">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold border ${
+                            isCritical
+                              ? 'bg-rose-50 border-rose-300 text-rose-800'
+                              : isWarning
+                              ? 'bg-amber-50 border-amber-300 text-amber-800'
+                              : 'bg-slate-100 border-slate-300 text-slate-800'
+                          }`}
+                        >
+                          {s.totalAbsences} {lang === 'ar' ? 'أيام غياب' : 'absences'}
+                        </span>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {isCritical
+                            ? 'إنذار نهائي وحرمان'
                             : isWarning
-                            ? 'bg-amber-50 border-amber-300 text-amber-800'
-                            : 'bg-slate-100 border-slate-300 text-slate-800'
-                        }`}
-                      >
-                        {s.totalAbsences} {lang === 'ar' ? 'أيام غياب' : 'absences'}
-                      </span>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        {isCritical
-                          ? 'إحالة للتوجيه والإنذار النهائي'
-                          : isWarning
-                          ? 'إنذار خطي لولي الأمر'
-                          : 'إشعار متابعة أول'}
+                            ? 'إنذار خطي ثانٍ'
+                            : 'إنذار أولي'}
+                        </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sendChronicWarningNotification(s.id, tierNumber);
+                          setSentWarningIds((prev) => [...prev, s.id]);
+                        }}
+                        className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                          isAlreadySent
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        }`}
+                        title={lang === 'ar' ? 'إرسال رسالة إنذار رسمي فورية لولي الأمر' : 'Send official warning SMS to parent'}
+                      >
+                        {isAlreadySent ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-[11px]">تم الإرسال</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3 h-3 text-rose-600" />
+                            <span className="text-[11px]">{lang === 'ar' ? 'إرسال إنذار' : 'Notify Parent'}</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 );

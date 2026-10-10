@@ -9,16 +9,26 @@ import { NotificationOutboxView } from './components/NotificationOutboxView';
 import { ReportsView } from './components/ReportsView';
 import { StudentManagementView } from './components/StudentManagementView';
 import { AuditSettingsView } from './components/AuditSettingsView';
+import { ParentPortalView } from './components/ParentPortalView';
+import { DailyEmailDigestView } from './components/DailyEmailDigestView';
 
 const MainAppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('sessions');
-  const { lang, currentTenant } = useAttendance();
+  const { lang, currentTenant, currentUser } = useAttendance();
+  const isParent = currentUser.role === 'parent';
+  const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'sessions');
 
   // Set document dir & lang attribute when language toggles
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   }, [lang]);
+
+  // Strict RBAC: Parents must NEVER access administrative views
+  useEffect(() => {
+    if (isParent && activeTab !== 'parent_portal' && activeTab !== 'justifications' && activeTab !== 'chatbot') {
+      setActiveTab('parent_portal');
+    }
+  }, [isParent, activeTab]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-['Cairo',sans-serif]">
@@ -27,14 +37,32 @@ const MainAppContent: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'sessions' && <AttendanceSessionsView />}
-        {activeTab === 'justifications' && <JustificationsView />}
-        {activeTab === 'chatbot' && <GeminiChatbotView />}
-        {activeTab === 'emergency' && <EmergencyRosterView />}
-        {activeTab === 'outbox' && <NotificationOutboxView />}
-        {activeTab === 'reports' && <ReportsView />}
-        {activeTab === 'students' && <StudentManagementView />}
-        {activeTab === 'settings' && <AuditSettingsView />}
+        {isParent ? (
+          <>
+            {activeTab === 'parent_portal' && (
+              <ParentPortalView onOpenExcuseForm={() => setActiveTab('justifications')} />
+            )}
+            {activeTab === 'justifications' && <JustificationsView />}
+            {activeTab === 'chatbot' && <GeminiChatbotView />}
+          </>
+        ) : (
+          <>
+            {activeTab === 'sessions' && <AttendanceSessionsView />}
+            {activeTab === 'justifications' && <JustificationsView />}
+            {activeTab === 'digest' && (
+              <DailyEmailDigestView onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)} />
+            )}
+            {activeTab === 'chatbot' && <GeminiChatbotView />}
+            {activeTab === 'emergency' && <EmergencyRosterView />}
+            {activeTab === 'outbox' && <NotificationOutboxView />}
+            {activeTab === 'reports' && <ReportsView />}
+            {activeTab === 'students' && <StudentManagementView />}
+            {activeTab === 'settings' && <AuditSettingsView />}
+            {activeTab === 'parent_portal' && (
+              <ParentPortalView onOpenExcuseForm={() => setActiveTab('justifications')} />
+            )}
+          </>
+        )}
       </main>
 
       {/* Footer */}

@@ -148,10 +148,10 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 print:p-0 print:bg-white print:static print:block">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 print:shadow-none print:p-0 print:border-none print:max-w-none">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
               <QrCode className="w-4 h-4" />
@@ -229,7 +229,7 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="space-y-2 pt-1 text-xs">
+        <div className="space-y-2 pt-1 text-xs print:hidden">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleDownloadCard}

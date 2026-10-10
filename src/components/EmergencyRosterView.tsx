@@ -171,9 +171,13 @@ export const EmergencyRosterView: React.FC = () => {
               className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer"
             >
               <option value="all">{lang === 'ar' ? 'جميع الفصول' : 'All Classes'}</option>
-              <option value="10 / أ">10 / أ</option>
-              <option value="10 / ب">10 / ب</option>
-              <option value="11 / أ">11 / أ</option>
+              {Array.from(new Set(students.map((s) => s.className).filter(Boolean)))
+                .sort()
+                .map((cName) => (
+                  <option key={cName} value={cName}>
+                    {cName}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -193,7 +197,7 @@ export const EmergencyRosterView: React.FC = () => {
         {/* Print button */}
         <button
           onClick={handlePrint}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs shrink-0"
+          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs shrink-0 print:hidden"
         >
           <Printer className="w-4 h-4" />
           <span>{lang === 'ar' ? 'طباعة كشف الإخلاء الفوري' : 'Print Roster'}</span>

@@ -17,6 +17,11 @@ import {
   ChevronRight,
   Info,
   Scan,
+  Zap,
+  UserCheck,
+  Users,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { QRScannerModal } from './QRScannerModal';
 import { WeeklyAttendanceTrendCard } from './WeeklyAttendanceTrendCard';
@@ -29,6 +34,7 @@ export const AttendanceSessionsView: React.FC = () => {
     lang,
     updateRecord,
     setAllPresentInDraft,
+    quickMarkGroupAsPresent,
     submitSession,
     reopenSession,
     createNewSession,
@@ -44,6 +50,11 @@ export const AttendanceSessionsView: React.FC = () => {
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
+  // Quick Mark & Group Selection state
+  const [selectedStudentIdsForGroup, setSelectedStudentIdsForGroup] = useState<string[]>([]);
+  const [isQuickMarkActive, setIsQuickMarkActive] = useState<boolean>(false);
+  const [isQuickMarkMenuOpen, setIsQuickMarkMenuOpen] = useState<boolean>(false);
+
   // Modals
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
   const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
@@ -106,6 +117,89 @@ export const AttendanceSessionsView: React.FC = () => {
 
   const handleMinutesLateChange = (studentId: string, minutes: number) => {
     updateRecord(selectedSession.id, studentId, 'late', minutes);
+  };
+
+  // Quick Mark: Mark Whole Class as Present by Default
+  const handleQuickMarkWholeClass = () => {
+    if (!selectedSession) return;
+    if (selectedSession.status === 'submitted') {
+      if (currentUser.role === 'admin' || currentUser.role === 'registrar') {
+        const proceed = confirm(
+          lang === 'ar'
+            ? 'الكشف معتمد حالياً. يلزم إعادة فتح الكشف أولاً لاستخدام التحضير السريع. هل تريد فتح نافذة إعادة الفتح؟'
+            : 'Session is submitted. Reopen session first?'
+        );
+        if (proceed) setIsReopenModalOpen(true);
+      } else {
+        alert(
+          lang === 'ar'
+            ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف بواسطة الإدارة أولاً.'
+            : 'Session is locked. Admin must reopen first.'
+        );
+      }
+      return;
+    }
+
+    const res = quickMarkGroupAsPresent(selectedSession.id);
+    setIsQuickMarkActive(true);
+    setIsQuickMarkMenuOpen(false);
+    setSelectedStudentIdsForGroup([]);
+    setNotificationBanner(
+      lang === 'ar'
+        ? `⚡ تم تفعيل التحضير السريع: تم تعيين جميع طلاب الفصل (${res.updatedCount} طالب) كـ 'حاضر' افتراضياً بنجاح! يمكنك الآن تعديل الغائبين فقط أدناه.`
+        : `⚡ Quick Mark applied: All ${res.updatedCount} students marked Present! You can now adjust absentees below.`
+    );
+  };
+
+  // Quick Mark: Mark Selected Group of Students as Present
+  const handleQuickMarkSelectedGroup = () => {
+    if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
+    if (selectedSession.status === 'submitted' && currentUser.role !== 'admin') {
+      alert(
+        lang === 'ar'
+          ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف أولاً.'
+          : 'Session is locked. Reopen before editing.'
+      );
+      return;
+    }
+
+    const count = selectedStudentIdsForGroup.length;
+    const res = quickMarkGroupAsPresent(selectedSession.id, selectedStudentIdsForGroup);
+    setIsQuickMarkActive(true);
+    setIsQuickMarkMenuOpen(false);
+    setSelectedStudentIdsForGroup([]);
+    setNotificationBanner(
+      lang === 'ar'
+        ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${count} طالب) كـ 'حاضر'.`
+        : `⚡ Quick Mark applied to ${count} students as Present.`
+    );
+  };
+
+  // Bulk Mark Selected Students as Absent
+  const handleGroupMarkAsAbsent = () => {
+    if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
+    const count = selectedStudentIdsForGroup.length;
+    selectedStudentIdsForGroup.forEach((id) => {
+      updateRecord(selectedSession.id, id, 'absent');
+    });
+    setSelectedStudentIdsForGroup([]);
+    setNotificationBanner(
+      lang === 'ar'
+        ? `تم تعيين ${count} طالب كـ 'غائب'.`
+        : `Marked ${count} students as Absent.`
+    );
+  };
+
+  // Toggle selection for all currently visible students
+  const handleToggleSelectAll = () => {
+    if (sessionStudents.length === 0) return;
+    const allIds = sessionStudents.map((s) => s.record.studentId);
+    const allSelected = allIds.every((id) => selectedStudentIdsForGroup.includes(id));
+    if (allSelected) {
+      setSelectedStudentIdsForGroup([]);
+    } else {
+      setSelectedStudentIdsForGroup(allIds);
+    }
   };
 
   const handleSubmitSession = () => {
@@ -293,24 +387,88 @@ export const AttendanceSessionsView: React.FC = () => {
                   <span>{lang === 'ar' ? 'قارئ QR بدون لمس' : 'Scan QR'}</span>
                 </button>
 
+                {/* Primary Quick Mark Feature Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsQuickMarkMenuOpen(!isQuickMarkMenuOpen)}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-all cursor-pointer shadow-xs border border-emerald-500/40"
+                    title="التحضير السريع: تعيين كامل الفصل أو مجموعة محددة كـ حاضر افتراضياً لتوفير الوقت"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>{lang === 'ar' ? 'التحضير السريع (Quick Mark)' : 'Quick Mark'}</span>
+                    <span className="bg-emerald-950/40 text-emerald-200 text-[10px] px-1.5 py-0.2 rounded font-normal">
+                      {selectedStudentIdsForGroup.length > 0
+                        ? `${selectedStudentIdsForGroup.length} محدد`
+                        : lang === 'ar' ? 'الفصل كامل' : 'Whole Class'}
+                    </span>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isQuickMarkMenuOpen && (
+                    <div className="absolute left-0 sm:right-0 sm:left-auto mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-2 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2.5 py-1.5 border-b border-slate-100 font-bold text-slate-800 flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{lang === 'ar' ? 'خيارات التحضير السريع:' : 'Quick Mark Options:'}</span>
+                        </span>
+                        <button
+                          onClick={() => setIsQuickMarkMenuOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleQuickMarkWholeClass}
+                        className="w-full text-right px-2.5 py-2 hover:bg-emerald-50 rounded-lg text-slate-800 hover:text-emerald-950 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      >
+                        <UserCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block font-bold text-slate-900">
+                            {lang === 'ar' ? 'تعيين كامل الفصل حاضر (افتراضياً)' : 'Mark Whole Class Present'}
+                          </strong>
+                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                            {lang === 'ar'
+                              ? 'تعيين جميع الطلاب كـ حاضر فوراً لضبط الغائبين فقط يدوياً'
+                              : 'Default whole roster to Present and adjust absentees manually'}
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleQuickMarkSelectedGroup}
+                        disabled={selectedStudentIdsForGroup.length === 0}
+                        className="w-full text-right px-2.5 py-2 hover:bg-teal-50 rounded-lg text-slate-800 hover:text-teal-950 transition-colors flex items-start gap-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Users className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block font-bold text-slate-900">
+                            {lang === 'ar'
+                              ? `تعيين المجموعة المحددة حاضر (${selectedStudentIdsForGroup.length})`
+                              : `Mark Selected Group Present (${selectedStudentIdsForGroup.length})`}
+                          </strong>
+                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                            {lang === 'ar'
+                              ? 'تطبيق الحضور فقط على الطلاب المحددين في مربعات الاختيار'
+                              : 'Apply presence only to checked students'}
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {selectedSession.status === 'draft' || selectedSession.status === 'reopened' ? (
-                  <>
-                    <button
-                      onClick={() => setAllPresentInDraft(selectedSession.id)}
-                      className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer border border-slate-300"
-                      title="تسهيل إدخال: تعيين جميع الطلاب حاضرين قبل تعديل الغائبين"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{lang === 'ar' ? 'تعيين الكل حاضر (تسريع)' : 'Mark All Present'}</span>
-                    </button>
-                    <button
-                      onClick={handleSubmitSession}
-                      className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{lang === 'ar' ? 'تأكيد واعتماد الكشف نهائياً' : 'Submit & Confirm'}</span>
-                    </button>
-                  </>
+                  <button
+                    onClick={handleSubmitSession}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{lang === 'ar' ? 'تأكيد واعتماد الكشف نهائياً' : 'Submit & Confirm'}</span>
+                  </button>
                 ) : (
                   <>
                     <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
@@ -355,6 +513,93 @@ export const AttendanceSessionsView: React.FC = () => {
                 <span className="text-lg font-bold text-indigo-800">{selectedSession.excusedCount}</span>
               </div>
             </div>
+
+            {/* Quick Mark Active Workflow Banner & Absentee Live Adjuster */}
+            {isQuickMarkActive && (
+              <div className="mt-4 bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white p-4 rounded-xl shadow-xs border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold shrink-0 mt-0.5">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm text-emerald-200">
+                          {lang === 'ar' ? 'التحضير السريع مفعل: تم تعيين طلاب الفصل حاضرين افتراضياً' : 'Quick Mark Active: All Defaulted to Present'}
+                        </h4>
+                        <span className="bg-emerald-400 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {lang === 'ar' ? 'خطوة 1 مكتملة ✓' : 'Step 1 Complete ✓'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-200 mt-0.5 leading-relaxed">
+                        {lang === 'ar'
+                          ? 'الخطوة 2: قم بالنقر المباشر على زر "غائب" أو "متأخر" للطلاب غير الحاضرين فقط في الجدول أدناه لحفظ 80% من وقت الرصد للجلسات الكبيرة.'
+                          : 'Step 2: Click "Absent" or "Late" only for students who are not in class to save 80% of session roll-call time.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter(statusFilter === 'absent' ? 'all' : 'absent')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        statusFilter === 'absent'
+                          ? 'bg-amber-400 text-slate-950 border-amber-300'
+                          : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+                      }`}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      <span>
+                        {statusFilter === 'absent'
+                          ? (lang === 'ar' ? 'عرض كامل الفصل' : 'Show Full Class')
+                          : (lang === 'ar' ? `حصر وتدقيق الغائبين (${selectedSession.absentCount})` : `Inspect Absentees (${selectedSession.absentCount})`)}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickMarkActive(false)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                      title={lang === 'ar' ? 'إغلاق شريط الإرشاد' : 'Close banner'}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Absentee Adjustment Strip */}
+                {selectedSession.absentCount > 0 && (
+                  <div className="pt-2 border-t border-emerald-800/60 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-emerald-300 font-bold flex items-center gap-1 text-[11px]">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                      <span>{lang === 'ar' ? 'الطلاب المعدّلون كـ غائبين حالياً:' : 'Current Absentees:'}</span>
+                    </span>
+                    {selectedSession.records
+                      .filter((r) => r.status === 'absent' || r.status === 'rejected_excuse')
+                      .map((r) => {
+                        const st = students.find((s) => s.id === r.studentId);
+                        return (
+                          <span
+                            key={r.studentId}
+                            className="bg-rose-950/70 border border-rose-500/50 text-rose-200 px-2.5 py-0.5 rounded-md text-[11px] inline-flex items-center gap-1.5"
+                          >
+                            <span>{st?.fullName || 'طالب'}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateRecord(selectedSession.id, r.studentId, 'present')}
+                              className="text-rose-400 hover:text-white cursor-pointer font-bold"
+                              title={lang === 'ar' ? 'إعادة إلى حاضر' : 'Restore to Present'}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Filter & Search Bar */}
@@ -403,6 +648,19 @@ export const AttendanceSessionsView: React.FC = () => {
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
                 <tr>
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="تحديد الكل"
+                      checked={
+                        sessionStudents.length > 0 &&
+                        sessionStudents.every((s) => selectedStudentIdsForGroup.includes(s.record.studentId))
+                      }
+                      onChange={handleToggleSelectAll}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      title={lang === 'ar' ? 'تحديد الكل للتحضير السريع كـ مجموعة' : 'Select all for group action'}
+                    />
+                  </th>
                   <th className="py-3 px-4">#</th>
                   <th className="py-3 px-4">{lang === 'ar' ? 'اسم الطالب / الرقم المدرسي' : 'Student'}</th>
                   <th className="py-3 px-4">{lang === 'ar' ? 'السجل المدني' : 'ID'}</th>
@@ -414,7 +672,7 @@ export const AttendanceSessionsView: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {sessionStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-500">
+                    <td colSpan={7} className="text-center py-8 text-slate-500">
                       {lang === 'ar' ? 'لا يوجد طلاب مطابقين للبحث' : 'No students found'}
                     </td>
                   </tr>
@@ -422,9 +680,32 @@ export const AttendanceSessionsView: React.FC = () => {
                   sessionStudents.map(({ record, student }, index) => {
                     const isSessionSubmitted = selectedSession.status === 'submitted';
                     const canEdit = !isSessionSubmitted || currentUser.role === 'admin';
+                    const isSelected = selectedStudentIdsForGroup.includes(record.studentId);
 
                     return (
-                      <tr key={record.studentId} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={record.studentId}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          isSelected ? 'bg-emerald-50/40' : ''
+                        }`}
+                      >
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`تحديد ${student.fullName}`}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudentIdsForGroup((prev) => [...prev, record.studentId]);
+                              } else {
+                                setSelectedStudentIdsForGroup((prev) =>
+                                  prev.filter((id) => id !== record.studentId)
+                                );
+                              }
+                            }}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{index + 1}</td>
                         <td className="py-3 px-4">
                           <div className="font-semibold text-slate-900">{student.fullName}</div>
@@ -524,6 +805,46 @@ export const AttendanceSessionsView: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Floating Group Bulk Actions Toolbar */}
+          {selectedStudentIdsForGroup.length > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 min-w-[320px] max-w-xl animate-in fade-in slide-in-from-bottom-3 duration-150">
+              <div className="flex items-center gap-2.5 text-xs font-semibold">
+                <span className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center">
+                  {selectedStudentIdsForGroup.length}
+                </span>
+                <span>{lang === 'ar' ? 'طالب محدد في المجموعة' : 'Students Selected'}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleQuickMarkSelectedGroup}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'تعيين كـ حاضر (Quick Mark)' : 'Quick Mark Present'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGroupMarkAsAbsent}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'تعيين كـ غائب' : 'Mark Absent'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedStudentIdsForGroup([])}
+                  className="px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Clear'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

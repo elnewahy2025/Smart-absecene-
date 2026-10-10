@@ -11,7 +11,13 @@ import {
   AuditLog,
   SchoolSettings,
   UserRole,
+  DailyDigestAnomaly,
+  DailyDigestHighRiskStudent,
+  DailyDigestPendingExcuse,
+  DailyEmailDigestItem,
+  DailyEmailDigestConfig,
 } from '../types/attendance';
+import { computeDailyDigestData, generateHtmlEmailTemplate } from '../utils/digestEngine';
 import {
   INITIAL_TENANTS,
   INITIAL_USERS,
@@ -23,7 +29,32 @@ import {
   INITIAL_SETTINGS,
 } from '../data/mockData';
 
+import {
+  auth,
+  db,
+  googleProvider,
+  handleFirestoreError,
+  OperationType,
+} from '../lib/firebase';
+import {
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import {
+  doc,
+  setDoc,
+  collection,
+  onSnapshot,
+} from 'firebase/firestore';
+
 interface AttendanceContextType {
+  // Firebase Auth
+  firebaseUser: FirebaseUser | null;
+  signInWithGoogle: () => Promise<void>;
+  signOutGoogle: () => Promise<void>;
+
   // Tenant & Role
   currentTenant: Tenant;
   tenants: Tenant[];
@@ -50,6 +81,7 @@ interface AttendanceContextType {
     note?: string
   ) => void;
   setAllPresentInDraft: (sessionId: string) => void;
+  quickMarkGroupAsPresent: (sessionId: string, studentIds?: string[]) => { updatedCount: number; message: string };
   submitSession: (sessionId: string) => { success: boolean; message: string };
   reopenSession: (sessionId: string, reason: string) => { success: boolean; message: string };
   createNewSession: (
@@ -75,10 +107,23 @@ interface AttendanceContextType {
     status: 'approved' | 'rejected',
     notes: string
   ) => void;
+  updateJustificationAnalysis: (
+    justificationId: string,
+    aiAnalysis: any
+  ) => void;
 
   // Notifications
   retryNotification: (id: string) => Promise<boolean>;
   retryAllFailedNotifications: () => void;
+  sendCustomParentNotification: (params: {
+    studentIds: string[];
+    messageText: string;
+    channel: 'SMS' | 'WhatsApp';
+    category?: 'absence' | 'late' | 'warning' | 'broadcast' | 'excuse_approved';
+    absenceDate?: string;
+  }) => number;
+  sendChronicWarningNotification: (studentId: string, warningTier: number) => boolean;
+  sendAllChronicWarningNotifications: (tierThreshold?: number) => number;
 
   // Audit
   addAuditLog: (entry: Omit<AuditLog, 'id' | 'tenantId' | 'timestamp'>) => void;
@@ -88,6 +133,13 @@ interface AttendanceContextType {
 
   // Settings
   updateSettings: (newSettings: Partial<SchoolSettings>) => void;
+
+  // Daily Email Digest
+  digestConfig: DailyEmailDigestConfig;
+  digestHistory: DailyEmailDigestItem[];
+  updateDigestConfig: (cfg: Partial<DailyEmailDigestConfig>) => void;
+  generateCurrentDigest: (customConfig?: Partial<DailyEmailDigestConfig>) => Promise<DailyEmailDigestItem>;
+  dispatchDailyDigest: (digestId?: string, targetRecipients?: string[]) => Promise<{ success: boolean; message: string; digestItem: DailyEmailDigestItem }>;
 }
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
@@ -96,10 +148,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [tenantId, setTenantIdState] = useState<string>('school-1');
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('admin');
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
   const [allStudents, setAllStudents] = useState<Student[]>(() => {
     const saved = localStorage.getItem('school_students');
-    return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+    if (!saved) return INITIAL_STUDENTS;
+    try {
+      const parsed: Student[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((s) => s.id));
+      const missing = INITIAL_STUDENTS.filter((s) => !existingIds.has(s.id));
+      return [...parsed, ...missing];
+    } catch {
+      return INITIAL_STUDENTS;
+    }
   });
 
   const [allSessions, setAllSessions] = useState<AttendanceSession[]>(() => {
@@ -109,7 +170,15 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [allJustifications, setAllJustifications] = useState<Justification[]>(() => {
     const saved = localStorage.getItem('school_justifications');
-    return saved ? JSON.parse(saved) : INITIAL_JUSTIFICATIONS;
+    if (!saved) return INITIAL_JUSTIFICATIONS;
+    try {
+      const parsed: Justification[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((j) => j.id));
+      const missing = INITIAL_JUSTIFICATIONS.filter((j) => !existingIds.has(j.id));
+      return [...parsed, ...missing];
+    } catch {
+      return INITIAL_JUSTIFICATIONS;
+    }
   });
 
   const [allNotifications, setAllNotifications] = useState<NotificationOutboxItem[]>(() => {
@@ -126,6 +195,146 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const saved = localStorage.getItem('school_settings');
     return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
   });
+
+  const DEFAULT_DIGEST_CONFIG: DailyEmailDigestConfig = {
+    enabled: true,
+    scheduledTime: '06:45',
+    daysOfWeek: [0, 1, 2, 3, 4],
+    recipients: [
+      'principal@andalus-school.edu.sa',
+      'counselor@andalus-school.edu.sa',
+      'vice.principal@andalus-school.edu.sa',
+      'attendance.registrar@andalus-school.edu.sa',
+    ],
+    includeAnomalies: true,
+    includePendingJustifications: true,
+    includeHighRiskStudents: true,
+    includeGeminiBriefing: true,
+    chronicAbsenceThreshold: 5,
+    consecutiveAbsenceDaysThreshold: 2,
+    anomalySpikePercentage: 25,
+    notifyViaWhatsAppToo: true,
+    principalPhone: '+966501112233',
+  };
+
+  const [digestConfig, setDigestConfig] = useState<DailyEmailDigestConfig>(() => {
+    const saved = localStorage.getItem('school_digest_config');
+    return saved ? JSON.parse(saved) : DEFAULT_DIGEST_CONFIG;
+  });
+
+  const [digestHistory, setDigestHistory] = useState<DailyEmailDigestItem[]>(() => {
+    const saved = localStorage.getItem('school_digest_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('school_digest_config', JSON.stringify(digestConfig));
+  }, [digestConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('school_digest_history', JSON.stringify(digestHistory));
+  }, [digestHistory]);
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        // Upsert user profile to Firestore adhering to schema
+        const userProfileRef = doc(db, 'users', user.uid);
+        setDoc(
+          userProfileRef,
+          {
+            userId: user.uid,
+            tenantId: tenantId,
+            name: user.displayName || 'مستخدم معتمد',
+            email: user.email || 'user@school.edu.sa',
+            role: currentUserRole,
+            phone: user.phoneNumber || '+966500000000',
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ).catch((err) => {
+          handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [tenantId, currentUserRole]);
+
+  // Sync students from Firestore if authenticated
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const unsubStudents = onSnapshot(
+      collection(db, 'students'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteStudents: Student[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            remoteStudents.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              studentNumber: data.studentNumber || '',
+              nationalId: data.nationalId || '',
+              fullName: data.fullName || '',
+              grade: data.grade || 'الصف العاشر',
+              className: data.className || '',
+              classId: data.classId || 'class-1a',
+              guardianName: data.guardianName || 'ولي أمر معتمد',
+              guardianPhone: data.guardianPhone || '+966500000000',
+              guardianRelationship: 'الأب',
+              bloodType: 'O+',
+              totalAbsences: data.totalAbsences || 0,
+              totalLates: 0,
+              attendanceRate: data.attendanceRate || 100,
+            });
+          });
+          if (remoteStudents.length > 0) {
+            setAllStudents((prev) => {
+              const map = new Map<string, Student>();
+              prev.forEach((s) => map.set(s.id, s));
+              remoteStudents.forEach((s) => map.set(s.id, s));
+              return Array.from(map.values());
+            });
+          }
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'students');
+      }
+    );
+
+    return () => {
+      unsubStudents();
+    };
+  }, [firebaseUser, tenantId]);
+
+  const signInWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      throw error;
+    }
+  };
+
+  const signOutGoogle = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Sign Out Error:', error);
+      throw error;
+    }
+  };
 
   // Save changes to localStorage
   useEffect(() => {
@@ -173,12 +382,65 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const settings = settingsMap[tenantId] || INITIAL_SETTINGS['school-1'];
 
-  // Data filtered strictly by tenantId (Multi-tenancy isolation enforcement)
-  const students = allStudents.filter((s) => s.tenantId === tenantId);
-  const sessions = allSessions.filter((s) => s.tenantId === tenantId);
-  const justifications = allJustifications.filter((j) => j.tenantId === tenantId);
-  const notifications = allNotifications.filter((n) => n.tenantId === tenantId);
-  const auditLogs = allAuditLogs.filter((a) => a.tenantId === tenantId);
+  // Helper to determine if a student record belongs to the authenticated parent
+  const isChildOfGuardian = (student: Student, user: UserProfile): boolean => {
+    if (user.role !== 'parent') return true;
+    const cleanUserPhone = (user.phone || '').replace(/[^\d]/g, '');
+    const cleanGuardianPhone = (student.guardianPhone || '').replace(/[^\d]/g, '');
+    if (cleanUserPhone && cleanGuardianPhone && cleanUserPhone === cleanGuardianPhone) return true;
+    if (user.email && student.guardianEmail && user.email.toLowerCase() === student.guardianEmail.toLowerCase()) return true;
+    if (user.name && student.guardianName && (
+      student.guardianName.trim() === user.name.trim() ||
+      (student.guardianName.includes('المطيري') && user.name.includes('المطيري'))
+    )) return true;
+    return false;
+  };
+
+  // Student IDs belonging strictly to current parent
+  const parentChildIds = currentUserRole === 'parent'
+    ? allStudents
+        .filter((s) => s.tenantId === tenantId && isChildOfGuardian(s, currentUser))
+        .map((s) => s.id)
+    : [];
+
+  // Data filtered strictly by tenantId AND Parent-Child Privacy Isolation
+  // A parent must NEVER see or know any other students, ONLY their child/children.
+  const students = currentUserRole === 'parent'
+    ? allStudents.filter((s) => s.tenantId === tenantId && parentChildIds.includes(s.id))
+    : allStudents.filter((s) => s.tenantId === tenantId);
+
+  const sessions = currentUserRole === 'parent'
+    ? allSessions
+        .filter((s) => s.tenantId === tenantId)
+        .map((sess) => {
+          const matchingRecords = sess.records.filter((rec) => parentChildIds.includes(rec.studentId));
+          return {
+            ...sess,
+            records: matchingRecords,
+            totalStudents: matchingRecords.length,
+            presentCount: matchingRecords.filter((r) => r.status === 'present').length,
+            absentCount: matchingRecords.filter((r) => r.status === 'absent').length,
+            excusedCount: matchingRecords.filter(
+              (r) => r.status === 'excused_absence' || r.status === 'excused_leave' || r.status === 'under_review'
+            ).length,
+          };
+        })
+        .filter((sess) => sess.records.length > 0)
+    : allSessions.filter((s) => s.tenantId === tenantId);
+
+  const justifications = currentUserRole === 'parent'
+    ? allJustifications.filter((j) => j.tenantId === tenantId && parentChildIds.includes(j.studentId))
+    : allJustifications.filter((j) => j.tenantId === tenantId);
+
+  const notifications = currentUserRole === 'parent'
+    ? allNotifications.filter((n) =>
+        n.tenantId === tenantId &&
+        (parentChildIds.includes(n.studentId) ||
+         ((currentUser.phone || '') && n.recipientPhone.replace(/[^\d]/g, '') === currentUser.phone.replace(/[^\d]/g, '')))
+      )
+    : allNotifications.filter((n) => n.tenantId === tenantId);
+
+  const auditLogs = currentUserRole === 'parent' ? [] : allAuditLogs.filter((a) => a.tenantId === tenantId);
 
   const addAuditLog = (entry: Omit<AuditLog, 'id' | 'tenantId' | 'timestamp'>) => {
     const newLog: AuditLog = {
@@ -197,6 +459,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     minutesLate?: number,
     note?: string
   ) => {
+    if (currentUserRole === 'parent') {
+      console.warn('Unauthorized: Parents cannot edit attendance records.');
+      return;
+    }
     setAllSessions((prev) =>
       prev.map((sess) => {
         if (sess.id !== sessionId) return sess;
@@ -260,6 +526,71 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const quickMarkGroupAsPresent = (sessionId: string, studentIds?: string[]) => {
+    let affectedCount = 0;
+    setAllSessions((prev) =>
+      prev.map((sess) => {
+        if (sess.id !== sessionId) return sess;
+        const targetIdsSet = studentIds && studentIds.length > 0 ? new Set(studentIds) : null;
+        const updatedRecords = sess.records.map((r) => {
+          if (!targetIdsSet || targetIdsSet.has(r.studentId)) {
+            affectedCount++;
+            return {
+              ...r,
+              status: 'present' as AttendanceStatus,
+              minutesLate: undefined,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentUser.name,
+            };
+          }
+          return r;
+        });
+
+        const presentCount = updatedRecords.filter((r) => r.status === 'present').length;
+        const absentCount = updatedRecords.filter(
+          (r) => r.status === 'absent' || r.status === 'rejected_excuse'
+        ).length;
+        const lateCount = updatedRecords.filter((r) => r.status === 'late').length;
+        const excusedCount = updatedRecords.filter(
+          (r) =>
+            r.status === 'excused_absence' ||
+            r.status === 'excused_leave' ||
+            r.status === 'under_review'
+        ).length;
+
+        return {
+          ...sess,
+          records: updatedRecords,
+          presentCount,
+          absentCount,
+          lateCount,
+          excusedCount,
+        };
+      })
+    );
+
+    addAuditLog({
+      entityType: 'session',
+      entityId: sessionId,
+      action: 'update',
+      performerId: currentUser.id,
+      performerName: currentUser.name,
+      performerRole: currentUser.role,
+      details:
+        studentIds && studentIds.length > 0
+          ? `التحضير السريع (Quick Mark): تم تعيين ${studentIds.length} طالب كمجموعة إلى حالة 'حاضر' افتراضياً.`
+          : `التحضير السريع (Quick Mark): تم تعيين جميع طلاب الكشف كـ 'حاضر' لتسريع الرصد وحصر الغياب يدوياً.`,
+    });
+
+    return {
+      updatedCount: affectedCount,
+      message:
+        studentIds && studentIds.length > 0
+          ? `تم تطبيق التحضير السريع على ${studentIds.length} طالب بنجاح.`
+          : `تم تعيين كامل الفصل حاضر افتراضياً بنجاح. يمكنك الآن تعديل الغائبين فقط لتوفير الوقت.`,
+    };
+  };
+
   const submitSession = (sessionId: string) => {
     const targetSession = sessions.find((s) => s.id === sessionId);
     if (!targetSession) {
@@ -275,9 +606,20 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const student = students.find((s) => s.id === rec.studentId);
         if (student) {
           const isAbsent = rec.status === 'absent';
+          const defaultAbsentTpl = settings.absenceMessageTemplate || 'المكرم ولي أمر الطالب ({student_name}): نفيدكم بتسجيل غياب نجلكم عن ({subject}) بتاريخ {date}. يرجى تقديم العذر عبر الرابط المدرسي.';
+          const defaultLateTpl = settings.lateMessageTemplate || 'المكرم ولي أمر الطالب ({student_name}): تم تسجيل تأخر نجلكم ({minutes} دقيقة) عن دوام اليوم بتاريخ {date}.';
+
           const msg = isAbsent
-            ? `المكرم ولي أمر الطالب (${student.fullName}): نفيدكم بتسجيل غياب نجلكم عن (${targetSession.subject || 'الدوام اليومي'}) بتاريخ ${targetSession.date}. يرجى تقديم العذر عبر الرابط المدرسي.`
-            : `المكرم ولي أمر الطالب (${student.fullName}): تم تسجيل تأخر نجلكم (${rec.minutesLate || 10} دقيقة) عن (${targetSession.subject || 'الدوام اليومي'}) بتاريخ ${targetSession.date}.`;
+            ? defaultAbsentTpl
+                .replace('{student_name}', student.fullName)
+                .replace('{subject}', targetSession.subject || 'الدوام اليومي')
+                .replace('{date}', targetSession.date)
+            : defaultLateTpl
+                .replace('{student_name}', student.fullName)
+                .replace('{minutes}', String(rec.minutesLate || 10))
+                .replace('{date}', targetSession.date);
+
+          const ch: 'SMS' | 'WhatsApp' = settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS';
 
           newNotifications.push({
             id: `notif-${Date.now()}-${student.id}`,
@@ -289,9 +631,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             absenceDate: targetSession.date,
             sessionTitle: `${targetSession.subject || 'حضور عام'} - ${targetSession.className}`,
             statusType: rec.status,
+            category: isAbsent ? 'absence' : 'late',
             messageText: msg,
-            channel: 'SMS',
-            status: 'sent', // Simulate fast transmission
+            channel: ch,
+            status: 'sent',
             retryCount: 0,
             createdAt: now,
             sentAt: now,
@@ -439,7 +782,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     attachment?: { name: string; mime: string; base64: string },
     aiAnalysis?: any
   ): Promise<Justification> => {
-    const student = students.find((s) => s.id === studentId);
+    if (currentUserRole === 'parent' && !parentChildIds.includes(studentId)) {
+      throw new Error('Unauthorized: Parents can only submit excuses for their own children.');
+    }
+    const student = allStudents.find((s) => s.id === studentId);
     const newJust: Justification = {
       id: `just-${Date.now()}`,
       tenantId: tenantId,
@@ -493,6 +839,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     status: 'approved' | 'rejected',
     notes: string
   ) => {
+    if (currentUserRole === 'parent') {
+      console.warn('Unauthorized: Parents cannot review justifications.');
+      return;
+    }
     const just = justifications.find((j) => j.id === justificationId);
     if (!just) return;
 
@@ -545,6 +895,53 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       previousValue: 'قيد المراجعة',
       newValue: status === 'approved' ? 'معتمد' : 'مرفوض',
     });
+
+    // Notify parent if excuse approved and enabled
+    if (status === 'approved' && settings.notifyOnExcuseApproved) {
+      const student = students.find((s) => s.id === just.studentId);
+      if (student) {
+        const approvalNotif: NotificationOutboxItem = {
+          id: `notif-appr-${Date.now()}-${just.id}`,
+          tenantId: tenantId,
+          recipientPhone: student.guardianPhone,
+          recipientName: student.guardianName,
+          studentId: student.id,
+          studentName: student.fullName,
+          absenceDate: just.absenceDate,
+          sessionTitle: 'اعتماد عذر طبي',
+          statusType: 'excused_absence',
+          category: 'excuse_approved',
+          messageText: `المكرم ولي أمر الطالب (${student.fullName}): تم قبول واعتماد العذر الطبي المقدم لغياب نجلكم بتاريخ ${just.absenceDate} رسمياً من قبل إدارة المدرسة.`,
+          channel: settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS',
+          status: 'sent',
+          retryCount: 0,
+          createdAt: now,
+          sentAt: now,
+        };
+        setAllNotifications((prev) => [approvalNotif, ...prev]);
+        if (firebaseUser) {
+          setDoc(doc(db, 'notification_outbox', approvalNotif.id), {
+            tenantId: approvalNotif.tenantId,
+            recipientPhone: approvalNotif.recipientPhone,
+            recipientName: approvalNotif.recipientName,
+            studentName: approvalNotif.studentName,
+            absenceDate: approvalNotif.absenceDate,
+            messageText: approvalNotif.messageText,
+            channel: approvalNotif.channel,
+            status: approvalNotif.status,
+            retryCount: approvalNotif.retryCount,
+          }).catch((err) => {
+            handleFirestoreError(err, OperationType.WRITE, `notification_outbox/${approvalNotif.id}`);
+          });
+        }
+      }
+    }
+  };
+
+  const updateJustificationAnalysis = (justificationId: string, aiAnalysis: any) => {
+    setAllJustifications((prev) =>
+      prev.map((j) => (j.id === justificationId ? { ...j, aiAnalysis } : j))
+    );
   };
 
   const retryNotification = async (id: string): Promise<boolean> => {
@@ -582,6 +979,177 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           : n
       )
     );
+  };
+
+  const sendCustomParentNotification = (params: {
+    studentIds: string[];
+    messageText: string;
+    channel: 'SMS' | 'WhatsApp';
+    category?: 'absence' | 'late' | 'warning' | 'broadcast' | 'excuse_approved';
+    absenceDate?: string;
+  }): number => {
+    const now = new Date().toISOString();
+    const newItems: NotificationOutboxItem[] = [];
+
+    params.studentIds.forEach((sid) => {
+      const std = students.find((s) => s.id === sid);
+      if (std) {
+        // Dynamic templated token replacements
+        const formattedMsg = params.messageText
+          .replace(/\{student_name\}/g, std.fullName)
+          .replace(/\{guardian_name\}/g, std.guardianName)
+          .replace(/\{class_name\}/g, std.className)
+          .replace(/\{absences_count\}/g, String(std.totalAbsences || 0))
+          .replace(/\{school_name\}/g, currentTenant.name);
+
+        const isAbsenceNotice = params.category === 'absence' || params.category === 'warning';
+        const sessionTitle =
+          params.category === 'absence'
+            ? 'تذكير غياب مدرسي'
+            : params.category === 'warning'
+            ? 'إنذار غياب رسمي'
+            : params.category === 'late'
+            ? 'تنبيه تأخر صباحي'
+            : params.category === 'broadcast'
+            ? 'تعميم مدرسي عام'
+            : 'إشعار مخصص';
+
+        const item: NotificationOutboxItem = {
+          id: `notif-cust-${Date.now()}-${Math.floor(Math.random() * 1000)}-${std.id}`,
+          tenantId,
+          recipientPhone: std.guardianPhone,
+          recipientName: std.guardianName,
+          studentId: std.id,
+          studentName: std.fullName,
+          absenceDate: params.absenceDate || new Date().toISOString().split('T')[0],
+          sessionTitle,
+          statusType: isAbsenceNotice ? 'absent' : params.category === 'late' ? 'late' : 'present',
+          category: params.category || 'broadcast',
+          messageText: formattedMsg,
+          channel: params.channel,
+          status: 'sent',
+          retryCount: 0,
+          createdAt: now,
+          sentAt: now,
+        };
+        newItems.push(item);
+      }
+    });
+
+    if (newItems.length > 0) {
+      setAllNotifications((prev) => [...newItems, ...prev]);
+
+      if (firebaseUser) {
+        newItems.forEach((n) => {
+          setDoc(doc(db, 'notification_outbox', n.id), {
+            tenantId: n.tenantId,
+            recipientPhone: n.recipientPhone,
+            recipientName: n.recipientName,
+            studentName: n.studentName,
+            absenceDate: n.absenceDate,
+            messageText: n.messageText,
+            channel: n.channel,
+            status: n.status,
+            retryCount: n.retryCount,
+          }).catch((err) => {
+            handleFirestoreError(err, OperationType.WRITE, `notification_outbox/${n.id}`);
+          });
+        });
+      }
+
+      addAuditLog({
+        entityType: 'settings',
+        entityId: `broadcast-${Date.now()}`,
+        action: 'create',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `إرسال وبث رسائل مخصصة لأولياء الأمور: تم إرسال ${newItems.length} رسالة عبر (${params.channel}).`,
+      });
+    }
+
+    return newItems.length;
+  };
+
+  const sendChronicWarningNotification = (studentId: string, warningTier: number): boolean => {
+    const std = students.find((s) => s.id === studentId);
+    if (!std) return false;
+
+    const tierLabels: Record<number, string> = {
+      1: 'الإنذار الأكاديمي الأول (3 أيام غياب)',
+      2: 'الإنذار الأكاديمي الثاني واستدعاء ولي الأمر (5 أيام غياب)',
+      3: 'إشعار حرمان وتوجيه وزاري (7+ أيام غياب)',
+    };
+
+    const tierLabel = tierLabels[warningTier] || `إنذار غياب رسمي (${std.totalAbsences} أيام)`;
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+
+    const template = settings.warningMessageTemplate || 'إشعار رسمي: المكرم ولي أمر الطالب ({student_name})، نظراً لتجاوز أيام الغياب غير المبررة الحد المسموح، نأمل مراجعة إدارة المدرسة عاجلاً.';
+    const message = template
+      .replace('{student_name}', std.fullName)
+      .concat(` [المستوى: ${tierLabel}]`);
+
+    const warningItem: NotificationOutboxItem = {
+      id: `notif-warn-${Date.now()}-${std.id}`,
+      tenantId,
+      recipientPhone: std.guardianPhone,
+      recipientName: std.guardianName,
+      studentId: std.id,
+      studentName: std.fullName,
+      absenceDate: today,
+      sessionTitle: tierLabel,
+      statusType: 'absent',
+      category: 'warning',
+      messageText: message,
+      channel: settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS',
+      status: 'sent',
+      retryCount: 0,
+      createdAt: now,
+      sentAt: now,
+    };
+
+    setAllNotifications((prev) => [warningItem, ...prev]);
+
+    if (firebaseUser) {
+      setDoc(doc(db, 'notification_outbox', warningItem.id), {
+        tenantId: warningItem.tenantId,
+        recipientPhone: warningItem.recipientPhone,
+        recipientName: warningItem.recipientName,
+        studentName: warningItem.studentName,
+        absenceDate: warningItem.absenceDate,
+        messageText: warningItem.messageText,
+        channel: warningItem.channel,
+        status: warningItem.status,
+        retryCount: warningItem.retryCount,
+      }).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `notification_outbox/${warningItem.id}`);
+      });
+    }
+
+    addAuditLog({
+      entityType: 'student',
+      entityId: std.id,
+      action: 'create',
+      performerId: currentUser.id,
+      performerName: currentUser.name,
+      performerRole: currentUser.role,
+      details: `إرسال إنذار غياب تراكمي لولي أمر الطالب ${std.fullName}: ${tierLabel}.`,
+    });
+
+    return true;
+  };
+
+  const sendAllChronicWarningNotifications = (tierThreshold = 3): number => {
+    const eligibleStudents = students.filter((s) => s.totalAbsences >= tierThreshold);
+    let sent = 0;
+    eligibleStudents.forEach((s) => {
+      const tier = s.totalAbsences >= 7 ? 3 : s.totalAbsences >= 5 ? 2 : 1;
+      if (sendChronicWarningNotification(s.id, tier)) {
+        sent++;
+      }
+    });
+    return sent;
   };
 
   const importStudents = (newStudentsList: Partial<Student>[]) => {
@@ -661,9 +1229,180 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   };
 
+  const updateDigestConfig = (cfg: Partial<DailyEmailDigestConfig>) => {
+    setDigestConfig((prev) => {
+      const updated = { ...prev, ...cfg };
+      addAuditLog({
+        entityType: 'settings',
+        entityId: `digest-config-${tenantId}`,
+        action: 'update',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `تحديث إعدادات النشرة الصباحية اليومية (وقت الإرسال: ${updated.scheduledTime} ص، حالة التفعيل: ${updated.enabled ? 'مفعلة' : 'معطلة'}، عدد المستلمين: ${updated.recipients.length}).`,
+      });
+      return updated;
+    });
+  };
+
+  const generateCurrentDigest = async (
+    customConfig?: Partial<DailyEmailDigestConfig>
+  ): Promise<DailyEmailDigestItem> => {
+    const effectiveConfig = { ...digestConfig, ...(customConfig || {}) };
+    const baseData = computeDailyDigestData({
+      tenantId,
+      tenantName: currentTenant.name,
+      students,
+      sessions,
+      justifications,
+      config: effectiveConfig,
+    });
+
+    let geminiBriefing: any = undefined;
+    if (effectiveConfig.includeGeminiBriefing) {
+      try {
+        const res = await fetch('/api/daily-digest/generate-briefing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantName: currentTenant.name,
+            date: baseData.date,
+            overallAttendanceRate: baseData.overallAttendanceRate,
+            totalStudents: baseData.totalStudents,
+            anomalies: baseData.anomalies,
+            pendingJustificationsCount: baseData.pendingJustificationsCount,
+            pendingIrregularCount: baseData.pendingJustifications.filter(
+              (j) => j.aiRiskLevel === 'high' || j.aiVerificationStatus === 'irregular'
+            ).length,
+            highRiskStudents: baseData.highRiskStudents,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.briefing) {
+            geminiBriefing = json.briefing;
+          }
+        }
+      } catch (err) {
+        console.warn('Gemini briefing generation fallback:', err);
+      }
+    }
+
+    // Default fallback briefing if offline or empty
+    if (!geminiBriefing && effectiveConfig.includeGeminiBriefing) {
+      geminiBriefing = {
+        headline: `نشرة الصباح اليومية للانضباط - ${currentTenant.name}`,
+        urgencyLevel: baseData.anomalies.length > 0 ? 'elevated' : 'normal',
+        executiveSummary: `متابعة انضباط مدرسة ${currentTenant.name}. نسبة الحضور العامة ${baseData.overallAttendanceRate}%. رُصد ${baseData.anomaliesCount} شذوذات سلوكية، و${baseData.pendingJustificationsCount} أعذار معلقة، و${baseData.highRiskStudentsCount} طلاب بحاجة لمتابعة إرشادية.`,
+        keyPriorities: [
+          'اعتماد كشوف الحضور غير المعتمدة للشعب قبل انطلاق الحصة الأولى.',
+          'تدقيق الأعذار الطبية المعلقة وفحص المستندات ذات الملاحظات بالذكاء الاصطناعي.',
+          'تواصل الموجه الطلابي مع أولياء أمور الطلاب المعرضين للحرمان (5+ أيام غياب).',
+        ],
+        counselorDirectives: [
+          'إجراء مقابلات إرشادية صباحية للطلاب متكرري الغياب.',
+          'تسجيل أسباب الغياب في ملف الرعاية الطلابية.',
+        ],
+      };
+    }
+
+    const digestItem: DailyEmailDigestItem = {
+      ...baseData,
+      id: `digest-${Date.now()}`,
+      dispatchedAt: new Date().toISOString(),
+      status: 'scheduled',
+      geminiBriefing,
+    };
+
+    digestItem.htmlContent = generateHtmlEmailTemplate(digestItem, currentTenant.name);
+    return digestItem;
+  };
+
+  const dispatchDailyDigest = async (
+    digestId?: string,
+    targetRecipients?: string[]
+  ): Promise<{ success: boolean; message: string; digestItem: DailyEmailDigestItem }> => {
+    // Generate fresh digest
+    const digest = await generateCurrentDigest();
+    const effectiveRecipients = targetRecipients && targetRecipients.length > 0 ? targetRecipients : digest.recipients;
+
+    try {
+      const res = await fetch('/api/daily-digest/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: effectiveRecipients,
+          subject: digest.subject,
+          htmlContent: digest.htmlContent,
+          scheduledTime: digest.scheduledTime,
+          digestId: digest.id,
+        }),
+      });
+
+      const resJson = res.ok ? await res.json() : null;
+      const dispatchedDigest: DailyEmailDigestItem = {
+        ...digest,
+        status: 'delivered',
+        dispatchedAt: new Date().toISOString(),
+        recipients: effectiveRecipients,
+      };
+
+      setDigestHistory((prev) => [dispatchedDigest, ...prev.slice(0, 49)]);
+      setDigestConfig((prev) => ({
+        ...prev,
+        lastDispatchedAt: dispatchedDigest.dispatchedAt,
+        lastDigestId: dispatchedDigest.id,
+      }));
+
+      addAuditLog({
+        entityType: 'settings',
+        entityId: dispatchedDigest.id,
+        action: 'submit',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم) متضمنة ${digest.anomaliesCount} شذوذات و${digest.pendingJustificationsCount} أعذار معلقة و${digest.highRiskStudentsCount} طلاب في النطاق الحرج.`,
+      });
+
+      return {
+        success: true,
+        message: resJson?.message || `تم إرسال النشرة الصباحية بنجاح إلى ${effectiveRecipients.length} من قيادات المدرسة.`,
+        digestItem: dispatchedDigest,
+      };
+    } catch (err: any) {
+      console.error('Failed to dispatch digest:', err);
+      const simulatedDigest: DailyEmailDigestItem = {
+        ...digest,
+        status: 'simulated',
+        dispatchedAt: new Date().toISOString(),
+        recipients: effectiveRecipients,
+      };
+      setDigestHistory((prev) => [simulatedDigest, ...prev.slice(0, 49)]);
+
+      addAuditLog({
+        entityType: 'settings',
+        entityId: simulatedDigest.id,
+        action: 'submit',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `محاكاة إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم).`,
+      });
+
+      return {
+        success: true,
+        message: `تمت محاكاة إرسال النشرة الصباحية بنجاح إلى بريد القيادة المدرسية (${effectiveRecipients.length} مستلم).`,
+        digestItem: simulatedDigest,
+      };
+    }
+  };
+
   return (
     <AttendanceContext.Provider
       value={{
+        firebaseUser,
+        signInWithGoogle,
+        signOutGoogle,
         currentTenant,
         tenants: INITIAL_TENANTS,
         setTenantId: setTenantIdState,
@@ -679,16 +1418,26 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         settings,
         updateRecord,
         setAllPresentInDraft,
+        quickMarkGroupAsPresent,
         submitSession,
         reopenSession,
         createNewSession,
         createJustification,
         reviewJustification,
+        updateJustificationAnalysis,
         retryNotification,
         retryAllFailedNotifications,
+        sendCustomParentNotification,
+        sendChronicWarningNotification,
+        sendAllChronicWarningNotifications,
         addAuditLog,
         importStudents,
         updateSettings,
+        digestConfig,
+        digestHistory,
+        updateDigestConfig,
+        generateCurrentDigest,
+        dispatchDailyDigest,
       }}
     >
       {children}

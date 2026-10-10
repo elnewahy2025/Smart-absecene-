@@ -122,3 +122,134 @@ export function generateSampleMedicalNoteBase64(studentName = 'يوسف خالد
 
   return canvas.toDataURL('image/jpeg', 0.9);
 }
+
+// Helper to create a base64 image of an irregular medical report with intentional inconsistencies
+// (e.g. Mismatched student name, old/unmatched dates, missing or unverified stamp)
+export function generateSampleIrregularMedicalNoteBase64(
+  mismatchedName = 'عبدالله بن فهد الدوسري',
+  oldDate = '2024-03-12'
+): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 800;
+  canvas.height = 1050;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  // Background - slightly degraded/yellowed paper
+  ctx.fillStyle = '#faf8f2';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Faint draft watermark across background
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(-Math.PI / 5);
+  ctx.font = 'bold 50px Cairo, sans-serif';
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+  ctx.textAlign = 'center';
+  ctx.fillText('نسخة غير مصادقة - مسودة', 0, 0);
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
+
+  // Header
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 22px Cairo, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('مستوصف السلام الأهلي - تقرير استشارة طبية أولية', canvas.width / 2, 85);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '15px Cairo, sans-serif';
+  ctx.fillText('(نموذج غير رسمي للمراجعة الداخلية فقط)', canvas.width / 2, 120);
+
+  // Divider line
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(60, 150);
+  ctx.lineTo(canvas.width - 60, 150);
+  ctx.stroke();
+
+  // Document details with obvious inconsistencies
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 17px Cairo, sans-serif';
+
+  const rightX = canvas.width - 80;
+  let y = 195;
+
+  ctx.fillText('رقم الكشف: 00482-DRAFT', rightX, y);
+  // Date inconsistency: old date from 2024 instead of current absence date
+  ctx.fillStyle = '#b91c1c';
+  ctx.fillText(`تاريخ الزيارة: ${oldDate} م (تاريخ قديم غير مطابق)`, rightX - 320, y);
+  y += 45;
+
+  // Name inconsistency: mismatched name
+  ctx.font = 'bold 18px Cairo, sans-serif';
+  ctx.fillStyle = '#b91c1c';
+  ctx.fillText(`اسم المريض: ${mismatchedName} (اسم غير مطابق لسجل الطالب)`, rightX, y);
+  y += 40;
+
+  ctx.font = '16px Cairo, sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('السجل المدني: 1045981240', rightX, y);
+  y += 35;
+  ctx.fillText('المرحلة: الصف التاسع (المتوسط الثالث)', rightX, y);
+  y += 45;
+
+  // Diagnosis box with generic unverified text
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(60, y, canvas.width - 120, 150);
+  ctx.strokeStyle = '#fca5a5';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(60, y, canvas.width - 120, 150);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 17px Cairo, sans-serif';
+  ctx.fillText('التشخيص والملاحظات:', rightX - 20, y + 35);
+
+  ctx.font = '15px Cairo, sans-serif';
+  ctx.fillStyle = '#475569';
+  ctx.fillText('حضر المريض يشكو من إرهاق عام وصداع.', rightX - 20, y + 70);
+  ctx.fillText('التقرير لا يتضمن مدة إجازة صريحة أو توصية غياب رسمية معتمدة.', rightX - 20, y + 100);
+  ctx.fillText('المستند ينقصه اعتماد منصة صحتي وتوقيع الاستشاري المسجل.', rightX - 20, y + 130);
+
+  y += 190;
+
+  ctx.fillStyle = '#334155';
+  ctx.fillText('طبيب عام مناوب: د. طارق (طبيب متدرب)', rightX, y);
+  y += 35;
+  ctx.fillText('رقم الترخيص: قيد التجديد', rightX, y);
+  y += 60;
+
+  // Missing Stamp box with red warning
+  ctx.save();
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(120, y, 220, 100);
+  ctx.fillStyle = '#b91c1c';
+  ctx.font = 'bold 14px Cairo, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('تنبيه: لا يوجد ختم رسمي معتمد', 230, y + 45);
+  ctx.font = '12px Cairo, sans-serif';
+  ctx.fillText('مستند غير مكتمل الأختام النظامية', 230, y + 70);
+  ctx.restore();
+
+  // Signature line blank
+  ctx.fillStyle = '#64748b';
+  ctx.font = '15px Cairo, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('توقيع الطبيب المعتمد: [فارغ وغير موقع]', rightX, y + 45);
+
+  // Footer note warning
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#b91c1c';
+  ctx.font = 'bold 13px Cairo, sans-serif';
+  ctx.fillText('تنبيه أمني: هذا التقرير غير معتمد من وزارة الصحة ولا يخول الطالب الحصول على إجازة رسمية.', canvas.width / 2, canvas.height - 45);
+
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+

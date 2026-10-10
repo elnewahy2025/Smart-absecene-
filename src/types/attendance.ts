@@ -42,6 +42,7 @@ export interface Student {
   guardianName: string;
   guardianPhone: string;
   guardianRelationship: string;
+  guardianEmail?: string;
   birthDate?: string;
   bloodType?: string;
   medicalConditions?: string;
@@ -108,14 +109,34 @@ export interface Justification {
     documentType?: string;
     studentName?: string;
     issuerName?: string;
+    physicianName?: string;
+    reportDate?: string;
     datesCovered?: string;
     durationDays?: string | number;
     reasonOrDiagnosis?: string;
     hasOfficialStampOrSignature?: boolean;
     confidenceScore?: string;
+    verificationStatus?: 'verified' | 'warning' | 'irregular';
+    overallRiskLevel?: 'low' | 'medium' | 'high';
+    integrityScore?: number;
     recommendedDecision?: string;
+    decisionRationale?: string;
     notesAndRecommendations?: string;
     extractedSummary?: string;
+    checklist?: {
+      [key: string]: {
+        passed: boolean;
+        details: string;
+      };
+    };
+    irregularities?: Array<{
+      type: string;
+      severity: 'high' | 'medium' | 'low';
+      titleAr: string;
+      titleEn?: string;
+      descriptionAr: string;
+      suggestedAction?: string;
+    }>;
   };
   submittedAt: string;
   reviewedBy?: string;
@@ -133,6 +154,7 @@ export interface NotificationOutboxItem {
   absenceDate: string;
   sessionTitle: string;
   statusType: AttendanceStatus;
+  category?: 'absence' | 'late' | 'warning' | 'broadcast' | 'excuse_approved';
   messageText: string;
   channel: 'SMS' | 'WhatsApp';
   status: 'pending' | 'sent' | 'failed';
@@ -167,4 +189,95 @@ export interface SchoolSettings {
   requireExcuseAttachment: boolean;
   allowParentSubmissions: boolean;
   emergencyAssemblyPoints: string[];
+  preferredChannel?: 'SMS' | 'WhatsApp' | 'both';
+  absenceMessageTemplate?: string;
+  lateMessageTemplate?: string;
+  warningMessageTemplate?: string;
+  notifyOnExcuseApproved?: boolean;
 }
+
+export interface DailyDigestAnomaly {
+  id: string;
+  type: 'class_spike' | 'consecutive_absence' | 'unsubmitted_session' | 'pattern_discrepancy' | 'dow_anomaly';
+  severity: 'critical' | 'warning' | 'info';
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  metric: string;
+  targetName: string;
+  suggestedActionAr: string;
+}
+
+export interface DailyDigestHighRiskStudent {
+  id: string;
+  name: string;
+  grade: string;
+  className: string;
+  totalAbsences: number;
+  totalLates: number;
+  attendanceRate: number;
+  riskTier: 'tier_8_plus' | 'tier_5_plus' | 'tier_3_plus';
+  guardianName: string;
+  guardianPhone: string;
+  primaryConcernAr: string;
+  actionRequiredAr: string;
+}
+
+export interface DailyDigestPendingExcuse {
+  id: string;
+  studentName: string;
+  className: string;
+  absenceDate: string;
+  reasonType: string;
+  aiVerificationStatus?: 'verified' | 'warning' | 'irregular';
+  aiRiskLevel?: 'low' | 'medium' | 'high';
+  integrityScore?: number;
+  flagsAr: string[];
+  actionRequiredAr: string;
+}
+
+export interface DailyEmailDigestItem {
+  id: string;
+  tenantId: string;
+  date: string;
+  dispatchedAt: string;
+  scheduledTime: string;
+  recipients: string[];
+  subject: string;
+  status: 'delivered' | 'simulated' | 'scheduled';
+  overallAttendanceRate: number;
+  totalStudents: number;
+  anomaliesCount: number;
+  pendingJustificationsCount: number;
+  highRiskStudentsCount: number;
+  anomalies: DailyDigestAnomaly[];
+  highRiskStudents: DailyDigestHighRiskStudent[];
+  pendingJustifications: DailyDigestPendingExcuse[];
+  geminiBriefing?: {
+    headline?: string;
+    executiveSummary: string;
+    urgencyLevel: 'normal' | 'elevated' | 'critical';
+    keyPriorities: string[];
+    counselorDirectives: string[];
+  };
+  htmlContent?: string;
+}
+
+export interface DailyEmailDigestConfig {
+  enabled: boolean;
+  scheduledTime: string; // e.g. "06:45"
+  daysOfWeek: number[]; // [0, 1, 2, 3, 4] for Sunday to Thursday
+  recipients: string[];
+  includeAnomalies: boolean;
+  includePendingJustifications: boolean;
+  includeHighRiskStudents: boolean;
+  includeGeminiBriefing: boolean;
+  chronicAbsenceThreshold: number;
+  consecutiveAbsenceDaysThreshold: number;
+  anomalySpikePercentage: number;
+  notifyViaWhatsAppToo: boolean;
+  principalPhone?: string;
+  lastDispatchedAt?: string;
+  lastDigestId?: string;
+}
+

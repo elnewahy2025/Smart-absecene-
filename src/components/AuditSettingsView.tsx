@@ -257,6 +257,91 @@ export const AuditSettingsView: React.FC = () => {
               />
             </div>
 
+            {/* Preferred Notification Channel */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-800 block">
+                {lang === 'ar' ? 'قناة إرسال إشعارات أولياء الأمور الافتراضية:' : 'Default Notification Channel:'}
+              </label>
+              <select
+                value={formSettings.preferredChannel || 'both'}
+                onChange={(e: any) =>
+                  setFormSettings({ ...formSettings, preferredChannel: e.target.value })
+                }
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 font-medium"
+              >
+                <option value="both">كلاهما (SMS و WhatsApp معاً)</option>
+                <option value="SMS">رسائل نصية قصيرة (SMS) فقط</option>
+                <option value="WhatsApp">تطبيق WhatsApp فقط</option>
+              </select>
+            </div>
+
+            {/* Notification Templates Section */}
+            <div className="pt-2 border-t border-slate-200 space-y-3">
+              <h4 className="font-bold text-slate-900 text-xs text-emerald-800">
+                {lang === 'ar' ? 'قوالب وصيغ رسائل أولياء الأمور التلقائية:' : 'Notification Message Templates:'}
+              </h4>
+
+              {/* Absence Template */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  {lang === 'ar' ? 'صيغة رسالة تسجيل الغياب:' : 'Absence Message Template:'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={
+                    formSettings.absenceMessageTemplate ||
+                    'المكرم ولي أمر الطالب ({student_name}): نفيدكم بتسجيل غياب نجلكم عن ({subject}) بتاريخ {date}. يرجى تقديم العذر عبر الرابط المدرسي.'
+                  }
+                  onChange={(e) =>
+                    setFormSettings({ ...formSettings, absenceMessageTemplate: e.target.value })
+                  }
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-sans"
+                />
+                <span className="text-[10px] text-slate-400 block">
+                  المتغيرات المتاحة: {`{student_name}`} ، {`{subject}`} ، {`{date}`}
+                </span>
+              </div>
+
+              {/* Late Template */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  {lang === 'ar' ? 'صيغة رسالة التأخر الصباحي:' : 'Tardiness Message Template:'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={
+                    formSettings.lateMessageTemplate ||
+                    'المكرم ولي أمر الطالب ({student_name}): تم تسجيل تأخر نجلكم ({minutes} دقيقة) عن دوام اليوم بتاريخ {date}.'
+                  }
+                  onChange={(e) =>
+                    setFormSettings({ ...formSettings, lateMessageTemplate: e.target.value })
+                  }
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-sans"
+                />
+                <span className="text-[10px] text-slate-400 block">
+                  المتغيرات المتاحة: {`{student_name}`} ، {`{minutes}`} ، {`{date}`}
+                </span>
+              </div>
+
+              {/* Warning Template */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  {lang === 'ar' ? 'صيغة إنذار الغياب المتكرر:' : 'Chronic Absence Warning Template:'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={
+                    formSettings.warningMessageTemplate ||
+                    'إشعار رسمي: المكرم ولي أمر الطالب ({student_name})، نظراً لتجاوز أيام الغياب غير المبررة الحد المسموح، نأمل مراجعة إدارة المدرسة عاجلاً.'
+                  }
+                  onChange={(e) =>
+                    setFormSettings({ ...formSettings, warningMessageTemplate: e.target.value })
+                  }
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-sans"
+                />
+              </div>
+            </div>
+
             {/* Checkboxes */}
             <div className="space-y-3 pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -269,7 +354,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إرسال رسالة SMS تلقائية لولي الأمر فور اعتماد غياب الطالب
+                  إرسال رسالة تلقائية لولي الأمر فور اعتماد غياب الطالب
                 </span>
               </label>
 
@@ -283,7 +368,21 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إرسال إشعار SMS لولي الأمر عند تسجيل التأخر الصباحي
+                  إرسال إشعار لولي الأمر عند تسجيل التأخر الصباحي
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formSettings.notifyOnExcuseApproved ?? true}
+                  onChange={(e) =>
+                    setFormSettings({ ...formSettings, notifyOnExcuseApproved: e.target.checked })
+                  }
+                  className="rounded text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-slate-800 font-medium">
+                  إرسال رسالة تأكيد لولي الأمر عند قبول واعتماد العذر الطبي
                 </span>
               </label>
 

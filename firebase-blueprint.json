@@ -1,0 +1,325 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "System or school administrator record for RBAC",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Administrator email address"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "super_admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile in the school system",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "tenantId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "registrar", "teacher", "parent"]
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "tenantId", "name", "email", "role"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "School student enrollment record",
+      "type": "object",
+      "properties": {
+        "studentNumber": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "nationalId": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "grade": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "guardianName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "guardianPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "totalAbsences": {
+          "type": "number"
+        },
+        "totalLates": {
+          "type": "number"
+        },
+        "attendanceRate": {
+          "type": "number"
+        },
+        "tenantId": {
+          "type": "string"
+        }
+      },
+      "required": ["studentNumber", "fullName", "className", "tenantId"]
+    },
+    "AttendanceSession": {
+      "title": "AttendanceSession",
+      "description": "Classroom or daily roll-call attendance session",
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "sessionType": {
+          "type": "string",
+          "enum": ["daily", "period"]
+        },
+        "periodNumber": {
+          "type": "number"
+        },
+        "subject": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "teacherId": {
+          "type": "string"
+        },
+        "teacherName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "submitted", "reopened"]
+        },
+        "totalStudents": {
+          "type": "number"
+        },
+        "presentCount": {
+          "type": "number"
+        },
+        "absentCount": {
+          "type": "number"
+        },
+        "lateCount": {
+          "type": "number"
+        },
+        "excusedCount": {
+          "type": "number"
+        },
+        "reopenedReason": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": ["tenantId", "date", "sessionType", "className", "status"]
+    },
+    "Justification": {
+      "title": "Justification",
+      "description": "Absence medical excuse or parent justification note",
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "studentId": {
+          "type": "string"
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "absenceDate": {
+          "type": "string"
+        },
+        "reasonType": {
+          "type": "string",
+          "enum": ["medical", "family", "travel", "other"]
+        },
+        "guardianExplanation": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "reviewerNotes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["tenantId", "studentId", "absenceDate", "reasonType", "guardianExplanation", "status"]
+    },
+    "NotificationOutboxItem": {
+      "title": "NotificationOutboxItem",
+      "description": "Outbox item for automated SMS or WhatsApp notifications",
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "recipientPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "recipientName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "absenceDate": {
+          "type": "string"
+        },
+        "messageText": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["SMS", "WhatsApp"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "sent", "failed"]
+        },
+        "retryCount": {
+          "type": "number"
+        }
+      },
+      "required": ["tenantId", "recipientPhone", "messageText", "channel", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and governance event log",
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "entityType": {
+          "type": "string"
+        },
+        "entityId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "performerName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "performerRole": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": ["tenantId", "entityType", "action", "performerName", "details", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Authorized administrators collection for RBAC"
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "User profiles in the school attendance system"
+    },
+    "/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/Student"
+      },
+      "description": "School students directory and attendance stats"
+    },
+    "/attendance_sessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/AttendanceSession"
+      },
+      "description": "Classroom and daily attendance sessions and roll-calls"
+    },
+    "/justifications/{justificationId}": {
+      "schema": {
+        "$ref": "#/entities/Justification"
+      },
+      "description": "Medical and parent absence excuse requests"
+    },
+    "/notification_outbox/{notificationId}": {
+      "schema": {
+        "$ref": "#/entities/NotificationOutboxItem"
+      },
+      "description": "Transactional outbox for SMS and WhatsApp notifications"
+    },
+    "/audit_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/AuditLog"
+      },
+      "description": "Immutable audit trail of sensitive attendance operations"
+    }
+  }
+}

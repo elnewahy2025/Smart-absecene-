@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE SECURITY PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Bootstrapped Admin verification using trusted email & admin doc
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'ah1000.kh1000@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.email is string && data.email.size() <= 120 &&
+             data.role in ['admin', 'super_admin'];
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['userId', 'tenantId', 'name', 'email', 'role']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.role in ['admin', 'registrar', 'teacher', 'parent'];
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['studentNumber', 'fullName', 'className', 'tenantId']) &&
+             data.studentNumber is string && data.studentNumber.size() <= 30 &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 120 &&
+             data.className is string && data.className.size() <= 30 &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             (!('nationalId' in data) || (data.nationalId is string && data.nationalId.size() <= 30)) &&
+             (!('totalAbsences' in data) || data.totalAbsences is number) &&
+             (!('attendanceRate' in data) || data.attendanceRate is number);
+    }
+
+    function isValidAttendanceSession(data) {
+      return data.keys().hasAll(['tenantId', 'date', 'sessionType', 'className', 'status']) &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             data.date is string && data.date.size() <= 30 &&
+             data.sessionType in ['daily', 'period'] &&
+             data.className is string && data.className.size() <= 30 &&
+             data.status in ['draft', 'submitted', 'reopened'] &&
+             (!('totalStudents' in data) || data.totalStudents is number) &&
+             (!('presentCount' in data) || data.presentCount is number);
+    }
+
+    function isValidJustification(data) {
+      return data.keys().hasAll(['tenantId', 'studentId', 'absenceDate', 'reasonType', 'guardianExplanation', 'status']) &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.absenceDate is string && data.absenceDate.size() <= 30 &&
+             data.reasonType in ['medical', 'family', 'travel', 'other'] &&
+             data.guardianExplanation is string && data.guardianExplanation.size() <= 1000 &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['tenantId', 'recipientPhone', 'messageText', 'channel', 'status']) &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             data.recipientPhone is string && data.recipientPhone.size() <= 30 &&
+             data.messageText is string && data.messageText.size() <= 500 &&
+             data.channel in ['SMS', 'WhatsApp'] &&
+             data.status in ['pending', 'sent', 'failed'];
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['tenantId', 'entityType', 'action', 'performerName', 'details', 'timestamp']) &&
+             data.tenantId is string && data.tenantId.size() <= 50 &&
+             data.entityType is string && data.entityType.size() <= 50 &&
+             data.action is string && data.action.size() <= 50 &&
+             data.performerName is string && data.performerName.size() <= 120 &&
+             data.details is string && data.details.size() <= 1000 &&
+             data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Admins Collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
+    }
+
+    // 2. Users Collection (Profile & Roles)
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
+        request.auth.uid == userId || isAdmin()
+      );
+      allow update: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
+        request.auth.uid == userId || isAdmin()
+      );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // 3. Students Collection
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
+      allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
+      allow delete: if isAdmin() && isValidId(studentId);
+    }
+
+    // 4. Attendance Sessions Collection
+    match /attendance_sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming());
+      allow update: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming());
+      allow delete: if isAdmin() && isValidId(sessionId);
+    }
+
+    // 5. Justifications & Medical Excuses Collection
+    match /justifications/{justificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming());
+      allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming());
+      allow delete: if isAdmin() && isValidId(justificationId);
+    }
+
+    // 6. Notification Outbox Collection
+    match /notification_outbox/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow delete: if isAdmin() && isValidId(notificationId);
+    }
+
+    // 7. Audit Logs Collection (Append-Only)
+    match /audit_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming());
+      // Updates and deletions are strictly forbidden for audit integrity
+      allow update, delete: if false;
+    }
+  }
+}
