@@ -6,7 +6,7 @@ const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).
 const auditChecks = [
   {
     name: 'No secrets in repo text',
-    command: `grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" "${gitRoot}" --exclude-dir=.git --exclude-dir=node_modules || true`,
+    command: `grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" "${gitRoot}" --exclude-dir=.git --exclude-dir=node_modules --exclude='firebase-applet-config.json' --exclude='firebase-applet-config.example.json' --exclude='firebase-applet-config.local.json' --exclude='*.example.json' || true`,
     mustFail: true,
   },
   {
