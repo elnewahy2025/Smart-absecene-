@@ -24,12 +24,9 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Bootstrapped Admin verification using trusted email & admin doc
+    /// Bootstrapped Admin verification using trusted admin doc ONLY
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email == 'ah1000.kh1000@gmail.com') ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     // --- ENTITY VALIDATION BLUEPRINTS ---
