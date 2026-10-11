@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import {
-  BotMessageSquare,
+  MessageSquare,
   Send,
   Sparkles,
   Zap,
@@ -191,7 +191,7 @@ export const GeminiChatbotView: React.FC = () => {
       <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-            <BotMessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-5 h-5" />
           </div>
           <div>
             <h3 className="font-bold text-slate-900 text-sm">
@@ -245,7 +245,7 @@ export const GeminiChatbotView: React.FC = () => {
           <button
             key={i}
             onClick={() => handleSendMessage(prompt)}
-            className="bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+            className="bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer shrink-0 text-[10px]"
           >
             {prompt}
           </button>
@@ -362,7 +362,7 @@ export const GeminiChatbotView: React.FC = () => {
                 ? `اسأل ${currentRoleCfg.titleAr}... (مثال: صغ رسالة اعتذار، خطوات إنذار الغياب)`
                 : `Ask ${currentRoleCfg.titleEn}...`
             }
-            className="flex-1 bg-slate-50 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-hidden"
+            className="flex-1 bg-slate-50 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-hidden disabled:opacity-50"
           />
 
           <button
