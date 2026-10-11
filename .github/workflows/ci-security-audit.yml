@@ -1,0 +1,48 @@
+name: CI Security Audit
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check
+        run: npm run lint
+
+      - name: Secret scan
+        run: |
+          grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" . --exclude-dir=.git --exclude-dir=node_modules || true
+          if grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" . --exclude-dir=.git --exclude-dir=node_modules >/tmp/secret-scan.txt; then
+            echo "Secrets detected in repository text. Fix before merge."
+            cat /tmp/secret-scan.txt
+            exit 1
+          fi
+
+      - name: Env file protection check
+        run: |
+          if [ -f .env ]; then
+            echo ".env file is present. Remove it from source control."
+            exit 1
+          fi
+
+      - name: Example env check
+        run: |
+          test -f .env.example
+
+      - name: Security audit script
+        run: node scripts/ci-security-audit.mjs
