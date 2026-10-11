@@ -4,7 +4,7 @@ import { UserRole } from '../types/attendance';
 import {
   CalendarDays,
   FileCheck2,
-  BotMessageSquare,
+  MessageSquare,
   ShieldAlert,
   Send,
   BarChart3,
@@ -92,7 +92,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
       id: 'chatbot',
       labelAr: 'المساعد المدرسي الذكي',
       labelEn: 'Gemini Assistant',
-      icon: <BotMessageSquare className="w-4 h-4" />,
+      icon: <MessageSquare className="w-4 h-4" />,
     },
     {
       id: 'emergency',
