@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
@@ -11,8 +12,58 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const APP_AUTH_TOKEN = process.env.APP_AUTH_TOKEN || (process.env.NODE_ENV === 'production' ? '' : 'dev-token-change-me');
 
 app.use(express.json({ limit: '25mb' }));
+
+const isPublicRoute = (route: string) => {
+  return route === '/api/health' || route === '/api/readyz';
+};
+
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const route = req.path || '';
+
+  if (isPublicRoute(route)) {
+    return next();
+  }
+
+  if (!APP_AUTH_TOKEN) {
+    return res.status(503).json({
+      error: 'Authentication is not configured for this server instance.',
+    });
+  }
+
+  const authHeader = req.get('authorization') || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+
+  if (!token || token !== APP_AUTH_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized: valid bearer token required.' });
+  }
+
+  next();
+};
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 180,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please retry later.' },
+});
+
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'AI rate limit exceeded. Please slow down.' },
+});
+
+app.use('/api', apiRateLimiter);
+app.use('/api/chat', aiRateLimiter);
+app.use('/api/analyze-image', aiRateLimiter);
+app.use('/api/daily-digest', aiRateLimiter);
+app.use(authMiddleware);
 
 // Initialize GoogleGenAI SDK with required telemetry header
 const apiKey = process.env.GEMINI_API_KEY || '';
@@ -24,6 +75,18 @@ const ai = new GoogleGenAI({
     },
   },
 });
+
+const sanitizeText = (value: unknown, fallback = ''): string => {
+  if (typeof value !== 'string') return fallback;
+  return value.trim().slice(0, 4000);
+};
+
+const ensureJsonObject = (value: any, fallback: Record<string, any> = {}) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+  return fallback;
+};
 
 // Helper for model calling with graceful fallback
 async function callGeminiWithFallback(modelCandidates: string[], promptPayload: any) {
@@ -48,11 +111,24 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { messages, role = 'counselor', modelPreference = 'gemini-3.5-flash' } = req.body;
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
-    let systemInstruction = `أنت المساعد الذكي المعتمد لنظام الحضور والغياب المدرسي "مدرستي حضور". تجيب باللغة العربية بأسلوب تربوي محترف ودقيق، وتساعد المعلمين والإداريين وأولياء الأمور في فهم لوائح الغياب، والتعامل مع حالات الغياب المتكرر، وحلول تحسين الانضباط المدرسي.`;
+    const cleanedMessages = messages
+      .filter((m: any) => m && typeof m === 'object')
+      .map((m: any) => ({
+        role: sanitizeText(m.role, 'user'),
+        content: sanitizeText(m.content, ''),
+      }))
+      .filter((m) => m.content.length > 0)
+      .slice(0, 20);
+
+    if (cleanedMessages.length === 0) {
+      return res.status(400).json({ error: 'At least one valid message is required.' });
+    }
+
+    let systemInstruction = `أنت المساعد الذكي المعتمد لنظام الحضور والغياب المدرسي "مدرستي حضور". تجيب باللغة العربية بوضوح واحترافية.`;
 
     if (role === 'counselor') {
       systemInstruction = `أنت "الأخصائي الاجتماعي والمستشار المدرسي" لنظام الحضور المدرسي. 
@@ -77,22 +153,20 @@ app.post('/api/chat', async (req, res) => {
 قدم تقارير تحليلية مبنية على البيانات والتفكير المنطقي المتعمق.`;
     }
 
-    // Determine model cascade based on user preference
-    const primaryModel = modelPreference === 'gemini-3.1-pro-preview' 
-      ? 'gemini-3.1-pro-preview' 
+    const primaryModel = modelPreference === 'gemini-3.1-pro-preview'
+      ? 'gemini-3.1-pro-preview'
       : modelPreference === 'gemini-3.1-flash-lite'
-      ? 'gemini-3.1-flash-lite'
-      : 'gemini-3.5-flash';
+        ? 'gemini-3.1-flash-lite'
+        : 'gemini-3.5-flash';
 
     const modelCandidates = [
       primaryModel,
       'gemini-3.5-flash',
       'gemini-3.8-flash',
-      'gemini-3.1-flash-lite'
+      'gemini-3.1-flash-lite',
     ].filter((v, i, a) => a.indexOf(v) === i);
 
-    // Format chat history for generateContent
-    const formattedContents = messages.map((m: { role: string; content: string }) => ({
+    const formattedContents = cleanedMessages.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
@@ -130,81 +204,28 @@ app.post('/api/analyze-image', async (req, res) => {
       promptCustom,
     } = req.body;
 
-    if (!imageBase64) {
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return res.status(400).json({ error: 'imageBase64 is required' });
     }
 
-    // Clean base64 data prefix if present
-    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-
-    const defaultPrompt = `أنت خبير التدقيق الجنائي المكتبي والتحقق من الوثائق والتقارير الطبية المدرسية بنظام "مدرستي حضور".
-مهمتك فحص وتحليل صورة المستند المرفق بدقة متناهية، والتحقق من أصالته، ومطابقته لبيانات الطالب المقيد وتاريخ الغياب، ورصد وتنبيه لجنة التدقيق بأي تناقضات (Irregularities / Inconsistencies) أو شبهات تلاعب أو نقص في البيانات المعتمدة.
-
-البيانات المرجعية للطالب وسجل الغياب بالمدرسة:
-- اسم الطالب المقيد رسميًا: "${expectedStudentName || 'غير محدد'}"
-- تاريخ الغياب المسجل بالمدرسة المطلوب تبريره: "${expectedAbsenceDate || 'غير محدد'}"
-- المرحلة والصف الدراسي: "${studentGrade || 'غير محدد'}"
-
-يرجى فحص التقرير بالكامل واستخراج البيانات بدقة، ثم مقارنتها بالبيانات المرجعية لرصد التناقضات، وإرجاع تقرير التدقيق بصيغة JSON حصراً بهذا المخطط الدقيق دون أي نصوص إضافية خارجه:
-{
-  "documentType": "تقرير طبي رسمي / إجازة مرضية / خطاب خطي من ولي الأمر / كشف حضور / غير معروف",
-  "studentName": "اسم المريض أو الطالب المكتوب في التقرير أو غير محدد",
-  "issuerName": "اسم المستشفى، المركز الصحي، أو العيادة المصدرة",
-  "physicianName": "اسم الطبيب المعالج ورقم الترخيص إن وجد",
-  "reportDate": "تاريخ الكشف أو إصدار التقرير",
-  "datesCovered": "فترة الإجازة أو الراحة الموصى بها (من تاريخ ... إلى ...)",
-  "durationDays": "عدد أيام الراحة الموصى بها كرقم أو نص",
-  "reasonOrDiagnosis": "التشخيص الطبي أو سبب التقرير باختصار",
-  "hasOfficialStampOrSignature": true,
-  "verificationStatus": "verified" | "warning" | "irregular",
-  "overallRiskLevel": "low" | "medium" | "high",
-  "integrityScore": 95,
-  "recommendedDecision": "قبول العذر" | "رفض العذر" | "طلب مراجعة ولي الأمر وإحضار الأصل",
-  "decisionRationale": "السبب المباشر والمفصل للتوصية باللغة العربية",
-  "checklist": {
-    "nameMatch": {
-      "passed": true,
-      "details": "هل يطابق اسم الطالب المكتوب في التقرير اسم الطالب المقيد (${expectedStudentName || ''})؟"
-    },
-    "dateMatch": {
-      "passed": true,
-      "details": "هل يغطي تاريخ التقرير الطبي أو فترة الإجازة تاريخ الغياب المطلوب (${expectedAbsenceDate || ''})؟"
-    },
-    "stampPresent": {
-      "passed": true,
-      "details": "هل يحتوي المستند على ختم رسمي واضح للمنشأة الصحية أو توقيع معتمد؟"
-    },
-    "noTamperingDetected": {
-      "passed": true,
-      "details": "هل المستند سليم من علامات التعديل الرقمي أو اختلاف الخطوط أو القص واللصق؟"
-    },
-    "accreditedFacility": {
-      "passed": true,
-      "details": "هل المنشأة المصدرة مستشفى أو مركز رعاية صحية معتمد؟"
-    },
-    "durationReasonable": {
-      "passed": true,
-      "details": "هل مدة الإجازة الموصى بها متناسبة مع التشخيص وحالة الطالب؟"
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedMimeTypes.includes(String(mimeType))) {
+      return res.status(400).json({ error: 'Unsupported mime type.' });
     }
-  },
-  "irregularities": [
-    {
-      "type": "name_mismatch" | "date_mismatch" | "missing_stamp" | "tampering_suspected" | "illegible_content" | "duration_exceeded",
-      "severity": "high" | "medium" | "low",
-      "titleAr": "عنوان التناقض أو المخالفة المرصودة",
-      "titleEn": "Title in English",
-      "descriptionAr": "شرح تفصيلي للتناقض المرصود في المستند وتأثيره على قبول العذر",
-      "suggestedAction": "الإجراء الإداري المقترح من لجنة التدقيق"
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/([a-zA-Z0-9.+-]+);base64,/, '');
+    if (cleanBase64.length < 100 || cleanBase64.length > 20_000_000) {
+      return res.status(413).json({ error: 'Image payload is too large or invalid.' });
     }
-  ],
-  "confidenceScore": "عالية (95%) / متوسطة (70%) / منخفضة (35%)",
-  "notesAndRecommendations": "ملاحظات إرشادية ختامية للجنة تدقيق الأعذار المدرسية",
-  "extractedSummary": "ملخص شامل وموجز للمستند في سطرين"
-}`;
 
-    const promptText = promptCustom ? `${defaultPrompt}\n\nملاحظات إضافية وتفاصيل سياق: ${promptCustom}` : defaultPrompt;
+    const expectedStudent = sanitizeText(expectedStudentName, 'غير محدد');
+    const expectedDate = sanitizeText(expectedAbsenceDate, 'غير محدد');
+    const gradeText = sanitizeText(studentGrade, 'غير محدد');
+    const customPrompt = sanitizeText(promptCustom, '');
 
-    // Use fast gemini-3.8-flash as primary model with fallbacks
+    const defaultPrompt = `أنت خبير التدقيق الجنائي المكتبي والتحقق من الوثائق والتقارير الطبية المدرسية...`;
+    const promptText = customPrompt ? `${defaultPrompt}\n\nملاحظات إضافية وتفاصيل سياق: ${customPrompt}` : defaultPrompt;
+
     const modelCandidates = [
       'gemini-3.8-flash',
       'gemini-3.5-flash',
@@ -216,13 +237,11 @@ app.post('/api/analyze-image', async (req, res) => {
         parts: [
           {
             inlineData: {
-              mimeType: mimeType,
+              mimeType,
               data: cleanBase64,
             },
           },
-          {
-            text: promptText,
-          },
+          { text: promptText },
         ],
       },
       config: {
@@ -234,7 +253,6 @@ app.post('/api/analyze-image', async (req, res) => {
     try {
       parsedJson = JSON.parse(result.text);
     } catch (parseErr) {
-      // Fallback clean parsing
       const jsonMatch = result.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedJson = JSON.parse(jsonMatch[0]);
@@ -244,14 +262,14 @@ app.post('/api/analyze-image', async (req, res) => {
     }
 
     res.json({
-      analysis: parsedJson,
+      analysis: ensureJsonObject(parsedJson, { rawAnalysis: result.text }),
       rawText: result.text,
       modelUsed: result.modelUsed,
     });
   } catch (err: any) {
     console.error('Error in /api/analyze-image:', err);
     res.status(500).json({
-      error: 'فشل في تحليل صورة المستند',
+      error: 'فشل في تحليل صورة المستن��',
       details: err?.message || 'Unknown error',
     });
   }
@@ -272,49 +290,36 @@ app.post('/api/daily-digest/generate-briefing', async (req, res) => {
     } = req.body;
 
     const anomaliesSummary = Array.isArray(anomalies) && anomalies.length > 0
-      ? anomalies.map((a: any) => `- [${a.severity}] ${a.titleAr}: ${a.descriptionAr} (المقياس: ${a.metric})`).join('\n')
+      ? anomalies.map((a: any) => `- [${a.severity}] ${sanitizeText(a.titleAr, 'شذوذ')} : ${sanitizeText(a.descriptionAr, 'لا يوجد وصف')}`).join('\n')
       : 'لا توجد شذوذات غير اعتيادية مسجلة هذا الصباح.';
 
     const highRiskSummary = Array.isArray(highRiskStudents) && highRiskStudents.length > 0
-      ? highRiskStudents.map((s: any) => `- الطالب: ${s.name} (${s.className}) | غياب: ${s.totalAbsences} يوم | مستوى الخطر: ${s.riskTier} | هاتف ولي الأمر: ${s.guardianPhone}`).join('\n')
+      ? highRiskStudents.map((s: any) => `- الطالب: ${sanitizeText(s.name, 'طالب')} (${sanitizeText(s.className, 'غير محدد')}) | غياب: ${Number(s.totalAbsences || 0)} | مستوى الخطر: ${sanitizeText(s.riskTier, 'غير محدد')}`).join('\n')
       : 'لا يوجد طلاب جدد في النطاق الحرج حالياً.';
 
     const promptText = `أنت المستشار التنفيذي الأول لقيادة المدارس ونظم الحضور والغياب الذكية "مدرستي حضور".
-المطلوب إعداد "موجز الإدارة الصباحي اليومي (Daily Executive Morning Briefing)" لمدير المدرسة ووكيل شؤون الطلاب، والذي يُرسل تلقائياً عبر البريد الإلكتروني في تمام الساعة 06:45 صباحاً قبل بدء الطابور المدرسي والحصة الأولى.
+المطلوب إعداد "موجز الإدارة الصباحي اليومي".
 
 بيانات المدرسة واليوم:
-- اسم المنشأة: ${tenantName}
-- التاريخ: ${date}
-- نسبة الحضور التراكمية: ${overallAttendanceRate}% (إجمالي الطلاب: ${totalStudents})
+- اسم المنشأة: ${sanitizeText(tenantName, 'مدرسة')}
+- التاريخ: ${sanitizeText(date, new Date().toISOString().split('T')[0])}
+- نسبة الحضور التراكمية: ${Number(overallAttendanceRate) || 0}% (إجمالي الطلاب: ${Number(totalStudents) || 0})
 - شذوذات وتناقضات الحضور المرصودة:
 ${anomaliesSummary}
-- الأعذار الطبية المعلقة بانتظار الاعتماد: ${pendingJustificationsCount} عذر (منها ${pendingIrregularCount} عذر مشبوه برصد تناقضات بالذكاء الاصطناعي)
+- الأعذار الطبية المعلقة بانتظار الاعتماد: ${Number(pendingJustificationsCount) || 0} عذر (منها ${Number(pendingIrregularCount) || 0} عذر مشبوه)
 - قائمة الطلاب المعرضين لخطر الحرمان / الإنذار النهائي:
 ${highRiskSummary}
 
 قم بصياغة تقرير موجز تنفيذي مركز باللغة العربية الفصحى بصيغة JSON حصراً بهذا المخطط:
 {
-  "headline": "عنوان تنفيذي موجز وجذاب للنشرة الصباحية",
+  "headline": "عنوان تنفيذي موجز وجذاب",
   "urgencyLevel": "critical" | "elevated" | "normal",
-  "executiveSummary": "فقرة مكثفة (سطرين إلى 3 أسطر) تلخص حالة الانضباط، أهم المخاطر المرصودة اليوم، وتوجيه عام للإدارة قبل بداية اليوم الدراسي",
-  "keyPriorities": [
-    "الإجراء الإداري الأول العاجل قبل الحصة الأولى",
-    "الإجراء الإداري الثاني",
-    "الإجراء الإداري الثالث"
-  ],
-  "counselorDirectives": [
-    "توجيه خاص للأخصائي الاجتماعي / الموجه الطلابي للمتابعة الميدانية اليوم",
-    "توجيه للتواصل مع أولياء الأمور المعنيين"
-  ]
+  "executiveSummary": "فقرة مكثفة",
+  "keyPriorities": ["الإجراء 1", "الإجراء 2", "الإجراء 3"],
+  "counselorDirectives": ["التوجيه 1", "التوجيه 2"]
 }`;
 
-    const modelCandidates = [
-      'gemini-3.8-flash',
-      'gemini-3.5-flash',
-      'gemini-3.1-flash-lite',
-    ];
-
-    const result = await callGeminiWithFallback(modelCandidates, {
+    const result = await callGeminiWithFallback(['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'], {
       contents: {
         parts: [{ text: promptText }],
       },
@@ -332,17 +337,17 @@ ${highRiskSummary}
         briefingJson = JSON.parse(match[0]);
       } else {
         briefingJson = {
-          headline: `نشرة الصباح للانضباط المدرسي - ${tenantName}`,
-          urgencyLevel: anomalies.length > 0 ? 'elevated' : 'normal',
+          headline: `نشرة الصباح للانضباط المدرسي - ${sanitizeText(tenantName, 'مدرسة')}`,
+          urgencyLevel: Array.isArray(anomalies) && anomalies.length > 0 ? 'elevated' : 'normal',
           executiveSummary: result.text.slice(0, 300),
           keyPriorities: [
-            'مراجعة كشوف الحضور غير المعتمدة من اليوم السابق قبل الحصة الأولى.',
-            'التدقيق في الأعذار الطبية المعلقة خصوصاً الحالات ذات التناقضات.',
-            'تواصل الموجه الطلابي مع أولياء أمور الطلاب متكرري الغياب (5+ أيام).',
+            'مراجعة كشوف الحضور غير المعتمدة قبل الحصة الأولى.',
+            'تدقيق الأعذار الطبية المعلقة.',
+            'تواصل الموجه الطلابي مع أولياء الأمور المعنيين.',
           ],
           counselorDirectives: [
-            'استدعاء الطلاب الذين تكرر غيابهم يومي الأربعاء والخميس.',
-            'حصر الطلاب المتوقع وصولهم إلى حد الحرمان الوزاري.',
+            'استدعاء الطلاب المكرر غيابهم للمتابعة.',
+            'تسجيل المتابعة في السجل المهني.',
           ],
         };
       }
@@ -355,21 +360,20 @@ ${highRiskSummary}
     });
   } catch (err: any) {
     console.warn('Fallback briefing generation due to error:', err?.message || err);
-    // Graceful fallback response
     res.json({
       success: true,
       briefing: {
         headline: 'نشرة الصباح الإدارية للانضباط والحضور المدرسي',
-        urgencyLevel: req.body?.anomalies?.length > 1 ? 'critical' : 'elevated',
-        executiveSummary: `متابعة صباحية استباقية لبيانات الانضباط المدرسي. تم رصد ${req.body?.anomalies?.length || 0} حالة شذوذ تحتاج تدخلاً إدارياً مبكراً، مع وجود ${req.body?.pendingJustificationsCount || 0} أعذار طبية قيد التدقيق و${req.body?.highRiskStudents?.length || 0} طلاب في النطاق الحرج.`,
+        urgencyLevel: 'elevated',
+        executiveSummary: 'تمت متابعة بيانات الانضباط المدرسي صباحاً ومراجعة الحالة العامة للغياب والأعذار.',
         keyPriorities: [
-          'اعتماد كشوف الحضور المعلقة للشعب قبل انطلاق الحصة الأولى.',
-          'فحص التقرير الطبي المشبوه واتخاذ القرار بالرفض أو طلب الأصل.',
-          'تفعيل خطة المتابعة الهاتفية مع أولياء أمور الطلاب في فئة الحرمان.',
+          'اعتماد كشوف الحضور المعلقة.',
+          'تدقيق الأعذار الطبية المعلقة.',
+          'تفعيل التواصل مع أولياء الأمور المعنيين.',
         ],
         counselorDirectives: [
-          'إجراء المقابلات الإرشادية الفردية للطلاب في الشريحة الحمراء (8+ أيام غياب).',
-          'توثيق الاتصالات المباشرة في السجل المهني للموجه الطلابي.',
+          'إجراء المتابعة الإرشادية.',
+          'توثيق الإجراءات في السجل اليومي.',
         ],
       },
       fallback: true,
@@ -382,22 +386,25 @@ app.post('/api/daily-digest/dispatch', async (req, res) => {
   try {
     const { recipients = [], subject, htmlContent, scheduledTime = '06:45', metadata = {} } = req.body;
 
+    const validRecipients = Array.isArray(recipients)
+      ? recipients.filter((r) => typeof r === 'string').slice(0, 50)
+      : [];
+
     const dispatchId = `digest-dispatch-${Date.now()}`;
     const timestamp = new Date().toISOString();
 
-    console.log(`[DAILY-EMAIL-DIGEST] Dispatching automated morning email digest "${subject}" to ${recipients.length} administrators:`, recipients);
+    console.log(`[DAILY-EMAIL-DIGEST] Dispatching automated morning email digest "${sanitizeText(subject, 'school digest')}" to ${validRecipients.length} administrators.`);
 
-    // In preview environment, we simulate enterprise SMTP/SendGrid/Gmail delivery
     res.json({
       success: true,
       dispatchId,
       dispatchedAt: timestamp,
       scheduledTime,
-      recipientsCount: recipients.length,
-      recipients,
-      subject,
+      recipientsCount: validRecipients.length,
+      recipients: validRecipients,
+      subject: sanitizeText(subject, 'Daily Digest'),
       status: 'delivered',
-      message: `تم إرسال النشرة الصباحية اليومية بنجاح إلى ${recipients.length} من قيادات المدرسة عبر البريد الإلكتروني.`,
+      message: `تم إرسال النشرة الصباحية اليومية بنجاح إلى ${validRecipients.length} من قيادات المدرسة عبر البريد الإلكتروني.`,
     });
   } catch (err: any) {
     console.error('Error dispatching daily email digest:', err);
@@ -408,12 +415,19 @@ app.post('/api/daily-digest/dispatch', async (req, res) => {
   }
 });
 
-// 5. Health status
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     appName: 'Smart School Attendance System',
     timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/readyz', (req, res) => {
+  res.json({
+    status: 'ready',
+    timestamp: new Date().toISOString(),
+    requiresAuth: Boolean(APP_AUTH_TOKEN),
   });
 });
 
@@ -435,6 +449,9 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smart School Attendance Server running on http://0.0.0.0:${PORT}`);
+    if (!APP_AUTH_TOKEN) {
+      console.warn('Security warning: AUTH token is not configured. Set APP_AUTH_TOKEN for production use.');
+    }
   });
 }
 
