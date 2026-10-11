@@ -1,30 +1,29 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import {
-  getFirestore,
-  doc,
-  getDocFromServer,
-  collection,
-  getDocs,
-  setDoc,
-  updateDoc,
-  onSnapshot,
-  query,
-  where,
-} from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
+const firebaseConfig = {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-project-id',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'demo-firebase-api-key',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'demo-project-id.firebaseapp.com',
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'demo-project-id.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '000000000000',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+  oAuthClientId: import.meta.env.VITE_FIREBASE_OAUTH_CLIENT_ID || '',
+  recaptchaSiteKey: import.meta.env.VITE_FIREBASE_RECAPTCHA_SITE_KEY || '',
+};
 
-// Initialize Firestore with designated database ID as instructed by Firebase skill
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+if (import.meta.env.DEV && !import.meta.env.VITE_FIREBASE_API_KEY) {
+  console.warn('Firebase is using placeholder values. Add VITE_FIREBASE_* variables to .env.local to connect to a real project.');
+}
 
-// Initialize Authentication
+const app = initializeApp(firebaseConfig as any);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Error handling types and function strictly adhering to Firebase Skill guidelines
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -73,7 +72,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection validation test as required by skill guidelines
 export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
@@ -87,5 +85,4 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-// Auto-run connection check on boot
 testConnection();
