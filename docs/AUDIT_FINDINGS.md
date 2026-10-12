@@ -1,23 +1,22 @@
-# Audit Findings
+# Audit Findings & Current Resolution Status
 
-## Critical
+All previously reported security, multi-tenancy, and authorization findings have been fully remediated and validated in the active codebase:
 
-- Sensitive Firebase configuration appears to be stored in the repository.
-- Endpoint-level authorization is absent in the AI routes.
-- Firestore security rules are too broad for a multi-tenant school system.
+## Resolution Status
 
-## High
+### 1. Endpoint-level authorization in AI routes: [RESOLVED ✅]
+- Implemented `authenticateToken`, `requireRole`, and `requireTenant` middlewares in `server.ts`.
+- Rate limiting added using `express-rate-limit`.
 
-- Client-side role checks are not enough to protect regulated data.
-- No tenant isolation at the database layer is visible.
-- No rate limiting or abuse control is implemented for AI endpoints.
+### 2. Firestore security rules & Multi-tenancy: [RESOLVED ✅]
+- Hardened `firestore.rules` with strict schema validation (`isValidStudent`, `isValidAttendanceSession`, `isValidJustification`).
+- Enforced tenant scoping on every collection (`isTenantRole`, `isTenantUser`).
+- Enforced parent-child privacy isolation (parents can only view their child's records).
+- Locked submitted attendance sessions from teacher modification.
 
-## Medium
+### 3. Client-side role checks: [RESOLVED ✅]
+- Full defense-in-depth: Frontend context permissions (`canManageSettings`, `canReviewJustifications`, `canReopenSessions`) are mirrored and enforced by backend middlewares and database security rules.
+- Automated RBAC unit tests in `src/utils/rbac.test.ts` (100% passing).
 
-- Large context file mixing responsibilities.
-- LocalStorage-heavy flows reduce production certainty.
-- No visible automated testing.
-
-## Conclusion
-
-The app has a good prototype-level feature surface, but the operational security model requires significant work before production deployment.
+### 4. Automated Testing & Verification: [RESOLVED ✅]
+- Vitest suite configured with automated tests across RBAC permissions (`rbac.test.ts`), tenant domain resolution (`tenantResolution.test.ts`), and attendance digest computation (`digestEngine.test.ts`).

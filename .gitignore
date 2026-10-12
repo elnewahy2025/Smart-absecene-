@@ -8,3 +8,6 @@ coverage/
 !.env.example
 firebase-applet-config.local.json
 firebase-applet-config.local.*
+serviceAccountKey*.json
+service-account*.json
+tenant-ai-secrets.json

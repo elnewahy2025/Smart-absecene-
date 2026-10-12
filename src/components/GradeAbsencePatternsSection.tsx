@@ -311,36 +311,36 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
       {/* Analytical Callout Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Most Disciplined Grade */}
-        <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3.5 flex items-start gap-3">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
           <div className="w-9 h-9 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
             <Award className="w-5 h-5" />
           </div>
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-emerald-800">
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
               {lang === 'ar' ? 'المرحلة الأكثر انضباطاً' : 'Most Disciplined Grade'}
             </span>
-            <div className="text-sm font-extrabold text-slate-900">
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
               {bestGrade ? bestGrade.gradeName : '—'}
             </div>
-            <div className="text-[11px] text-emerald-700 font-semibold">
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
               {bestGrade ? `${bestGrade.averageAttendanceRate}% حضور عام` : ''}
             </div>
           </div>
         </div>
 
         {/* Most Vulnerable / Chronic Risk Grade */}
-        <div className="bg-rose-50/60 border border-rose-200/80 rounded-xl p-3.5 flex items-start gap-3">
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
           <div className="w-9 h-9 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-rose-800">
+            <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
               {lang === 'ar' ? 'الأعلى في مؤشر الخطر' : 'Highest Vulnerability'}
             </span>
-            <div className="text-sm font-extrabold text-slate-900">
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
               {mostVulnerableGrade ? mostVulnerableGrade.gradeName : '—'}
             </div>
-            <div className="text-[11px] text-rose-700 font-semibold">
+            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
               {mostVulnerableGrade
                 ? `${mostVulnerableGrade.chronicCount} طلاب (${mostVulnerableGrade.chronicRate}% خطورة)`
                 : ''}
@@ -349,36 +349,36 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
         </div>
 
         {/* Excuses Documentation Rate */}
-        <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-3.5 flex items-start gap-3">
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
           <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-blue-800">
+            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
               {lang === 'ar' ? 'نسبة توثيق الأعذار' : 'Excuse Doc. Compliance'}
             </span>
-            <div className="text-sm font-extrabold text-slate-900">
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
               {overallDocRate}% {lang === 'ar' ? 'أعذار موثقة' : 'Documented'}
             </div>
-            <div className="text-[11px] text-blue-700 font-semibold">
+            <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
               {lang === 'ar' ? 'تحت التدقيق الإداري' : 'Under admin review'}
             </div>
           </div>
         </div>
 
         {/* Performance Disparity Gap */}
-        <div className="bg-indigo-50/60 border border-indigo-200/80 rounded-xl p-3.5 flex items-start gap-3">
+        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
           <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
             <Activity className="w-5 h-5" />
           </div>
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-indigo-800">
+            <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
               {lang === 'ar' ? 'فجوة التباين بين المراحل' : 'Grade Disparity Spread'}
             </span>
-            <div className="text-sm font-extrabold text-slate-900">
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
               {attendanceGap}% {lang === 'ar' ? 'فارق الانضباط' : 'Gap Spread'}
             </div>
-            <div className="text-[11px] text-indigo-700 font-semibold">
+            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
               {attendanceGap <= 5
                 ? (lang === 'ar' ? 'تقارب إيجابي متوازن' : 'Balanced consistency')
                 : (lang === 'ar' ? 'تفاوت ملحوظ يستدعي تدخلاً' : 'Notable variance')}
@@ -388,7 +388,13 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
       </div>
 
       {/* Main Bar Chart Container */}
-      <div className="border border-slate-100 bg-slate-50/50 rounded-xl p-4 space-y-3">
+      <div
+        className="rounded-xl p-4 space-y-3 transition-colors border"
+        style={{
+          backgroundColor: 'var(--app-chart-bg)',
+          borderColor: 'var(--app-border)',
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
           <div className="font-bold text-slate-800 flex items-center gap-2">
             <span>

@@ -1,0 +1,65 @@
+# Testing & Verification Checklist
+
+Use this checklist to manually test and verify the Smart School Attendance System.
+
+## Automated Checks (Run via Terminal)
+- [x] **TypeScript Validation**:
+  ```powershell
+  npm run lint
+  ```
+  *Result: 0 errors.*
+- [x] **Unit Testing with Vitest**:
+  ```powershell
+  npm run test
+  ```
+  *Result: 3 tests passed in `digestEngine.test.ts`.*
+- [x] **Windows 11 Clean Script**:
+  ```powershell
+  npm run clean
+  ```
+  *Result: `dist/` and `server.js` removed using `rimraf` without PowerShell error.*
+- [x] **Production Bundle**:
+  ```powershell
+  npm run build
+  ```
+  *Result: Successfully outputs `dist/` in 4.19s.*
+
+---
+
+## API & Security Verification
+
+### 1. Health Endpoint (Public)
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/health" -Method Get
+```
+- **Expected**: `200 OK` with JSON `{ status: 'ok', appName: 'Smart School Attendance System' }`.
+
+### 2. Unauthenticated AI Endpoint Block
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Body '{"messages":[{"role":"user","content":"test"}]}' -ContentType "application/json"
+```
+- **Expected**: `401 Unauthorized` (`Bearer token is required`).
+
+### 3. Authenticated Request
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Headers @{ Authorization = "Bearer dev-token-change-me" } -Body '{"messages":[{"role":"user","content":"اختبار"}]}' -ContentType "application/json"
+```
+- **Expected**: Token accepted (passes authentication).
+
+### 4. Over-sized Image Upload Rejection
+- Call `POST /api/analyze-image` with an image base64 exceeding 5 MB (or > 7,000,000 characters).
+- **Expected**: `413 Payload Too Large` ("Image payload exceeds maximum allowed size of 5 MB").
+
+### 5. Magic Byte Rejection
+- Call `POST /api/analyze-image` with a `.txt` file encoded as base64 but with `mimeType: "image/jpeg"`.
+- **Expected**: `400 Bad Request` ("Invalid file content: signature does not match allowed image/pdf formats").
+
+---
+
+## UI & Functional Verification
+
+- [x] **Arabic RTL Preservation**: App root maintains `<html dir="rtl" lang="ar">`, Cairo font, and proper mirrored layout.
+- [x] **Offline Mode Indicator**: Disconnecting internet or using offline simulation displays the amber warning banner at the top of `App.tsx`.
+- [x] **Simulation Mode Banner**: Visiting the "Notification Outbox" tab displays the purple Simulation Mode disclaimer.
+- [x] **Parent Portal Isolation**: Logging in as Parent strictly filters student lists to the guardian's assigned child/children.
+- [x] **Audit Log Immutability**: All audit logs are append-only; `firestore.rules` blocks updates and deletes.

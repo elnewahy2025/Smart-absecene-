@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
+import { authenticatedFetch } from '../lib/api';
 import {
   MessageSquare,
   Send,
@@ -40,7 +41,7 @@ export const GeminiChatbotView: React.FC = () => {
 
 كيف يمكنني خدمتك اليوم؟`,
       timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-      modelUsed: 'gemini-3.5-flash',
+      modelUsed: 'gemini-2.5-flash',
     },
   ]);
 
@@ -58,21 +59,21 @@ export const GeminiChatbotView: React.FC = () => {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Model preference mapped per role as instructed:
-  // - gemini-3.1-pro-preview for particularly complex tasks
-  // - gemini-3.5-flash for general tasks
-  // - gemini-3.1-flash-lite for tasks that should happen fast
+  // Model preference mapped per role:
+  // - gemini-2.5-pro for complex policy analysis and strategic planning
+  // - gemini-2.5-flash for general counselor tasks
+  // - gemini-2.5-flash for rapid SMS & classroom speed
   const getModelPreference = (role: string) => {
-    if (role === 'teacher_fast') return 'gemini-3.1-flash-lite';
-    if (role === 'policy_analyst') return 'gemini-3.1-pro-preview';
-    return 'gemini-3.5-flash';
+    if (role === 'teacher_fast') return 'gemini-2.5-flash';
+    if (role === 'policy_analyst') return 'gemini-2.5-pro';
+    return 'gemini-2.5-flash';
   };
 
   const roleConfigs = {
     counselor: {
       titleAr: 'المستشار المدرسي والتوجيه الطلابي',
       titleEn: 'Academic & Guidance Counselor',
-      modelName: 'gemini-3.5-flash',
+      modelName: 'gemini-2.5-flash',
       icon: <BookOpen className="w-4 h-4 text-emerald-600" />,
       descAr: 'استشارات تربوية، حلول الغياب المتكرر، وشراكة الأسرة مع المدرسة',
       quickPrompts: [
@@ -84,7 +85,7 @@ export const GeminiChatbotView: React.FC = () => {
     teacher_fast: {
       titleAr: 'مساعد المعلم السريع للحصص',
       titleEn: 'Fast Teacher Classroom Assistant',
-      modelName: 'gemini-3.1-flash-lite',
+      modelName: 'gemini-2.5-flash',
       icon: <Zap className="w-4 h-4 text-amber-500" />,
       descAr: 'صياغة رسائل SMS سريعة، ملخصات الحصة، نصائح إدارة الوقت',
       quickPrompts: [
@@ -96,7 +97,7 @@ export const GeminiChatbotView: React.FC = () => {
     policy_analyst: {
       titleAr: 'المحلل الإحصائي وخبير السياسات',
       titleEn: 'Policy & Attendance Data Analyst',
-      modelName: 'gemini-3.1-pro-preview',
+      modelName: 'gemini-2.5-pro',
       icon: <Brain className="w-4 h-4 text-indigo-600" />,
       descAr: 'تحليل أعمق لاتجاهات الغياب، أيام ما قبل الإجازات، ومبادرات التحفيز',
       quickPrompts: [
@@ -126,7 +127,7 @@ export const GeminiChatbotView: React.FC = () => {
 
     try {
       const preferredModel = getModelPreference(activeRole);
-      const res = await fetch('/api/chat', {
+      const res = await authenticatedFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -186,7 +187,7 @@ export const GeminiChatbotView: React.FC = () => {
   const currentRoleCfg = roleConfigs[activeRole];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col h-[750px] overflow-hidden">
+    <div className="gemini-chat-container bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col h-[750px] overflow-hidden">
       {/* Header Bar */}
       <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -245,7 +246,7 @@ export const GeminiChatbotView: React.FC = () => {
           <button
             key={i}
             onClick={() => handleSendMessage(prompt)}
-            className="bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer shrink-0 text-[10px]"
+            className="gemini-quick-pill bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer shrink-0 text-[10px]"
           >
             {prompt}
           </button>
@@ -253,7 +254,7 @@ export const GeminiChatbotView: React.FC = () => {
       </div>
 
       {/* Chat Thread Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/20">
+      <div className="gemini-chat-thread flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/20">
         {messages.map((msg) => {
           const isAssistant = msg.role === 'assistant';
           return (
@@ -270,8 +271,8 @@ export const GeminiChatbotView: React.FC = () => {
               <div
                 className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3.5 text-xs sm:text-[13px] leading-relaxed shadow-xs ${
                   isAssistant
-                    ? 'bg-white border border-slate-200 text-slate-800 rounded-tr-xs'
-                    : 'bg-slate-900 text-white rounded-tl-xs'
+                    ? 'gemini-assistant-bubble bg-white border border-slate-200 text-slate-800 rounded-tr-xs'
+                    : 'gemini-user-bubble bg-slate-900 text-white rounded-tl-xs'
                 }`}
               >
                 {/* Message Header info */}

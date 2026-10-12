@@ -22,9 +22,13 @@ import {
   Users,
   CheckSquare,
   Square,
+  Palmtree,
 } from 'lucide-react';
 import { QRScannerModal } from './QRScannerModal';
 import { WeeklyAttendanceTrendCard } from './WeeklyAttendanceTrendCard';
+import { BulkEditConfirmationModal } from './attendance/BulkEditConfirmationModal';
+import { ClassCalendarView } from './attendance/ClassCalendarView';
+import { GamifiedCelebrationModal } from './attendance/GamifiedCelebrationModal';
 
 export const AttendanceSessionsView: React.FC = () => {
   const {
@@ -38,9 +42,14 @@ export const AttendanceSessionsView: React.FC = () => {
     submitSession,
     reopenSession,
     createNewSession,
+    canEditSession,
+    canReopenSessions,
+    classesStats,
+    isOffDay,
   } = useAttendance();
 
   // State
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [selectedSessionId, setSelectedSessionId] = useState<string>(
     sessions[0]?.id || ''
   );
@@ -61,16 +70,20 @@ export const AttendanceSessionsView: React.FC = () => {
   const [reopenReason, setReopenReason] = useState('');
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
+  const [pendingBulkStatus, setPendingBulkStatus] = useState<AttendanceStatus>('absent');
+  const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
+  const [celebrationStats, setCelebrationStats] = useState({ rate: 100, present: 0, total: 0 });
 
   // New session form state
   const [newSessionType, setNewSessionType] = useState<'daily' | 'period'>('period');
   const [newPeriodNum, setNewPeriodNum] = useState<number>(3);
   const [newSubject, setNewSubject] = useState<string>('اللغة العربية');
-  const [newClass, setNewClass] = useState<string>('10 / أ');
+  const [newClass, setNewClass] = useState<string>(classesStats[0]?.className || '');
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || sessions[0];
 
-  // Filtered session records
+  // Filtered session records (excludes transferred students from active roll-call)
   const sessionStudents = selectedSession?.records.map((rec) => {
     const student = students.find((s) => s.id === rec.studentId);
     return {
@@ -93,6 +106,9 @@ export const AttendanceSessionsView: React.FC = () => {
       },
     };
   }).filter((item) => {
+    // Hide transferred students from active daily roll-call
+    if (item.student.enrollmentStatus === 'transferred') return false;
+
     const matchesSearch =
       item.student.fullName.toLowerCase().includes(searchStudent.toLowerCase()) ||
       item.student.nationalId.includes(searchStudent) ||
@@ -104,11 +120,13 @@ export const AttendanceSessionsView: React.FC = () => {
   }) || [];
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
-    if (selectedSession?.status === 'submitted' && currentUser.role !== 'admin') {
+    if (!selectedSession || !canEditSession(selectedSession)) {
       alert(
         lang === 'ar'
-          ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف بواسطة الإدارة أولاً لتعديل السجلات.'
-          : 'Session is locked and submitted. Admin must reopen the session before edits can be made.'
+          ? (selectedSession?.status === 'submitted'
+              ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف بواسطة الإدارة أولاً لتعديل السجلات.'
+              : 'هذا الكشف ليس ضمن الصفوف المسندة لك كمعلم (صلاحية قراءة فقط).')
+          : 'You do not have permission to edit this session.'
       );
       return;
     }
@@ -175,19 +193,53 @@ export const AttendanceSessionsView: React.FC = () => {
     );
   };
 
-  // Bulk Mark Selected Students as Absent
+  // Open confirmation before marking as Absent
   const handleGroupMarkAsAbsent = () => {
     if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
+    setPendingBulkStatus('absent');
+    setIsBulkConfirmOpen(true);
+  };
+
+  // Open confirmation before bulk Quick Mark as Present (if more than 3 students)
+  const handleRequestQuickMarkPresent = () => {
+    if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
+    if (selectedStudentIdsForGroup.length > 5) {
+      setPendingBulkStatus('present');
+      setIsBulkConfirmOpen(true);
+    } else {
+      handleQuickMarkSelectedGroup();
+    }
+  };
+
+  // Execution after confirmation
+  const handleConfirmBulkAction = () => {
+    if (!selectedSession || selectedStudentIdsForGroup.length === 0) {
+      setIsBulkConfirmOpen(false);
+      return;
+    }
     const count = selectedStudentIdsForGroup.length;
-    selectedStudentIdsForGroup.forEach((id) => {
-      updateRecord(selectedSession.id, id, 'absent');
-    });
+
+    if (pendingBulkStatus === 'present') {
+      quickMarkGroupAsPresent(selectedSession.id, selectedStudentIdsForGroup);
+      setIsQuickMarkActive(true);
+      setNotificationBanner(
+        lang === 'ar'
+          ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${count} طالب) كـ 'حاضر'.`
+          : `⚡ Quick Mark applied to ${count} students as Present.`
+      );
+    } else {
+      selectedStudentIdsForGroup.forEach((id) => {
+        updateRecord(selectedSession.id, id, pendingBulkStatus);
+      });
+      setNotificationBanner(
+        lang === 'ar'
+          ? `تم تحديث حالة ${count} طالب كـ '${pendingBulkStatus === 'absent' ? 'غائب' : 'حاضر'}'.`
+          : `Updated ${count} students as ${pendingBulkStatus}.`
+      );
+    }
+
+    setIsBulkConfirmOpen(false);
     setSelectedStudentIdsForGroup([]);
-    setNotificationBanner(
-      lang === 'ar'
-        ? `تم تعيين ${count} طالب كـ 'غائب'.`
-        : `Marked ${count} students as Absent.`
-    );
   };
 
   // Toggle selection for all currently visible students
@@ -208,6 +260,12 @@ export const AttendanceSessionsView: React.FC = () => {
     if (res.success) {
       setNotificationBanner(res.message);
       setTimeout(() => setNotificationBanner(null), 6000);
+      // Trigger gamified celebration
+      const total = selectedSession.records.length;
+      const present = selectedSession.records.filter((r) => r.status === 'present').length;
+      const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+      setCelebrationStats({ rate, present, total });
+      setIsCelebrationOpen(true);
     } else {
       alert(res.message);
     }
@@ -228,13 +286,17 @@ export const AttendanceSessionsView: React.FC = () => {
 
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
+    const matchedClass = classesStats.find((c) => c.className === newClass);
+    const targetClassId = matchedClass?.classId || `class-${newClass.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const targetGrade = matchedClass?.grade || 'المرحلة الدراسية';
+
     const created = createNewSession(
       newSessionType,
       newPeriodNum,
       newSubject,
       newClass,
-      newClass === '10 / أ' ? 'class-1a' : 'class-1b',
-      'الصف العاشر'
+      targetClassId,
+      targetGrade
     );
     setIsNewSessionModalOpen(false);
     setSelectedSessionId(created.id);
@@ -268,6 +330,39 @@ export const AttendanceSessionsView: React.FC = () => {
 
       {/* Weekly Daily Attendance Percentage Trends Visualization (Recharts) */}
       <WeeklyAttendanceTrendCard />
+
+      {/* Official Holiday / Weekend Alert Banner when current filter date is an off-day */}
+      {(() => {
+        const offDayCheck = isOffDay(filterDate);
+        if (offDayCheck.isOff) {
+          return (
+            <div className="bg-purple-50 border border-purple-200 text-purple-950 p-3.5 rounded-xl flex items-center justify-between text-xs shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0">
+                  <Palmtree className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-purple-900">{offDayCheck.reason}</span>
+                    <span className="text-[10px] bg-purple-200/80 text-purple-900 px-2 py-0.5 rounded-full font-bold">
+                      {lang === 'ar' ? 'إجازة رسمية معتمدة' : 'Official Off-Day'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-purple-800 mt-0.5">
+                    {lang === 'ar'
+                      ? `التاريخ المختار (${filterDate}) يوافق عطلة رسمية أو نهاية أسبوع. وفقاً للائحة الانضباط، لا يتم احتساب أي غياب للطلاب ولا يؤثر هذا اليوم على نسب الحضور.`
+                      : `Selected date (${filterDate}) is an official holiday or weekend. Absences are not calculated or recorded for students.`}
+                  </p>
+                </div>
+              </div>
+              <span className="font-mono text-[11px] text-purple-700 bg-white px-2 py-1 rounded-lg border border-purple-200 hidden sm:inline">
+                {filterDate}
+              </span>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Control Strip: Session Picker & Actions */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -307,8 +402,34 @@ export const AttendanceSessionsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: New Session button */}
+          {/* Right: View Mode Toggle & New Session button */}
           <div className="flex items-center gap-2">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 rounded-md font-semibold cursor-pointer transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {lang === 'ar' ? 'كشف الحصة' : 'Session Table'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-1.5 rounded-md font-semibold cursor-pointer transition-colors flex items-center gap-1 ${
+                  viewMode === 'calendar'
+                    ? 'bg-white text-emerald-800 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{lang === 'ar' ? 'التقويم الشهري' : 'Calendar'}</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setIsNewSessionModalOpen(true)}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
@@ -320,7 +441,20 @@ export const AttendanceSessionsView: React.FC = () => {
         </div>
       </div>
 
-      {selectedSession && (
+      {/* Feature #6: Class Calendar View */}
+      {viewMode === 'calendar' && (
+        <ClassCalendarView
+          sessions={sessions}
+          selectedSessionId={selectedSessionId}
+          onSelectSession={(sessId) => {
+            setSelectedSessionId(sessId);
+            setViewMode('table');
+          }}
+          lang={lang}
+        />
+      )}
+
+      {viewMode === 'table' && selectedSession && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {/* Session Overview Header */}
           <div className="p-5 border-b border-slate-200 bg-slate-50/70">
@@ -490,27 +624,134 @@ export const AttendanceSessionsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick KPI stats for this session */}
+            {/* Quick KPI stats for this session - Prominent Percentages + Actual Headcounts + Instant Drilldown */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-slate-200">
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">{lang === 'ar' ? 'إجمالي المقيدين' : 'Total'}</span>
-                <span className="text-lg font-bold text-slate-900">{selectedSession.totalStudents}</span>
+              {/* Total enrolled */}
+              <div
+                onClick={() => setStatusFilter('all')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  statusFilter === 'all'
+                    ? 'bg-slate-100 border-slate-400 shadow-xs ring-1 ring-slate-400'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+                title={lang === 'ar' ? 'انقر لعرض جميع طلاب الكشف' : 'Click to view all session students'}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">{lang === 'ar' ? 'إجمالي المقيدين' : 'Total'}</span>
+                  <span className="text-[10px] text-slate-400 hover:underline">عرض الكل ←</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-slate-900 font-mono">
+                    {selectedSession.totalStudents}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {lang === 'ar' ? 'طالب' : 'students'}
+                  </span>
+                </div>
               </div>
-              <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
-                <span className="text-[11px] text-emerald-700 block">{lang === 'ar' ? 'حاضرون' : 'Present'}</span>
-                <span className="text-lg font-bold text-emerald-800">{selectedSession.presentCount}</span>
+
+              {/* Present */}
+              <div
+                onClick={() => setStatusFilter(statusFilter === 'present' ? 'all' : 'present')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  statusFilter === 'present'
+                    ? 'bg-emerald-100/70 border-emerald-500 shadow-xs ring-2 ring-emerald-500/20'
+                    : 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300'
+                }`}
+                title={lang === 'ar' ? 'انقر لتصفية الحاضرين فقط' : 'Click to filter present students'}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-800">{lang === 'ar' ? 'نسبة الحضور' : 'Present %'}</span>
+                  <span className="text-[10px] text-emerald-700 font-bold hover:underline">تصفية ←</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-emerald-800 font-mono">
+                    %{selectedSession.totalStudents > 0
+                      ? Math.round((selectedSession.presentCount / selectedSession.totalStudents) * 100)
+                      : 0}
+                  </span>
+                  <span className="text-xs text-emerald-700 font-semibold">
+                    ({selectedSession.presentCount})
+                  </span>
+                </div>
               </div>
-              <div className="bg-rose-50/60 p-2.5 rounded-lg border border-rose-200">
-                <span className="text-[11px] text-rose-700 block">{lang === 'ar' ? 'غائبون' : 'Absent'}</span>
-                <span className="text-lg font-bold text-rose-800">{selectedSession.absentCount}</span>
+
+              {/* Absent */}
+              <div
+                onClick={() => setStatusFilter(statusFilter === 'absent' ? 'all' : 'absent')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  statusFilter === 'absent'
+                    ? 'bg-rose-100/70 border-rose-500 shadow-xs ring-2 ring-rose-500/20'
+                    : 'bg-rose-50/60 border-rose-200 hover:border-rose-300'
+                }`}
+                title={lang === 'ar' ? 'انقر للتعمق في قائمة الغائبين للتدخل' : 'Click to drill down into absent students'}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-rose-800">{lang === 'ar' ? 'نسبة الغياب' : 'Absent %'}</span>
+                  <span className="text-[10px] text-rose-700 font-bold hover:underline">تدخل ←</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-rose-800 font-mono">
+                    %{selectedSession.totalStudents > 0
+                      ? Math.round((selectedSession.absentCount / selectedSession.totalStudents) * 100)
+                      : 0}
+                  </span>
+                  <span className="text-xs text-rose-700 font-semibold">
+                    ({selectedSession.absentCount})
+                  </span>
+                </div>
               </div>
-              <div className="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
-                <span className="text-[11px] text-amber-700 block">{lang === 'ar' ? 'متأخرون' : 'Late'}</span>
-                <span className="text-lg font-bold text-amber-800">{selectedSession.lateCount}</span>
+
+              {/* Late */}
+              <div
+                onClick={() => setStatusFilter(statusFilter === 'late' ? 'all' : 'late')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  statusFilter === 'late'
+                    ? 'bg-amber-100/70 border-amber-500 shadow-xs ring-2 ring-amber-500/20'
+                    : 'bg-amber-50/60 border-amber-200 hover:border-amber-300'
+                }`}
+                title={lang === 'ar' ? 'انقر لتصفية المتأخرين' : 'Click to filter late students'}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-800">{lang === 'ar' ? 'نسبة التأخر' : 'Late %'}</span>
+                  <span className="text-[10px] text-amber-700 font-bold hover:underline">تصفية ←</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-amber-800 font-mono">
+                    %{selectedSession.totalStudents > 0
+                      ? Math.round((selectedSession.lateCount / selectedSession.totalStudents) * 100)
+                      : 0}
+                  </span>
+                  <span className="text-xs text-amber-700 font-semibold">
+                    ({selectedSession.lateCount})
+                  </span>
+                </div>
               </div>
-              <div className="bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-200 col-span-2 sm:col-span-1">
-                <span className="text-[11px] text-indigo-700 block">{lang === 'ar' ? 'أعذار ومستأذن' : 'Excused'}</span>
-                <span className="text-lg font-bold text-indigo-800">{selectedSession.excusedCount}</span>
+
+              {/* Excused */}
+              <div
+                onClick={() => setStatusFilter(statusFilter === 'excused_absence' ? 'all' : 'excused_absence')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                  statusFilter === 'excused_absence'
+                    ? 'bg-indigo-100/70 border-indigo-500 shadow-xs ring-2 ring-indigo-500/20'
+                    : 'bg-indigo-50/60 border-indigo-200 hover:border-indigo-300'
+                }`}
+                title={lang === 'ar' ? 'انقر لتصفية المستأذنين وذوي الأعذار' : 'Click to filter excused students'}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-indigo-800">{lang === 'ar' ? 'نسبة الأعذار' : 'Excused %'}</span>
+                  <span className="text-[10px] text-indigo-700 font-bold hover:underline">تصفية ←</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-indigo-800 font-mono">
+                    %{selectedSession.totalStudents > 0
+                      ? Math.round((selectedSession.excusedCount / selectedSession.totalStudents) * 100)
+                      : 0}
+                  </span>
+                  <span className="text-xs text-indigo-700 font-semibold">
+                    ({selectedSession.excusedCount})
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -603,7 +844,8 @@ export const AttendanceSessionsView: React.FC = () => {
           </div>
 
           {/* Filter & Search Bar */}
-          <div className="p-4 border-b border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-4 border-b border-slate-200 bg-white flex flex-wrap items-center gap-3">
+            {/* Search input */}
             <div className="relative w-full sm:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
               <input
@@ -615,8 +857,8 @@ export const AttendanceSessionsView: React.FC = () => {
               />
             </div>
 
-            {/* Filter by status */}
-            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            {/* Filter by status directly beside the search box */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               <span className="text-xs text-slate-500 shrink-0 flex items-center gap-1">
                 <Filter className="w-3.5 h-3.5" />
                 {lang === 'ar' ? 'تصفية:' : 'Filter:'}
@@ -679,7 +921,7 @@ export const AttendanceSessionsView: React.FC = () => {
                 ) : (
                   sessionStudents.map(({ record, student }, index) => {
                     const isSessionSubmitted = selectedSession.status === 'submitted';
-                    const canEdit = !isSessionSubmitted || currentUser.role === 'admin';
+                    const canEdit = selectedSession ? canEditSession(selectedSession) : false;
                     const isSelected = selectedStudentIdsForGroup.includes(record.studentId);
 
                     return (
@@ -819,7 +1061,7 @@ export const AttendanceSessionsView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleQuickMarkSelectedGroup}
+                  onClick={handleRequestQuickMarkPresent}
                   className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
                 >
                   <Zap className="w-3.5 h-3.5" />
@@ -936,9 +1178,11 @@ export const AttendanceSessionsView: React.FC = () => {
                   onChange={(e) => setNewClass(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                 >
-                  <option value="10 / أ">10 / أ (الصف العاشر)</option>
-                  <option value="10 / ب">10 / ب (الصف العاشر)</option>
-                  <option value="11 / أ">11 / أ (الصف الحادي عشر)</option>
+                  {classesStats.map((c) => (
+                    <option key={c.className} value={c.className}>
+                      {c.className} ({c.grade}) - {c.activeStudents} {lang === 'ar' ? 'طالب' : 'students'}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1024,6 +1268,28 @@ export const AttendanceSessionsView: React.FC = () => {
           onClose={() => setIsScannerOpen(false)}
         />
       )}
+
+      {/* Bulk Edit Confirmation Modal */}
+      <BulkEditConfirmationModal
+        isOpen={isBulkConfirmOpen}
+        onClose={() => setIsBulkConfirmOpen(false)}
+        onConfirm={handleConfirmBulkAction}
+        targetStatus={pendingBulkStatus}
+        selectedStudents={students.filter((s) => selectedStudentIdsForGroup.includes(s.id))}
+        sessionTitle={`${selectedSession?.subject || 'كشف الحضور'} - ${selectedSession?.className || ''}`}
+        lang={lang}
+      />
+
+      {/* Gamified Celebration Modal */}
+      <GamifiedCelebrationModal
+        isOpen={isCelebrationOpen}
+        onClose={() => setIsCelebrationOpen(false)}
+        classNameTitle={`${selectedSession?.className || ''} - ${selectedSession?.subject || ''}`}
+        attendanceRate={celebrationStats.rate}
+        totalPresent={celebrationStats.present}
+        totalStudents={celebrationStats.total}
+        lang={lang}
+      />
     </div>
   );
 };

@@ -98,63 +98,154 @@ service cloud.firestore {
 
     // --- COLLECTION RULES ---
 
-    // 1. Admins Collection
+    // --- RBAC & MULTI-TENANT HELPERS ---
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isTenantUser(tenantId) {
+      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId));
+    }
+
+    function isTenantRole(tenantId, roles) {
+      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && getUserData().role in roles));
+    }
+
+    function isTeacherAssigned(data) {
+      return isTenantRole(data.tenantId, ['admin', 'registrar']) ||
+        (isTenantRole(data.tenantId, ['teacher']) && (
+          ('teacherId' in data && data.teacherId == request.auth.uid) ||
+          (('assignedClasses' in getUserData()) && 'classId' in data && data.classId in getUserData().assignedClasses)
+        ));
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Admins Collection (Platform Super-Admins)
     match /admins/{adminId} {
       allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
       allow list: if isAdmin();
       allow write: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
     }
 
-    // 2. Users Collection (Profile & Roles)
+    // 2. Users Collection (Profile & Role Management)
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list: if isSignedIn();
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin() || (hasUserDoc() && getUserData().role in ['admin', 'registrar']));
+      allow list: if isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().role in ['admin', 'registrar']));
+      // New user registration cannot self-grant 'admin' role unless platform admin
       allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
-        request.auth.uid == userId || isAdmin()
+        isAdmin() || (
+          request.auth.uid == userId &&
+          incoming().role in ['teacher', 'parent', 'registrar']
+        )
       );
+      // Profile update cannot elevate role or change tenant unless platform admin
       allow update: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
-        request.auth.uid == userId || isAdmin()
+        isAdmin() || (
+          request.auth.uid == userId &&
+          incoming().role == existing().role &&
+          incoming().tenantId == existing().tenantId
+        )
       );
       allow delete: if isAdmin() && isValidId(userId);
     }
 
-    // 3. Students Collection
+    // 3. Students Collection (Multi-Tenant & Role Isolation)
     match /students/{studentId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
-      allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
+      // Staff can read all tenant students; parents can only read their child
+      allow read: if isSignedIn() && (
+        isAdmin() || (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+            getUserData().role in ['admin', 'registrar', 'teacher'] ||
+            (getUserData().role == 'parent' && (
+              resource.data.guardianPhone == getUserData().phone ||
+              resource.data.guardianEmail == getUserData().email ||
+              resource.data.id == request.auth.uid
+            ))
+          )
+        )
+      );
+      // Only Admin and Registrar can create or modify student master records
+      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
+                    isTenantRole(incoming().tenantId, ['admin', 'registrar']);
+      allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
+                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
       allow delete: if isAdmin() && isValidId(studentId);
     }
 
     // 4. Attendance Sessions Collection
     match /attendance_sessions/{sessionId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming());
-      allow update: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming());
+      allow read: if isSignedIn() && (
+        isAdmin() || (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+            getUserData().role in ['admin', 'registrar', 'teacher'] ||
+            getUserData().role == 'parent'
+          )
+        )
+      );
+      // Create session: Admin, Registrar, or Teacher assigned to that class
+      allow create: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming()) &&
+                    isTeacherAssigned(incoming());
+      // Update session:
+      // If submitted: ONLY Admin or Registrar can reopen/edit!
+      // If draft or reopened: Admin, Registrar, or assigned Teacher
+      allow update: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming()) &&
+                    isTenantUser(resource.data.tenantId) && (
+                      isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
+                      (resource.data.status in ['draft', 'reopened'] && isTeacherAssigned(resource.data))
+                    );
       allow delete: if isAdmin() && isValidId(sessionId);
     }
 
     // 5. Justifications & Medical Excuses Collection
     match /justifications/{justificationId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming());
-      allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming());
+      allow read: if isSignedIn() && (
+        isAdmin() || (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+            getUserData().role in ['admin', 'registrar', 'teacher'] ||
+            resource.data.studentId == request.auth.uid ||
+            (getUserData().role == 'parent' && resource.data.studentId == request.auth.uid)
+          )
+        )
+      );
+      // Parent or staff can create a justification in their tenant
+      allow create: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
+                    isTenantUser(incoming().tenantId);
+      // Reviewing (status change to approved/rejected): ONLY Admin and Registrar!
+      allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
+                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
       allow delete: if isAdmin() && isValidId(justificationId);
     }
 
-    // 6. Notification Outbox Collection
+    // 6. School Settings Collection
+    match /settings/{tenantId} {
+      allow read: if isTenantUser(tenantId);
+      // Only School Admin can modify institutional settings
+      allow write: if isTenantRole(tenantId, ['admin']);
+    }
+
+    // 7. Notification Outbox Collection
     match /notification_outbox/{notificationId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
-      allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow read: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
+                    isTenantRole(incoming().tenantId, ['admin', 'registrar', 'teacher']);
+      allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
+                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
       allow delete: if isAdmin() && isValidId(notificationId);
     }
 
-    // 7. Audit Logs Collection (Append-Only)
+    // 8. Audit Logs Collection (Append-Only & Multi-Tenant Scoped)
     match /audit_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming());
-      // Updates and deletions are strictly forbidden for audit integrity
+      // Only Admin and Registrar can view audit logs
+      allow read: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
+      // Any authenticated tenant user can append audit entries
+      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming()) &&
+                    isTenantUser(incoming().tenantId);
+      // Modifications and deletions are strictly forbidden for tamper-evidence
       allow update, delete: if false;
     }
   }

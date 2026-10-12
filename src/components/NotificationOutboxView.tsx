@@ -37,6 +37,7 @@ export const NotificationOutboxView: React.FC = () => {
     sendCustomParentNotification,
     lang,
     currentTenant,
+    classesStats,
   } = useAttendance();
 
   // Filters & Search
@@ -55,7 +56,9 @@ export const NotificationOutboxView: React.FC = () => {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [singleTargetType, setSingleTargetType] = useState<'student' | 'class'>('student');
   const [singleStudentId, setSingleStudentId] = useState<string>(students[0]?.id || '');
-  const [singleClass, setSingleClass] = useState<string>(students[0]?.className || '10 / أ');
+  const [singleClass, setSingleClass] = useState<string>(
+    classesStats[0]?.className || students[0]?.className || ''
+  );
   const [composeChannel, setComposeChannel] = useState<'SMS' | 'WhatsApp'>('SMS');
   const [composeCategory, setComposeCategory] = useState<'absence' | 'late' | 'warning' | 'broadcast'>('absence');
   const [composeMessage, setComposeMessage] = useState('');
@@ -329,6 +332,23 @@ export const NotificationOutboxView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Simulation Mode Indicator (L4) */}
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-900 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+            {lang === 'ar' ? 'وضع المحاكاة' : 'Simulation Mode'}
+          </span>
+          <span className="font-medium">
+            {lang === 'ar'
+              ? 'تنبيه بيئة العرض: بوابة الرسائل النصية والواتساب تعمل حالياً بنمط المحاكاة المباشرة (Sandbox) لمحاكاة الإرسال دون استهلاك رصيد المشغل.'
+              : 'SMS/WhatsApp gateways are currently in Simulation / Sandbox mode for testing and auditing without consuming SMS quota.'}
+          </span>
+        </div>
+        <span className="text-purple-700/80 text-[11px] hidden sm:inline">
+          {lang === 'ar' ? 'محاكاة Twilio / Unifonic' : 'Mock Gateway'}
+        </span>
+      </div>
+
       {/* Privacy Notice Banner */}
       <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 text-xs text-sky-900 shadow-xs flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
@@ -380,7 +400,7 @@ export const NotificationOutboxView: React.FC = () => {
       </div>
 
       {/* Prominent Batch Absence Reminders Launch Card */}
-      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-emerald-700/40 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="outbox-batch-banner bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-emerald-700/40 flex flex-col md:flex-row items-center justify-between gap-4 transition-all">
         <div className="flex items-start gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-300">
             <Users className="w-6 h-6" />

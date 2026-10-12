@@ -1,0 +1,990 @@
+/* ==========================================================================
+   Multi-Theme & Dark Mode Design Tokens
+   Supports:
+   - light-emerald: Classic School Emerald Mint (Default)
+   - dark-slate: Sleek Midnight Dark Mode (OLED friendly)
+   - elementary-sky: Calm Sky Blue for Primary/Elementary
+   - rose-blossom: Soft Rose Quartz for Girls' Academies
+   - warm-amber: Warm Heritage Amber
+   ========================================================================== */
+
+/* 1. Light Emerald (Default) */
+:root,
+[data-theme="light-emerald"] {
+  --app-bg: #f8fafc;
+  --app-card-bg: #ffffff;
+  --app-card-hover: #f1f5f9;
+  --app-border: #e2e8f0;
+  --app-border-subtle: #f1f5f9;
+  --app-text-main: #0f172a;
+  --app-text: var(--app-text-main);
+  --app-text-muted: #64748b;
+  --app-header-bg: rgba(255, 255, 255, 0.95);
+  --app-sidebar-bg: #ffffff;
+  --app-sidebar-hover: #f1f5f9;
+  --app-primary: #059669;
+  --app-primary-hover: #047857;
+  --app-primary-light: #ecfdf5;
+  --app-primary-border: #a7f3d0;
+  --app-input-bg: #ffffff;
+  --app-table-stripe: #f8fafc;
+  --app-chart-bg: #ffffff;
+  --app-chart-grid: #f1f5f9;
+  --settings-header-bg: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+  --settings-header-border: #a7f3d0;
+  --settings-header-text: #065f46;
+  --settings-header-badge: #059669;
+  --app-label-color: #047857;
+  --app-subheading-color: #065f46;
+}
+
+/* 2. Spotify-Inspired Executive Dark Mode */
+html.dark,
+[data-theme="dark-slate"] {
+  --app-bg: #121212;
+  --app-card-bg: #181818;
+  --app-card-hover: #282828;
+  --app-border: #282828;
+  --app-border-subtle: #1e1e1e;
+  --app-text-main: #ffffff;
+  --app-text: #ffffff;
+  --app-text-muted: #b3b3b3;
+  --app-header-bg: rgba(18, 18, 18, 0.95);
+  --app-sidebar-bg: #000000;
+  --app-sidebar-hover: #282828;
+  --app-primary: #1ed760;
+  --app-primary-hover: #1db954;
+  --app-primary-light: rgba(30, 215, 96, 0.12);
+  --app-primary-border: #1db954;
+  --app-input-bg: #242424;
+  --app-table-stripe: #181818;
+  --app-chart-bg: #181818;
+  --app-chart-grid: #282828;
+  --settings-header-bg: linear-gradient(135deg, rgba(30, 215, 96, 0.15) 0%, rgba(24, 24, 24, 0.95) 100%);
+  --settings-header-border: #1db954;
+  --settings-header-text: #1ed760;
+  --settings-header-badge: #1ed760;
+  --app-label-color: #1ed760;
+  --app-subheading-color: #6ee7b7;
+}
+
+/* 3. Elementary Sky Theme (Calm Sky Blue for Primary/Elementary) */
+[data-theme="elementary-sky"] {
+  --app-bg: #f0f9ff;
+  --app-card-bg: #ffffff;
+  --app-card-hover: #e0f2fe;
+  --app-border: #bae6fd;
+  --app-border-subtle: #e0f2fe;
+  --app-text-main: #0c4a6e;
+  --app-text: var(--app-text-main);
+  --app-text-muted: #0369a1;
+  --app-header-bg: rgba(255, 255, 255, 0.95);
+  --app-sidebar-bg: #ffffff;
+  --app-sidebar-hover: #e0f2fe;
+  --app-primary: #0284c7;
+  --app-primary-hover: #0369a1;
+  --app-primary-light: #e0f2fe;
+  --app-primary-border: #7dd3fc;
+  --app-input-bg: #f8fafc;
+  --app-table-stripe: #f0f9ff;
+  --app-chart-bg: #ffffff;
+  --app-chart-grid: #e0f2fe;
+  --settings-header-bg: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+  --settings-header-border: #7dd3fc;
+  --settings-header-text: #0369a1;
+  --settings-header-badge: #0284c7;
+  --app-label-color: #0284c7;
+  --app-subheading-color: #0369a1;
+}
+
+/* 4. Rose Blossom Theme (Soft Rose Quartz for Girls' Academies) */
+[data-theme="rose-blossom"] {
+  --app-bg: #fff1f2;
+  --app-card-bg: #ffffff;
+  --app-card-hover: #ffe4e6;
+  --app-border: #fecdd3;
+  --app-border-subtle: #ffe4e6;
+  --app-text-main: #881337;
+  --app-text: var(--app-text-main);
+  --app-text-muted: #9f1239;
+  --app-header-bg: rgba(255, 255, 255, 0.95);
+  --app-sidebar-bg: #ffffff;
+  --app-sidebar-hover: #ffe4e6;
+  --app-primary: #e11d48;
+  --app-primary-hover: #be123c;
+  --app-primary-light: #ffe4e6;
+  --app-primary-border: #fda4af;
+  --app-input-bg: #fff5f5;
+  --app-table-stripe: #fff1f2;
+  --app-chart-bg: #ffffff;
+  --app-chart-grid: #ffe4e6;
+  --settings-header-bg: linear-gradient(135deg, #ffe4e6 0%, #fff1f2 100%);
+  --settings-header-border: #fda4af;
+  --settings-header-text: #9f1239;
+  --settings-header-badge: #e11d48;
+  --app-label-color: #e11d48;
+  --app-subheading-color: #be123c;
+}
+
+/* 5. Warm Amber Theme (Calm Heritage & Focus) */
+[data-theme="warm-amber"] {
+  --app-bg: #fffbeb;
+  --app-card-bg: #ffffff;
+  --app-card-hover: #fef3c7;
+  --app-border: #fde68a;
+  --app-border-subtle: #fef3c7;
+  --app-text-main: #78350f;
+  --app-text: var(--app-text-main);
+  --app-text-muted: #92400e;
+  --app-header-bg: rgba(254, 243, 199, 0.95);
+  --app-sidebar-bg: #fef3c7;
+  --app-sidebar-hover: #fde68a;
+  --app-primary: #d97706;
+  --app-primary-hover: #b45309;
+  --app-primary-light: #fef3c7;
+  --app-primary-border: #fcd34d;
+  --app-input-bg: #fffdf5;
+  --app-table-stripe: #fffbeb;
+  --app-chart-bg: #ffffff;
+  --app-chart-grid: #fef3c7;
+  --settings-header-bg: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+  --settings-header-border: #fcd34d;
+  --settings-header-text: #92400e;
+  --settings-header-badge: #d97706;
+  --app-label-color: #d97706;
+  --app-subheading-color: #b45309;
+}
+
+/* Global Application Dynamic Resets */
+html,
+body,
+#app-root-container {
+  background-color: var(--app-bg) !important;
+  color: var(--app-text-main) !important;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Universal Settings Group & Section Header Style */
+.settings-group-header,
+.app-section-header {
+  background: var(--settings-header-bg) !important;
+  border-color: var(--settings-header-border) !important;
+  color: var(--settings-header-text) !important;
+  transition: all 0.2s ease;
+}
+
+.settings-group-header svg,
+.app-section-header svg {
+  color: var(--settings-header-badge) !important;
+}
+
+/* Distinctive Section, Card, and Form Field Headings across all themes */
+label,
+label.text-slate-700,
+label.text-slate-600,
+label.text-slate-800,
+.form-label {
+  color: var(--app-label-color) !important;
+  font-weight: 700 !important;
+  transition: color 0.2s ease;
+}
+
+h2,
+h3,
+h4,
+.section-title,
+.font-bold.text-slate-800 {
+  color: var(--app-subheading-color) !important;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="light-emerald"] label,
+[data-theme="light-emerald"] label.text-slate-700,
+[data-theme="light-emerald"] label.text-slate-800,
+[data-theme="light-emerald"] .form-label {
+  color: #047857 !important;
+}
+
+[data-theme="dark-slate"] label,
+[data-theme="dark-slate"] label.text-slate-700,
+[data-theme="dark-slate"] label.text-slate-800,
+[data-theme="dark-slate"] .form-label,
+html.dark label,
+html.dark label.text-slate-700,
+html.dark label.text-slate-800,
+html.dark .form-label {
+  color: #1ed760 !important;
+}
+
+[data-theme="dark-slate"] h2,
+[data-theme="dark-slate"] h3,
+[data-theme="dark-slate"] h4,
+[data-theme="dark-slate"] .font-bold.text-slate-800,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark .font-bold.text-slate-800 {
+  color: #6ee7b7 !important;
+}
+
+[data-theme="elementary-sky"] label,
+[data-theme="elementary-sky"] label.text-slate-700,
+[data-theme="elementary-sky"] label.text-slate-800,
+[data-theme="elementary-sky"] .form-label {
+  color: #0284c7 !important;
+}
+
+[data-theme="rose-blossom"] label,
+[data-theme="rose-blossom"] label.text-slate-700,
+[data-theme="rose-blossom"] label.text-slate-800,
+[data-theme="rose-blossom"] .form-label {
+  color: #e11d48 !important;
+}
+
+[data-theme="warm-amber"] label,
+[data-theme="warm-amber"] label.text-slate-700,
+[data-theme="warm-amber"] label.text-slate-800,
+[data-theme="warm-amber"] .form-label {
+  color: #d97706 !important;
+}
+
+/* ==========================================================================
+   THEME SPECIFIC OVERRIDES (CARDS, SIDEBARS, HEADERS, TEXT, INPUTS)
+   ========================================================================== */
+
+/* 1. Elementary Sky Theme (Calm Sky Blue for Primary/Elementary) */
+[data-theme="elementary-sky"] aside {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+}
+[data-theme="elementary-sky"] header {
+  background-color: rgba(240, 249, 255, 0.95) !important;
+  border-color: #bae6fd !important;
+}
+[data-theme="elementary-sky"] .bg-white {
+  background-color: #ffffff !important;
+  border-color: #bae6fd !important;
+}
+[data-theme="elementary-sky"] .bg-slate-50,
+[data-theme="elementary-sky"] .bg-slate-50\/70,
+[data-theme="elementary-sky"] .bg-slate-50\/80,
+[data-theme="elementary-sky"] .bg-slate-50\/90 {
+  background-color: #e0f2fe !important;
+}
+[data-theme="elementary-sky"] .bg-slate-100 {
+  background-color: #bae6fd !important;
+}
+[data-theme="elementary-sky"] .border-slate-100,
+[data-theme="elementary-sky"] .border-slate-200,
+[data-theme="elementary-sky"] .border-slate-300 {
+  border-color: #bae6fd !important;
+}
+[data-theme="elementary-sky"] .text-slate-900,
+[data-theme="elementary-sky"] .text-slate-800 {
+  color: #0369a1 !important;
+}
+[data-theme="elementary-sky"] .text-slate-700,
+[data-theme="elementary-sky"] .text-slate-600 {
+  color: #0284c7 !important;
+}
+[data-theme="elementary-sky"] .text-slate-500,
+[data-theme="elementary-sky"] .text-slate-400 {
+  color: #0369a1 !important;
+}
+[data-theme="elementary-sky"] aside button.bg-slate-900,
+[data-theme="elementary-sky"] .bg-slate-900 {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+[data-theme="elementary-sky"] aside button:hover:not(.bg-slate-900) {
+  background-color: #e0f2fe !important;
+}
+[data-theme="elementary-sky"] input,
+[data-theme="elementary-sky"] select,
+[data-theme="elementary-sky"] textarea {
+  border-color: #bae6fd !important;
+}
+
+/* 2. Rose Blossom Theme (Soft Rose Quartz for Girls' Academies) */
+[data-theme="rose-blossom"] aside {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+[data-theme="rose-blossom"] header {
+  background-color: rgba(255, 241, 242, 0.95) !important;
+  border-color: #fecdd3 !important;
+}
+[data-theme="rose-blossom"] .bg-white {
+  background-color: #ffffff !important;
+  border-color: #fecdd3 !important;
+}
+[data-theme="rose-blossom"] .bg-slate-50,
+[data-theme="rose-blossom"] .bg-slate-50\/70,
+[data-theme="rose-blossom"] .bg-slate-50\/80,
+[data-theme="rose-blossom"] .bg-slate-50\/90 {
+  background-color: #ffe4e6 !important;
+}
+[data-theme="rose-blossom"] .bg-slate-100 {
+  background-color: #fecdd3 !important;
+}
+[data-theme="rose-blossom"] .border-slate-100,
+[data-theme="rose-blossom"] .border-slate-200,
+[data-theme="rose-blossom"] .border-slate-300 {
+  border-color: #fecdd3 !important;
+}
+[data-theme="rose-blossom"] .text-slate-900,
+[data-theme="rose-blossom"] .text-slate-800 {
+  color: #881337 !important;
+}
+[data-theme="rose-blossom"] .text-slate-700,
+[data-theme="rose-blossom"] .text-slate-600 {
+  color: #9f1239 !important;
+}
+[data-theme="rose-blossom"] .text-slate-500,
+[data-theme="rose-blossom"] .text-slate-400 {
+  color: #be123c !important;
+}
+[data-theme="rose-blossom"] aside button.bg-slate-900,
+[data-theme="rose-blossom"] .bg-slate-900 {
+  background-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+[data-theme="rose-blossom"] aside button:hover:not(.bg-slate-900) {
+  background-color: #ffe4e6 !important;
+}
+[data-theme="rose-blossom"] input,
+[data-theme="rose-blossom"] select,
+[data-theme="rose-blossom"] textarea {
+  border-color: #fecdd3 !important;
+}
+
+/* 3. Warm Amber Theme (Calm Heritage & Focus) */
+[data-theme="warm-amber"] aside {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+}
+[data-theme="warm-amber"] header {
+  background-color: rgba(254, 243, 199, 0.95) !important;
+  border-color: #fde68a !important;
+}
+[data-theme="warm-amber"] .bg-white {
+  background-color: #ffffff !important;
+  border-color: #fde68a !important;
+}
+[data-theme="warm-amber"] .bg-slate-50,
+[data-theme="warm-amber"] .bg-slate-50\/70,
+[data-theme="warm-amber"] .bg-slate-50\/80,
+[data-theme="warm-amber"] .bg-slate-50\/90 {
+  background-color: #fef3c7 !important;
+}
+[data-theme="warm-amber"] .bg-slate-100 {
+  background-color: #fde68a !important;
+}
+[data-theme="warm-amber"] .border-slate-100,
+[data-theme="warm-amber"] .border-slate-200,
+[data-theme="warm-amber"] .border-slate-300 {
+  border-color: #fde68a !important;
+}
+[data-theme="warm-amber"] .text-slate-900,
+[data-theme="warm-amber"] .text-slate-800 {
+  color: #78350f !important;
+}
+[data-theme="warm-amber"] .text-slate-700,
+[data-theme="warm-amber"] .text-slate-600 {
+  color: #92400e !important;
+}
+[data-theme="warm-amber"] .text-slate-500,
+[data-theme="warm-amber"] .text-slate-400 {
+  color: #b45309 !important;
+}
+[data-theme="warm-amber"] aside button.bg-slate-900,
+[data-theme="warm-amber"] .bg-slate-900 {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+[data-theme="warm-amber"] aside button:hover:not(.bg-slate-900) {
+  background-color: #fef3c7 !important;
+}
+[data-theme="warm-amber"] input,
+[data-theme="warm-amber"] select,
+[data-theme="warm-amber"] textarea {
+  border-color: #fde68a !important;
+}
+
+/* Comprehensive Dark Mode Rules (Spotify-Style) */
+html.dark,
+[data-theme="dark-slate"] {
+  color-scheme: dark;
+}
+
+html.dark body,
+[data-theme="dark-slate"] body,
+html.dark #app-root-container,
+[data-theme="dark-slate"] #app-root-container {
+  background-color: #121212 !important;
+  color: #ffffff !important;
+}
+
+html.dark .bg-white,
+[data-theme="dark-slate"] .bg-white {
+  background-color: #181818 !important;
+  color: #ffffff !important;
+  border-color: #282828 !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/20,
+html.dark .bg-slate-50\/30,
+html.dark .bg-slate-50\/40,
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/90,
+[data-theme="dark-slate"] .bg-slate-50,
+[data-theme="dark-slate"] .bg-slate-50\/20,
+[data-theme="dark-slate"] .bg-slate-50\/30,
+[data-theme="dark-slate"] .bg-slate-50\/40,
+[data-theme="dark-slate"] .bg-slate-50\/50,
+[data-theme="dark-slate"] .bg-slate-50\/60,
+[data-theme="dark-slate"] .bg-slate-50\/70,
+[data-theme="dark-slate"] .bg-slate-50\/80 {
+  background-color: #242424 !important;
+}
+
+html.dark .bg-slate-100,
+[data-theme="dark-slate"] .bg-slate-100 {
+  background-color: #2a2a2a !important;
+}
+
+html.dark .bg-slate-200,
+[data-theme="dark-slate"] .bg-slate-200 {
+  background-color: #333333 !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+[data-theme="dark-slate"] .border-slate-100,
+[data-theme="dark-slate"] .border-slate-200,
+[data-theme="dark-slate"] .border-slate-300 {
+  border-color: #282828 !important;
+}
+
+/* Translucent Glowing Dark Mode Tints for Colored Metric Cards & Alerts */
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-50\/50,
+html.dark .bg-emerald-50\/60,
+html.dark .bg-emerald-50\/70,
+html.dark .bg-emerald-100,
+[data-theme="dark-slate"] .bg-emerald-50,
+[data-theme="dark-slate"] .bg-emerald-50\/50,
+[data-theme="dark-slate"] .bg-emerald-50\/60,
+[data-theme="dark-slate"] .bg-emerald-50\/70,
+[data-theme="dark-slate"] .bg-emerald-100 {
+  background-color: rgba(30, 215, 96, 0.12) !important;
+  border-color: rgba(30, 215, 96, 0.3) !important;
+}
+
+html.dark .text-emerald-700,
+html.dark .text-emerald-800,
+html.dark .text-emerald-900,
+html.dark .text-emerald-950,
+[data-theme="dark-slate"] .text-emerald-700,
+[data-theme="dark-slate"] .text-emerald-800,
+[data-theme="dark-slate"] .text-emerald-900,
+[data-theme="dark-slate"] .text-emerald-950 {
+  color: #1ed760 !important;
+}
+
+html.dark .bg-rose-50,
+html.dark .bg-rose-50\/50,
+html.dark .bg-rose-50\/60,
+html.dark .bg-rose-50\/70,
+html.dark .bg-rose-100,
+html.dark .bg-red-50,
+html.dark .bg-red-50\/50,
+html.dark .bg-red-50\/60,
+html.dark .bg-red-50\/70,
+html.dark .bg-red-100,
+[data-theme="dark-slate"] .bg-rose-50,
+[data-theme="dark-slate"] .bg-rose-50\/50,
+[data-theme="dark-slate"] .bg-rose-50\/60,
+[data-theme="dark-slate"] .bg-rose-100,
+[data-theme="dark-slate"] .bg-red-50,
+[data-theme="dark-slate"] .bg-red-50\/50,
+[data-theme="dark-slate"] .bg-red-50\/60,
+[data-theme="dark-slate"] .bg-red-100 {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.dark .border-red-200,
+html.dark .border-red-300,
+[data-theme="dark-slate"] .border-red-200,
+[data-theme="dark-slate"] .border-red-300 {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.dark .text-rose-700,
+html.dark .text-rose-800,
+html.dark .text-rose-900,
+html.dark .text-red-700,
+html.dark .text-red-800,
+html.dark .text-red-900,
+[data-theme="dark-slate"] .text-rose-700,
+[data-theme="dark-slate"] .text-rose-800,
+[data-theme="dark-slate"] .text-rose-900,
+[data-theme="dark-slate"] .text-red-700,
+[data-theme="dark-slate"] .text-red-800,
+[data-theme="dark-slate"] .text-red-900 {
+  color: #fb7185 !important;
+}
+
+html.dark .bg-amber-50,
+html.dark .bg-amber-50\/50,
+html.dark .bg-amber-50\/60,
+html.dark .bg-amber-50\/70,
+html.dark .bg-amber-100,
+[data-theme="dark-slate"] .bg-amber-50,
+[data-theme="dark-slate"] .bg-amber-50\/50,
+[data-theme="dark-slate"] .bg-amber-50\/60,
+[data-theme="dark-slate"] .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.dark .text-amber-700,
+html.dark .text-amber-800,
+html.dark .text-amber-900,
+[data-theme="dark-slate"] .text-amber-700,
+[data-theme="dark-slate"] .text-amber-800,
+[data-theme="dark-slate"] .text-amber-900 {
+  color: #fbbf24 !important;
+}
+
+html.dark .bg-blue-50,
+html.dark .bg-blue-50\/50,
+html.dark .bg-blue-50\/60,
+html.dark .bg-blue-50\/70,
+html.dark .bg-blue-100,
+[data-theme="dark-slate"] .bg-blue-50,
+[data-theme="dark-slate"] .bg-blue-50\/50,
+[data-theme="dark-slate"] .bg-blue-50\/60,
+[data-theme="dark-slate"] .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+html.dark .text-blue-700,
+html.dark .text-blue-800,
+html.dark .text-blue-900,
+[data-theme="dark-slate"] .text-blue-700,
+[data-theme="dark-slate"] .text-blue-800,
+[data-theme="dark-slate"] .text-blue-900 {
+  color: #60a5fa !important;
+}
+
+html.dark .bg-indigo-50,
+html.dark .bg-indigo-50\/50,
+html.dark .bg-indigo-50\/60,
+html.dark .bg-indigo-50\/70,
+html.dark .bg-indigo-100,
+[data-theme="dark-slate"] .bg-indigo-50,
+[data-theme="dark-slate"] .bg-indigo-50\/50,
+[data-theme="dark-slate"] .bg-indigo-50\/60,
+[data-theme="dark-slate"] .bg-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+html.dark .text-indigo-700,
+html.dark .text-indigo-800,
+html.dark .text-indigo-900,
+[data-theme="dark-slate"] .text-indigo-700,
+[data-theme="dark-slate"] .text-indigo-800,
+[data-theme="dark-slate"] .text-indigo-900 {
+  color: #818cf8 !important;
+}
+
+/* Purple Banners (Simulation mode / AI Assistant / Academic Terms) */
+html.dark .bg-purple-50,
+html.dark .bg-purple-50\/50,
+html.dark .bg-purple-50\/60,
+html.dark .bg-purple-50\/80,
+html.dark .bg-purple-100,
+[data-theme="dark-slate"] .bg-purple-50,
+[data-theme="dark-slate"] .bg-purple-50\/50,
+[data-theme="dark-slate"] .bg-purple-50\/60,
+[data-theme="dark-slate"] .bg-purple-50\/80,
+[data-theme="dark-slate"] .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.dark .border-purple-400,
+[data-theme="dark-slate"] .border-purple-400 {
+  border-color: rgba(192, 132, 252, 0.5) !important;
+}
+
+html.dark .text-purple-600,
+[data-theme="dark-slate"] .text-purple-600 {
+  color: #c084fc !important;
+}
+
+html.dark .text-purple-700,
+html.dark .text-purple-800,
+html.dark .text-purple-900,
+html.dark .text-purple-950,
+[data-theme="dark-slate"] .text-purple-700,
+[data-theme="dark-slate"] .text-purple-800,
+[data-theme="dark-slate"] .text-purple-900,
+[data-theme="dark-slate"] .text-purple-950 {
+  color: #c084fc !important;
+}
+
+/* Sky Banners (Privacy / Outbox pattern) */
+html.dark .bg-sky-50,
+html.dark .bg-sky-50\/50,
+html.dark .bg-sky-50\/60,
+html.dark .bg-sky-100,
+[data-theme="dark-slate"] .bg-sky-50,
+[data-theme="dark-slate"] .bg-sky-50\/50,
+[data-theme="dark-slate"] .bg-sky-50\/60,
+[data-theme="dark-slate"] .bg-sky-100 {
+  background-color: rgba(14, 165, 233, 0.12) !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+html.dark .text-sky-700,
+html.dark .text-sky-800,
+html.dark .text-sky-900,
+html.dark .text-sky-950,
+[data-theme="dark-slate"] .text-sky-700,
+[data-theme="dark-slate"] .text-sky-800,
+[data-theme="dark-slate"] .text-sky-900,
+[data-theme="dark-slate"] .text-sky-950 {
+  color: #38bdf8 !important;
+}
+
+html.dark .border-purple-200,
+html.dark .border-purple-300,
+[data-theme="dark-slate"] .border-purple-200,
+[data-theme="dark-slate"] .border-purple-300 {
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.dark .border-sky-200,
+html.dark .border-sky-300,
+[data-theme="dark-slate"] .border-sky-200,
+[data-theme="dark-slate"] .border-sky-300 {
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+html.dark .border-emerald-200,
+html.dark .border-emerald-300,
+[data-theme="dark-slate"] .border-emerald-200,
+[data-theme="dark-slate"] .border-emerald-300 {
+  border-color: rgba(30, 215, 96, 0.3) !important;
+}
+
+html.dark .border-rose-200,
+html.dark .border-rose-300,
+[data-theme="dark-slate"] .border-rose-200,
+[data-theme="dark-slate"] .border-rose-300 {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.dark .border-amber-200,
+html.dark .border-amber-300,
+[data-theme="dark-slate"] .border-amber-200,
+[data-theme="dark-slate"] .border-amber-300 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.dark .border-blue-200,
+html.dark .border-blue-300,
+[data-theme="dark-slate"] .border-blue-200,
+[data-theme="dark-slate"] .border-blue-300 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+html.dark .border-indigo-200,
+html.dark .border-indigo-300,
+[data-theme="dark-slate"] .border-indigo-200,
+[data-theme="dark-slate"] .border-indigo-300 {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+html.dark .text-slate-900:not(label):not(h4),
+html.dark .text-slate-800:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-900:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-800:not(label):not(h4) {
+  color: #ffffff !important;
+}
+
+html.dark .text-slate-700:not(label):not(h4),
+html.dark .text-slate-600:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-700:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-600:not(label):not(h4) {
+  color: #e5e5e5 !important;
+}
+
+html.dark .text-slate-500:not(label):not(h4),
+html.dark .text-slate-400:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-500:not(label):not(h4),
+[data-theme="dark-slate"] .text-slate-400:not(label):not(h4) {
+  color: #a7a7a7 !important;
+}
+
+/* Explicit final rule: all labels across the app in dark mode */
+html.dark label,
+[data-theme="dark-slate"] label {
+  color: #1ed760 !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea,
+[data-theme="dark-slate"] input,
+[data-theme="dark-slate"] select,
+[data-theme="dark-slate"] textarea {
+  background-color: #242424 !important;
+  color: #ffffff !important;
+  border-color: #3e3e3e !important;
+}
+
+html.dark header,
+[data-theme="dark-slate"] header {
+  background-color: rgba(18, 18, 18, 0.95) !important;
+  border-color: #282828 !important;
+}
+
+html.dark aside,
+[data-theme="dark-slate"] aside {
+  background-color: #000000 !important;
+  border-color: #282828 !important;
+}
+
+html.dark aside button.bg-slate-900,
+[data-theme="dark-slate"] aside button.bg-slate-900 {
+  background-color: #1ed760 !important;
+  color: #000000 !important;
+}
+
+html.dark aside button:hover:not(.bg-slate-900),
+[data-theme="dark-slate"] aside button:hover:not(.bg-slate-900) {
+  background-color: #282828 !important;
+  color: #ffffff !important;
+}
+
+html.dark [role="dialog"],
+[data-theme="dark-slate"] [role="dialog"] {
+  background-color: #181818 !important;
+  color: #ffffff !important;
+  border-color: #282828 !important;
+}
+
+html.dark table thead tr,
+[data-theme="dark-slate"] table thead tr {
+  background-color: #242424 !important;
+}
+
+html.dark table tbody tr,
+[data-theme="dark-slate"] table tbody tr {
+  border-color: #1e1e1e !important;
+}
+
+html.dark table tbody tr:hover,
+[data-theme="dark-slate"] table tbody tr:hover {
+  background-color: #282828 !important;
+}
+
+html.dark footer,
+[data-theme="dark-slate"] footer {
+  background-color: #000000 !important;
+  border-color: #282828 !important;
+}
+
+/* Chart SVG Theme Support */
+html.dark .recharts-cartesian-grid line,
+[data-theme="dark-slate"] .recharts-cartesian-grid line {
+  stroke: #282828 !important;
+}
+
+html.dark .recharts-text,
+[data-theme="dark-slate"] .recharts-text {
+  fill: #a7a7a7 !important;
+}
+
+html.dark .recharts-cartesian-axis-line,
+[data-theme="dark-slate"] .recharts-cartesian-axis-line {
+  stroke: #282828 !important;
+}
+
+[data-theme="elementary-sky"] .recharts-cartesian-grid line {
+  stroke: #e0f2fe !important;
+}
+
+[data-theme="rose-blossom"] .recharts-cartesian-grid line {
+  stroke: #ffe4e6 !important;
+}
+
+[data-theme="warm-amber"] .recharts-cartesian-grid line {
+  stroke: #fef3c7 !important;
+}
+
+/* Batch Reminder Banner & Outbox Banners Theme Overrides */
+html.dark .outbox-batch-banner,
+[data-theme="dark-slate"] .outbox-batch-banner {
+  background: linear-gradient(135deg, rgba(30, 215, 96, 0.18) 0%, rgba(18, 18, 18, 0.98) 100%) !important;
+  border-color: rgba(30, 215, 96, 0.35) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="elementary-sky"] .outbox-batch-banner {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-color: #38bdf8 !important;
+}
+
+[data-theme="rose-blossom"] .outbox-batch-banner {
+  background: linear-gradient(135deg, #e11d48 0%, #9f1239 100%) !important;
+  border-color: #fb7185 !important;
+}
+
+[data-theme="warm-amber"] .outbox-batch-banner {
+  background: linear-gradient(135deg, #d97706 0%, #92400e 100%) !important;
+  border-color: #fbbf24 !important;
+}
+
+/* Sky Theme Banners for Outbox & Badges */
+[data-theme="elementary-sky"] .bg-purple-50 {
+  background-color: #f3e8ff !important;
+  border-color: #e9d5ff !important;
+  color: #6b21a8 !important;
+}
+[data-theme="elementary-sky"] .bg-sky-50 {
+  background-color: #e0f2fe !important;
+  border-color: #bae6fd !important;
+  color: #0369a1 !important;
+}
+[data-theme="rose-blossom"] .bg-purple-50 {
+  background-color: #fdf2f8 !important;
+  border-color: #fbcfe8 !important;
+  color: #831843 !important;
+}
+[data-theme="rose-blossom"] .bg-sky-50 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #9f1239 !important;
+}
+[data-theme="warm-amber"] .bg-purple-50 {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+[data-theme="warm-amber"] .bg-sky-50 {
+  background-color: #fefce8 !important;
+  border-color: #fef08a !important;
+  color: #854d0e !important;
+}
+
+/* Settings Sub-Tabs Theme Adaptive Rules */
+[data-theme="elementary-sky"] .border-b button.bg-slate-900 {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="rose-blossom"] .border-b button.bg-slate-900 {
+  background-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="warm-amber"] .border-b button.bg-slate-900 {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+
+html.dark .border-b button.bg-slate-900,
+[data-theme="dark-slate"] .border-b button.bg-slate-900 {
+  background-color: #1ed760 !important;
+  color: #000000 !important;
+}
+
+/* Gemini Chatbot & AI Settings Theme Adaptations */
+html.dark .gemini-chat-container,
+[data-theme="dark-slate"] .gemini-chat-container {
+  background-color: #181818 !important;
+  border-color: #282828 !important;
+}
+
+html.dark .gemini-chat-thread,
+[data-theme="dark-slate"] .gemini-chat-thread {
+  background-color: #121212 !important;
+}
+
+html.dark .gemini-assistant-bubble,
+[data-theme="dark-slate"] .gemini-assistant-bubble {
+  background-color: #1e1e1e !important;
+  border-color: #2c2c2c !important;
+  color: #ffffff !important;
+}
+
+html.dark .gemini-user-bubble,
+[data-theme="dark-slate"] .gemini-user-bubble {
+  background-color: #1ed760 !important;
+  color: #000000 !important;
+}
+
+html.dark .gemini-quick-pill,
+[data-theme="dark-slate"] .gemini-quick-pill {
+  background-color: #242424 !important;
+  border-color: #383838 !important;
+  color: #b3b3b3 !important;
+}
+
+html.dark .gemini-quick-pill:hover,
+[data-theme="dark-slate"] .gemini-quick-pill:hover {
+  background-color: rgba(30, 215, 96, 0.15) !important;
+  border-color: #1ed760 !important;
+  color: #1ed760 !important;
+}
+
+/* Light Themes Pill & Bubble Adaptations */
+[data-theme="elementary-sky"] .gemini-user-bubble {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+[data-theme="elementary-sky"] .gemini-quick-pill:hover {
+  background-color: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0369a1 !important;
+}
+
+[data-theme="rose-blossom"] .gemini-user-bubble {
+  background-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+[data-theme="rose-blossom"] .gemini-quick-pill:hover {
+  background-color: #ffe4e6 !important;
+  border-color: #e11d48 !important;
+  color: #9f1239 !important;
+}
+
+[data-theme="warm-amber"] .gemini-user-bubble {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+[data-theme="warm-amber"] .gemini-quick-pill:hover {
+  background-color: #fef3c7 !important;
+  border-color: #d97706 !important;
+  color: #78350f !important;
+}
+
+/* Print Isolation: Prints always remain clean, bright paper white */
+@media print {
+  body, html, [role="dialog"] {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+}

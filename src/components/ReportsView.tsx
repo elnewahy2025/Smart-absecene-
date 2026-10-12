@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { OfficialReportModal } from './OfficialReportModal';
 import { GradeAbsencePatternsSection } from './GradeAbsencePatternsSection';
+import { AbsenceHeatmapCard } from './reports/AbsenceHeatmapCard';
+import { StudentEngagementSection } from './reports/StudentEngagementSection';
+import { BatchPrintCenterModal } from './reports/BatchPrintCenterModal';
 
 export const ReportsView: React.FC = () => {
   const {
@@ -32,46 +35,50 @@ export const ReportsView: React.FC = () => {
   } = useAttendance();
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
-  const [reportType, setReportType] = useState<'full' | 'chronic_only' | 'sessions'>('full');
+  const [reportType, setReportType] = useState<'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical' | 'sessions'>('full');
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isBatchPrintModalOpen, setIsBatchPrintModalOpen] = useState(false);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
   const [sentWarningIds, setSentWarningIds] = useState<string[]>([]);
   const [batchWarningAlert, setBatchWarningAlert] = useState<string | null>(null);
 
+  // Active students only (excluding transferred students from active calculations)
+  const activeStudents = students.filter((s) => s.enrollmentStatus !== 'transferred');
+
   // Filtered dataset
-  const filteredStudents = students.filter((s) => {
+  const filteredStudents = activeStudents.filter((s) => {
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
     if (reportType === 'chronic_only') return s.totalAbsences >= 3;
+    if (reportType === 'tier2_warning') return s.totalAbsences >= 5 && s.totalAbsences < 8;
+    if (reportType === 'tier3_critical') return s.totalAbsences >= 8;
     return true;
   });
 
-  // Calculate overall metrics
-  const totalStudents = students.length;
+  // Calculate overall metrics from active students
+  const totalStudents = activeStudents.length;
   const averageAttendanceRate =
     totalStudents > 0
-      ? (students.reduce((acc, s) => acc + s.attendanceRate, 0) / totalStudents).toFixed(1)
+      ? (activeStudents.reduce((acc, s) => acc + s.attendanceRate, 0) / totalStudents).toFixed(1)
       : '100';
 
-  // Chronic absence risk tiers
-  const tier3Plus = students.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5);
-  const tier5Plus = students.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8);
-  const tier8Plus = students.filter((s) => s.totalAbsences >= 8);
+  // Chronic absence risk tiers (active students only)
+  const tier3Plus = activeStudents.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5);
+  const tier5Plus = activeStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8);
+  const tier8Plus = activeStudents.filter((s) => s.totalAbsences >= 8);
 
-  // Group by Class
-  const classBreakdown: Record<string, { total: number; absentSum: number; avgRate: number }> = {};
-  students.forEach((s) => {
+  // Group by Class (Active students)
+  const classBreakdown: Record<string, { total: number; rateSum: number; avgRate: number }> = {};
+  activeStudents.forEach((s) => {
     if (!classBreakdown[s.className]) {
-      classBreakdown[s.className] = { total: 0, absentSum: 0, avgRate: 0 };
+      classBreakdown[s.className] = { total: 0, rateSum: 0, avgRate: 0 };
     }
     classBreakdown[s.className].total += 1;
-    classBreakdown[s.className].absentSum += s.totalAbsences;
+    classBreakdown[s.className].rateSum += s.attendanceRate;
   });
 
   Object.keys(classBreakdown).forEach((cName) => {
     const item = classBreakdown[cName];
-    const totalPossibleDays = 20 * item.total;
-    const rate = totalPossibleDays > 0 ? ((totalPossibleDays - item.absentSum) / totalPossibleDays) * 100 : 100;
-    item.avgRate = parseFloat(rate.toFixed(1));
+    item.avgRate = item.total > 0 ? parseFloat((item.rateSum / item.total).toFixed(1)) : 100;
   });
 
   // 1. Download formatted Excel Workbook (.xls with native styling & RTL)
@@ -141,7 +148,7 @@ export const ReportsView: React.FC = () => {
           <tr><td colspan="13"></td></tr>
           <tr class="summary-card">
             <td colspan="3">إجمالي الطلاب: ${studentsList.length}</td>
-            <td colspan="4">متوسط الحضور: ${avgRate}%</td>
+            <td colspan="4">متوسط الحضور: ${averageAttendanceRate}%</td>
             <td colspan="3">إنذار 5+ أيام: ${studentsList.filter((s) => s.totalAbsences >= 5).length}</td>
             <td colspan="3">إنذار نهائي 8+ أيام: ${studentsList.filter((s) => s.totalAbsences >= 8).length}</td>
           </tr>
@@ -311,15 +318,23 @@ export const ReportsView: React.FC = () => {
         <div className="flex flex-wrap lg:flex-col gap-2.5 shrink-0">
           <button
             onClick={() => setIsPdfModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-5 py-3 rounded-xl transition-colors cursor-pointer shadow-sm"
+            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm"
           >
             <FileText className="w-4 h-4 text-slate-950" />
             <span>{lang === 'ar' ? 'تنزيل مستند PDF رسمي معتمد' : 'Download Official PDF Report'}</span>
           </button>
 
           <button
+            onClick={() => setIsBatchPrintModalOpen(true)}
+            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm"
+          >
+            <Printer className="w-4 h-4 text-white" />
+            <span>{lang === 'ar' ? 'مركز الطباعة المجمعة للمستندات' : 'Batch Print Center'}</span>
+          </button>
+
+          <button
             onClick={handleDownloadExcelWorkbook}
-            className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-5 py-2.5 rounded-xl border border-white/20 transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-5 py-2 rounded-xl border border-white/20 transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
             <span>{lang === 'ar' ? 'تنزيل ملف إكسل منسق (Excel .xls)' : 'Download Formatted Excel (.xls)'}</span>
@@ -335,58 +350,114 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - Prominent Percentages + Actual Headcounts + Instant Drilldown */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        {/* Card 1: Average Attendance Rate */}
+        <div
+          onClick={() => setReportType('full')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            reportType === 'full'
+              ? 'bg-emerald-50/40 border-emerald-500 shadow-xs ring-2 ring-emerald-500/20'
+              : 'bg-white border-slate-200 hover:border-emerald-300'
+          }`}
+          title={lang === 'ar' ? 'انقر لعرض الكشف الشامل' : 'Click to view full roster'}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-bold text-slate-600">
               {lang === 'ar' ? 'متوسط نسبة الحضور العامة' : 'Average Attendance Rate'}
             </span>
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-emerald-700">{averageAttendanceRate}%</span>
-            <span className="text-xs text-slate-500">من المستهدف 95%</span>
+            <span className="text-3xl font-black font-mono text-emerald-800">%{averageAttendanceRate}</span>
+            <span className="text-xs text-slate-500 font-semibold">({totalStudents} طالب نشط)</span>
           </div>
+          <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+            <span>من المستهدف الوزاري 95%</span>
+            <span className="text-emerald-700 font-bold hover:underline">عرض الكل ←</span>
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        {/* Card 2: Active Enrollment */}
+        <div
+          onClick={() => setReportType('full')}
+          className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">
-              {lang === 'ar' ? 'إجمالي المقيدين' : 'Total Students'}
+            <span className="text-xs font-bold text-slate-600">
+              {lang === 'ar' ? 'نسبة القيد النشط بالمدرسة' : 'Active Enrollment %'}
             </span>
             <Users className="w-4 h-4 text-slate-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{totalStudents}</span>
-            <span className="text-xs text-slate-500">طالب في المدرسة</span>
+            <span className="text-3xl font-black font-mono text-slate-900">
+              %{students.length > 0 ? Math.round((totalStudents / students.length) * 100) : 100}
+            </span>
+            <span className="text-xs text-slate-500 font-semibold">({totalStudents} / {students.length})</span>
           </div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            طالب مسجل ومنتظم بالدراسة
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        {/* Card 3: Tier 2 Risk (5+ Days) */}
+        <div
+          onClick={() => setReportType(reportType === 'tier2_warning' ? 'full' : 'tier2_warning')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            reportType === 'tier2_warning'
+              ? 'bg-amber-50 border-amber-500 shadow-xs ring-2 ring-amber-500/20'
+              : 'bg-white border-slate-200 hover:border-amber-300'
+          }`}
+          title={lang === 'ar' ? 'انقر للتعمق في قائمة إنذار المرحلة الثانية' : 'Click to drill down into Tier 2 warnings'}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-amber-700">
-              {lang === 'ar' ? 'إنذار مرحلة ثانية (5+ أيام)' : 'Tier 2 Risk (5+ Days)'}
+            <span className="text-xs font-bold text-amber-800">
+              {lang === 'ar' ? 'نسبة إنذار مرحلة ثانية (5+ أيام)' : 'Tier 2 Risk (5+ Days)'}
             </span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-amber-700">{tier5Plus.length}</span>
-            <span className="text-xs text-slate-500">بحاجة لإنذار خطي</span>
+            <span className="text-3xl font-black font-mono text-amber-700">
+              %{totalStudents > 0 ? ((tier5Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
+            </span>
+            <span className="text-xs text-amber-800 font-semibold">({tier5Plus.length} طالب)</span>
           </div>
+          <p className="text-[11px] text-amber-700 font-medium mt-2 flex items-center justify-between">
+            <span>بحاجة لإنذار خطي</span>
+            <span className="font-bold underline">
+              {reportType === 'tier2_warning' ? 'إلغاء التصفية' : 'تصفية الطلاب ←'}
+            </span>
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        {/* Card 4: Critical Cases (8+ Days) */}
+        <div
+          onClick={() => setReportType(reportType === 'tier3_critical' ? 'full' : 'tier3_critical')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            reportType === 'tier3_critical'
+              ? 'bg-rose-50 border-rose-500 shadow-xs ring-2 ring-rose-500/20'
+              : 'bg-white border-slate-200 hover:border-rose-300'
+          }`}
+          title={lang === 'ar' ? 'انقر للتعمق في قائمة الحالات الحرجة للتدخل' : 'Click to drill down into Critical cases'}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-rose-700">
-              {lang === 'ar' ? 'حالات حرجة (8+ أيام غياب)' : 'Critical (8+ Days)'}
+            <span className="text-xs font-bold text-rose-800">
+              {lang === 'ar' ? 'نسبة الحالات الحرجة (8+ أيام)' : 'Critical (8+ Days)'}
             </span>
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-rose-700">{tier8Plus.length}</span>
-            <span className="text-xs text-rose-600 font-semibold">تحويل للمرشد الطلابي</span>
+            <span className="text-3xl font-black font-mono text-rose-700">
+              %{totalStudents > 0 ? ((tier8Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
+            </span>
+            <span className="text-xs text-rose-800 font-semibold">({tier8Plus.length} طالب)</span>
           </div>
+          <p className="text-[11px] text-rose-700 font-medium mt-2 flex items-center justify-between">
+            <span>تحويل مباشر للمرشد الطلابي</span>
+            <span className="font-bold underline">
+              {reportType === 'tier3_critical' ? 'إلغاء التصفية' : 'تدخل عاجل ←'}
+            </span>
+          </p>
         </div>
       </div>
 
@@ -405,6 +476,12 @@ export const ReportsView: React.FC = () => {
           }
         }}
       />
+
+      {/* Feature #2: Absence Heatmap Matrix */}
+      <AbsenceHeatmapCard />
+
+      {/* Feature #1: Student Engagement & Gamified Streaks Hub */}
+      <StudentEngagementSection students={students} lang={lang} />
 
       {/* Class Comparison and Risk Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -554,10 +631,17 @@ export const ReportsView: React.FC = () => {
       {isPdfModalOpen && (
         <OfficialReportModal
           selectedClassFilter={selectedClass}
-          reportType={reportType}
+          reportType={reportType === 'tier2_warning' || reportType === 'tier3_critical' ? 'chronic_only' : reportType}
           onClose={() => setIsPdfModalOpen(false)}
         />
       )}
+
+      {/* Batch Print Center Modal */}
+      <BatchPrintCenterModal
+        isOpen={isBatchPrintModalOpen}
+        onClose={() => setIsBatchPrintModalOpen(false)}
+        students={students}
+      />
     </div>
   );
 };

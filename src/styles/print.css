@@ -1,0 +1,99 @@
+/* ==========================================================================
+   Modular Dedicated Print Stylesheet
+   Ensures crystal-clear native vector printouts across Chrome, Edge, Safari, Firefox.
+   ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 6mm;
+  }
+
+  /* Force exact background colors and text coloring */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    font-family: 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+  }
+
+  /* When a modal dialog is mounted (e.g. OfficialReportModal, BatchQRModal), hide app root chrome */
+  body:has([role="dialog"]) #root {
+    display: none !important;
+  }
+
+  /* Hide app navigation, headers, footers, and buttons */
+  header,
+  nav,
+  footer,
+  aside,
+  button,
+  .print-hidden,
+  .print\:hidden,
+  .modal-controls-header {
+    display: none !important;
+  }
+
+  /* Normalize modal container for print layout */
+  [role="dialog"] {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  [role="dialog"] > div {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Tables and cards pagination optimization */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr,
+  .break-inside-avoid,
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Clean borders for printable cards */
+  .border-2 {
+    border-width: 1px !important;
+  }
+}

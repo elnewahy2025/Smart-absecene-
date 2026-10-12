@@ -44,5 +44,11 @@ jobs:
         run: |
           test -f .env.example
 
+      - name: Build check
+        run: npm run build
+
+      - name: Run automated unit tests
+        run: npm run test
+
       - name: Security audit script
         run: node scripts/ci-security-audit.mjs

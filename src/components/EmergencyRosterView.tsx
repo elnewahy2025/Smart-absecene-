@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
+import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 import {
   ShieldAlert,
   Printer,
+  Download,
+  Loader2,
   CheckCircle2,
   Users,
   AlertTriangle,
@@ -14,10 +17,15 @@ import {
 } from 'lucide-react';
 
 export const EmergencyRosterView: React.FC = () => {
-  const { students, sessions, settings, lang, currentTenant } = useAttendance();
+  const { students, sessions, settings, schoolProfile, lang, currentTenant } = useAttendance();
+  const rosterContentRef = useRef<HTMLDivElement>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const availableAssemblyPoints = schoolProfile.assemblyPoints?.map((ap) => ap.name) ||
+    settings.emergencyAssemblyPoints || ['نقطة التجمع (أ) - الفناء الرئيسي'];
 
   const [selectedAssemblyPoint, setSelectedAssemblyPoint] = useState<string>(
-    settings.emergencyAssemblyPoints[0] || 'نقطة التجمع (أ) - الفناء الرئيسي'
+    availableAssemblyPoints[0] || 'نقطة التجمع (أ) - الفناء الرئيسي'
   );
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -74,12 +82,41 @@ export const EmergencyRosterView: React.FC = () => {
     });
   };
 
+  const handleExportVectorPdf = async () => {
+    if (!rosterContentRef.current) {
+      window.print();
+      return;
+    }
+
+    setIsExportingPdf(true);
+    const html = rosterContentRef.current.innerHTML;
+    const today = new Date().toLocaleDateString('ar-SA');
+    const reportTitle = `${currentTenant.name} - كشف الإخلاء الميداني وحصر الطوارئ (${selectedAssemblyPoint})`;
+    const filename = `كشف_طوارئ_${currentTenant.code}_${today.replace(/\s+/g, '_')}.pdf`;
+
+    await downloadNativePdfFromHtml({
+      htmlContent: html,
+      title: reportTitle,
+      filename,
+    });
+    setIsExportingPdf(false);
+  };
+
   const handlePrint = () => {
-    window.print();
+    if (rosterContentRef.current) {
+      const html = rosterContentRef.current.innerHTML;
+      const reportTitle = `${currentTenant.name} - كشف الإخلاء الميداني وحصر الطوارئ (${selectedAssemblyPoint})`;
+      printNativePdfFromHtml({
+        htmlContent: html,
+        title: reportTitle,
+      });
+    } else {
+      window.print();
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-root-active">
       {/* Disclaimer / Architectural Note Banner as required by spec */}
       <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 shadow-xs flex items-start gap-3">
         <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -151,7 +188,7 @@ export const EmergencyRosterView: React.FC = () => {
               onChange={(e) => setSelectedAssemblyPoint(e.target.value)}
               className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer"
             >
-              {settings.emergencyAssemblyPoints.map((pt) => (
+              {availableAssemblyPoints.map((pt) => (
                 <option key={pt} value={pt}>
                   {pt}
                 </option>
@@ -194,26 +231,54 @@ export const EmergencyRosterView: React.FC = () => {
           </div>
         </div>
 
-        {/* Print button */}
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs shrink-0 print:hidden"
-        >
-          <Printer className="w-4 h-4" />
-          <span>{lang === 'ar' ? 'طباعة كشف الإخلاء الفوري' : 'Print Roster'}</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0 print:hidden">
+          <button
+            onClick={handleExportVectorPdf}
+            disabled={isExportingPdf}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+            title="تنزيل كشف الطوارئ كمستند PDF أصلي بنصوص قابلة للنسخ"
+          >
+            {isExportingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{lang === 'ar' ? 'جارٍ إنشاء PDF...' : 'Generating...'}</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>{lang === 'ar' ? 'تنزيل PDF أصلي' : 'Export Vector PDF'}</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+          >
+            <Printer className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'طباعة مباشرة' : 'Print'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Roster Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div ref={rosterContentRef} className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">
-              {lang === 'ar' ? 'قائمة التحقق الميداني للطوارئ' : 'Emergency Roll-Call Checklist'}
+              {lang === 'ar' ? 'قائمة التحقق الميداني للطوارئ والإخلاء' : 'Emergency Roll-Call Checklist'}
             </h3>
-            <span className="text-[11px] text-slate-500 font-mono">
-              {currentTenant.name} · {latestSession?.subject || 'كشف اليوم'} ({latestSession?.date})
-            </span>
+            <div className="text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-2 mt-0.5">
+              <span>{schoolProfile.schoolName || currentTenant.name}</span>
+              <span>·</span>
+              <span>{latestSession?.subject || 'كشف اليوم'} ({latestSession?.date})</span>
+              {schoolProfile.emergencyHotline && (
+                <>
+                  <span>·</span>
+                  <span className="text-rose-700 font-bold font-mono">طوارئ: {schoolProfile.emergencyHotline}</span>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="text-xs text-slate-600">
@@ -225,14 +290,14 @@ export const EmergencyRosterView: React.FC = () => {
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
               <tr>
-                <th className="py-3 px-4 text-center w-14">
+                <th className="py-3 px-4 text-center w-14 whitespace-nowrap">
                   {lang === 'ar' ? 'تم الحصر' : 'Checked'}
                 </th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'الفصل الدراسي' : 'Class'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'حالة الحضور الأخيرة' : 'Last Known Status'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'هاتف ولي الأمر للطوارئ' : 'Emergency Contact'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'فصيلة الدم / حالات صحية' : 'Medical Flags'}</th>
+                <th className="py-3 px-4 whitespace-nowrap">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+                <th className="py-3 px-4 whitespace-nowrap">{lang === 'ar' ? 'الفصل الدراسي' : 'Class'}</th>
+                <th className="py-3 px-4 whitespace-nowrap">{lang === 'ar' ? 'حالة الحضور الأخيرة' : 'Last Known Status'}</th>
+                <th className="py-3 px-4 whitespace-nowrap">{lang === 'ar' ? 'هاتف ولي الأمر للطوارئ' : 'Emergency Contact'}</th>
+                <th className="py-3 px-4 whitespace-nowrap">{lang === 'ar' ? 'فصيلة الدم / حالات صحية' : 'Medical Flags'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -249,7 +314,7 @@ export const EmergencyRosterView: React.FC = () => {
                         : 'bg-rose-50/30 hover:bg-rose-50/60 opacity-80'
                     }`}
                   >
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
                       <div
                         className={`w-5 h-5 mx-auto rounded flex items-center justify-center border transition-colors ${
                           isVerifiedAtPoint
@@ -260,14 +325,14 @@ export const EmergencyRosterView: React.FC = () => {
                         {isVerifiedAtPoint && <Check className="w-3.5 h-3.5" />}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <div className="font-semibold text-slate-900">{student.fullName}</div>
                       <div className="text-[11px] text-slate-500 font-mono">رقم: {student.studentNumber}</div>
                     </td>
-                    <td className="py-3 px-4 font-medium text-slate-700">{student.className}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">{student.className}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                        className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border leading-none shadow-2xs ${
                           lastStatus === 'present'
                             ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
                             : lastStatus === 'late'
@@ -285,12 +350,12 @@ export const EmergencyRosterView: React.FC = () => {
                           ? 'مستأذن (غادر المبنى)'
                           : 'غائب رسميًا'}
                       </span>
-                      {note && <div className="text-[10px] text-slate-500 mt-0.5">{note}</div>}
+                      {note && <div className="text-[10px] text-slate-500 mt-1">{note}</div>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-700" dir="ltr">
+                    <td className="py-3 px-4 font-mono text-slate-700 whitespace-nowrap" dir="ltr">
                       {student.emergencyContact || student.guardianPhone}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
                           {student.bloodType || 'O+'}

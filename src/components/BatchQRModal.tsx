@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Student } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
-import { Printer, Download, X, QrCode, Building, Layers } from 'lucide-react';
+import { Printer, Download, X, QrCode, Building, Layers, Loader2 } from 'lucide-react';
+import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 
 interface BatchQRModalProps {
   onClose: () => void;
@@ -10,22 +12,32 @@ interface BatchQRModalProps {
 }
 
 export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClass = 'all' }) => {
-  const { students, currentTenant, lang } = useAttendance();
+  const { students, currentTenant, schoolProfile, lang } = useAttendance();
+  const cardsContainerRef = useRef<HTMLDivElement>(null);
 
   const [selectedClass, setSelectedClass] = useState<string>(initialClass);
   const [qrCodeUrls, setQrCodeUrls] = useState<Record<string, string>>({});
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  const filteredStudents = students.filter(
-    (s) => selectedClass === 'all' || s.className === selectedClass
-  );
+  const filteredStudents = useMemo(() => {
+    return students.filter(
+      (s) => selectedClass === 'all' || s.className === selectedClass
+    );
+  }, [students, selectedClass]);
 
   useEffect(() => {
+    let isCancelled = false;
     async function generateAll() {
+      setIsGenerating(true);
       const urls: Record<string, string> = {};
+      const schoolId = currentTenant?.id || 'school-1';
+      const schoolCode = schoolProfile?.schoolCode || currentTenant?.code || 'ANDALUS-101';
+
       for (const s of filteredStudents) {
+        if (isCancelled) return;
         const payload = JSON.stringify({
           app: 'SMART_ATTENDANCE',
-          schoolId: currentTenant.id,
+          schoolId,
           studentId: s.id,
           studentNumber: s.studentNumber,
           nationalId: s.nationalId,
@@ -38,27 +50,61 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
             width: 140,
             margin: 1,
             color: { dark: '#0f172a', light: '#ffffff' },
+            errorCorrectionLevel: 'M',
           });
           urls[s.id] = dataUrl;
         } catch (e) {
           console.error('Error generating QR', e);
         }
       }
-      setQrCodeUrls(urls);
+
+      if (!isCancelled) {
+        setQrCodeUrls(urls);
+        setIsGenerating(false);
+      }
     }
 
     generateAll();
-  }, [filteredStudents, currentTenant]);
 
-  const handlePrint = () => {
-    window.print();
+    return () => {
+      isCancelled = true;
+    };
+  }, [filteredStudents, currentTenant?.id]);
+
+  const handleDownloadVectorPdf = async () => {
+    if (cardsContainerRef.current) {
+      const html = cardsContainerRef.current.innerHTML;
+      const title = `${currentTenant?.name || 'مدرستي'} - بطاقات الحضور بالـ QR (${selectedClass === 'all' ? 'جميع الطلاب' : `فصل ${selectedClass}`})`;
+      const filename = `بطاقات_حضور_${currentTenant?.code || 'school'}_${selectedClass}.pdf`;
+      await downloadNativePdfFromHtml({
+        htmlContent: `<div style="direction:rtl; text-align:right; font-family:'Cairo', sans-serif;"><div style="margin-bottom:15px; border-bottom:2px solid #059669; padding-bottom:10px;"><h2 style="margin:0; font-size:16px; color:#065f46;">${title}</h2><span style="font-size:11px; color:#64748b;">إجمالي البطاقات: ${filteredStudents.length} طالب</span></div><div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">${html}</div></div>`,
+        title,
+        filename,
+      });
+    }
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 print:p-0 print:bg-white print:static print:block">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:overflow-visible">
+  const handlePrint = () => {
+    if (cardsContainerRef.current) {
+      const html = cardsContainerRef.current.innerHTML;
+      const title = `${currentTenant?.name || 'مدرستي'} - بطاقات الحضور بالـ QR (${selectedClass === 'all' ? 'جميع الطلاب' : `فصل ${selectedClass}`})`;
+      printNativePdfFromHtml({
+        htmlContent: `<div style="direction:rtl; text-align:right; font-family:'Cairo', sans-serif;"><div style="margin-bottom:15px; border-bottom:2px solid #059669; padding-bottom:10px;"><h2 style="margin:0; font-size:16px; color:#065f46;">${title}</h2><span style="font-size:11px; color:#64748b;">إجمالي البطاقات: ${filteredStudents.length} طالب</span></div><div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">${html}</div></div>`,
+        title,
+      });
+    }
+  };
+
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto w-screen h-screen print:p-0 print:bg-white print:static print:block"
+      style={{ margin: 0, padding: '0.75rem', left: 0, top: 0, right: 0, bottom: 0 }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full p-3.5 sm:p-6 space-y-4 max-h-[94dvh] overflow-y-auto my-auto print:max-h-none print:shadow-none print:p-0 print:overflow-visible border border-slate-200">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden modal-controls-header">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
               <Layers className="w-4 h-4" />
@@ -68,12 +114,18 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
                 {lang === 'ar' ? 'طباعة بطاقات الحضور بالـ QR مجمعة (كافة طلاب الفصل)' : 'Batch QR Student Cards Print'}
               </h3>
               <p className="text-xs text-slate-500">
-                {currentTenant.name} · بطاقات مهيأة للطباعة والتوزيع
+                {currentTenant?.name || 'مدرستي'} · بطاقات مهيأة للطباعة والتوزيع
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {isGenerating && (
+              <span className="flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>جارٍ التوليد...</span>
+              </span>
+            )}
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
@@ -90,11 +142,22 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
             </select>
 
             <button
+              onClick={handleDownloadVectorPdf}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
+              title="تنزيل البطاقات كملف PDF رسمي عالي الدقة"
+            >
+              <Download className="w-4 h-4" />
+              <span>{lang === 'ar' ? 'تنزيل PDF أصلي' : 'Vector PDF'}</span>
+            </button>
+
+            <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
             >
               <Printer className="w-4 h-4" />
-              <span>{lang === 'ar' ? 'طباعة البطاقات' : 'Print All'}</span>
+              <span>{lang === 'ar' ? 'طباعة مباشرة' : 'Print'}</span>
             </button>
 
             <button
@@ -107,14 +170,16 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
         </div>
 
         {/* Printable Grid of ID Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2 print:grid-cols-3 print:gap-3">
+        <div ref={cardsContainerRef} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2 print:grid-cols-3 print:gap-3">
           {filteredStudents.map((s) => (
             <div
               key={s.id}
               className="border-2 border-emerald-600 rounded-xl overflow-hidden bg-white shadow-xs p-3 text-center space-y-2 break-inside-avoid"
             >
               <div className="bg-emerald-800 text-white p-2 -mx-3 -mt-3">
-                <span className="font-bold text-xs block leading-tight">{currentTenant.name}</span>
+                <span className="font-bold text-xs block leading-tight">
+                  {schoolProfile.schoolName || currentTenant?.name || 'مدرستي'}
+                </span>
                 <span className="text-[10px] text-emerald-200">بطاقة الحضور والانضباط المدرسي</span>
               </div>
 
@@ -146,4 +211,8 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };

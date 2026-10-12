@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -20,145 +19,254 @@ import {
   ArrowDownRight,
   CheckCircle2,
   Filter,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Palmtree,
+  CalendarDays,
 } from 'lucide-react';
+import { getSchoolWeekDays, isSchoolOffDay } from '../utils/holidayUtils';
 
 interface WeeklyTrendDataPoint {
   dayName: string;
+  dayNameEn: string;
   date: string;
-  attendanceRate: number;
+  attendanceRate: number | null;
   presentCount: number;
   absentCount: number;
   lateCount: number;
+  excusedCount: number;
+  totalStudents: number;
   isToday?: boolean;
+  isPast?: boolean;
+  isUpcoming?: boolean;
+  isHoliday?: boolean;
+  holidayName?: string;
+  offDayReason?: string;
+  hasData: boolean;
 }
 
 export const WeeklyAttendanceTrendCard: React.FC = () => {
-  const { sessions, students, lang, currentTenant } = useAttendance();
+  const { sessions, lang, currentTenant, classesStats, settings, schoolProfile } = useAttendance();
 
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
+  const [weekOffset, setWeekOffset] = useState<number>(0); // 0 = current week, -1 = last week, etc.
 
-  // Compute school week data (Sunday to Thursday in the school calendar)
-  // We compute based on sessions and students
-  const totalStudentsCount =
-    selectedClassFilter === 'all'
-      ? students.length
-      : students.filter((s) => s.className === selectedClassFilter).length || 6;
+  // Determine reference date for the selected week
+  const referenceDateStr = useMemo(() => {
+    // Find latest session date in tenant or fallback to today
+    const validDates = sessions.map((s) => s.date).filter(Boolean).sort();
+    const baseDateStr = validDates.length > 0 ? validDates[validDates.length - 1] : new Date().toISOString().split('T')[0];
+    
+    const parts = baseDateStr.slice(0, 10).split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() + (weekOffset * 7));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, [sessions, weekOffset]);
 
-  // Week days starting Sunday Oct 5 to Thursday Oct 9 / Friday-Saturday weekend (Saudi/Arab School week)
-  const baseWeeklyData: WeeklyTrendDataPoint[] = [
-    {
-      dayName: 'الأحد',
-      date: '2026-10-04',
-      attendanceRate: 93.5,
-      presentCount: Math.round(totalStudentsCount * 0.935),
-      absentCount: Math.max(1, Math.round(totalStudentsCount * 0.065)),
-      lateCount: 2,
-    },
-    {
-      dayName: 'الإثنين',
-      date: '2026-10-05',
-      attendanceRate: 96.8,
-      presentCount: Math.round(totalStudentsCount * 0.968),
-      absentCount: Math.max(0, Math.round(totalStudentsCount * 0.032)),
-      lateCount: 1,
-    },
-    {
-      dayName: 'الثلاثاء',
-      date: '2026-10-06',
-      attendanceRate: 98.4,
-      presentCount: Math.round(totalStudentsCount * 0.984),
-      absentCount: Math.max(0, Math.round(totalStudentsCount * 0.016)),
-      lateCount: 0,
-    },
-    {
-      dayName: 'الأربعاء',
-      date: '2026-10-07',
-      attendanceRate: 95.2,
-      presentCount: Math.round(totalStudentsCount * 0.952),
-      absentCount: Math.max(1, Math.round(totalStudentsCount * 0.048)),
-      lateCount: 1,
-    },
-    {
-      dayName: 'الخميس',
-      date: '2026-10-08',
-      attendanceRate: 91.2,
-      presentCount: Math.round(totalStudentsCount * 0.912),
-      absentCount: Math.max(2, Math.round(totalStudentsCount * 0.088)),
-      lateCount: 3,
-    },
-    {
-      dayName: 'اليوم (السبت)',
-      date: '2026-10-10',
-      attendanceRate: 94.7,
-      presentCount: Math.round(totalStudentsCount * 0.947),
-      absentCount: Math.max(1, Math.round(totalStudentsCount * 0.053)),
-      lateCount: 1,
-      isToday: true,
-    },
-  ];
+  const activeWeekendDays = settings.weekendDays || schoolProfile.weekendDays || [5, 6];
+  const activeOfficialHolidays = settings.officialHolidays || schoolProfile.officialHolidays || [];
 
-  // If a session exists for today, reflect real-time active session attendance!
-  const todaySession = sessions.find((s) => s.status === 'submitted') || sessions[0];
-  if (todaySession) {
-    const totalInTodaySess = todaySession.totalStudents || 1;
-    const rateToday = parseFloat(
-      ((todaySession.presentCount / totalInTodaySess) * 100).toFixed(1)
-    );
-    baseWeeklyData[baseWeeklyData.length - 1] = {
-      dayName: 'اليوم',
-      date: todaySession.date,
-      attendanceRate: rateToday,
-      presentCount: todaySession.presentCount,
-      absentCount: todaySession.absentCount,
-      lateCount: todaySession.lateCount,
-      isToday: true,
-    };
-  }
+  // Generate the full 5 school days (Sunday through Thursday)
+  const schoolWeekSlots = useMemo(() => {
+    return getSchoolWeekDays(referenceDateStr, activeWeekendDays, activeOfficialHolidays);
+  }, [referenceDateStr, activeWeekendDays, activeOfficialHolidays]);
 
-  // Calculate statistics
-  const weeklyAverage = (
-    baseWeeklyData.reduce((acc, d) => acc + d.attendanceRate, 0) / baseWeeklyData.length
-  ).toFixed(1);
+  // Compute attendance data for all 5 school days of the week
+  const weeklyData: WeeklyTrendDataPoint[] = useMemo(() => {
+    const validSessions = sessions.filter((s) => {
+      if (s.status !== 'submitted') return false;
+      if (selectedClassFilter !== 'all' && s.className !== selectedClassFilter) return false;
+      // Do not count sessions recorded on configured weekends
+      const check = isSchoolOffDay(s.date, activeWeekendDays, activeOfficialHolidays);
+      if (check.type === 'weekend') return false;
+      return true;
+    });
 
-  const highestDay = [...baseWeeklyData].sort((a, b) => b.attendanceRate - a.attendanceRate)[0];
-  const lowestDay = [...baseWeeklyData].sort((a, b) => a.attendanceRate - b.attendanceRate)[0];
+    // Map sessions by date
+    const dateMap: Record<
+      string,
+      { presentCount: number; absentCount: number; lateCount: number; excusedCount: number; totalStudents: number }
+    > = {};
 
-  // Custom Recharts Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+    validSessions.forEach((s) => {
+      if (!dateMap[s.date]) {
+        dateMap[s.date] = { presentCount: 0, absentCount: 0, lateCount: 0, excusedCount: 0, totalStudents: 0 };
+      }
+      dateMap[s.date].presentCount += s.presentCount;
+      dateMap[s.date].absentCount += s.absentCount;
+      dateMap[s.date].lateCount += s.lateCount;
+      dateMap[s.date].excusedCount += s.excusedCount || 0;
+      dateMap[s.date].totalStudents += s.totalStudents;
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    return schoolWeekSlots.map((slot) => {
+      const item = dateMap[slot.date];
+      const hasData = !!item && item.totalStudents > 0;
+      const rate = hasData
+        ? parseFloat(((item.presentCount / item.totalStudents) * 100).toFixed(1))
+        : null;
+
+      const isUpcoming = slot.date > todayStr;
+      const isPast = slot.date < todayStr;
+
+      return {
+        dayName: lang === 'ar' ? slot.dayNameAr : slot.dayNameEn,
+        dayNameEn: slot.dayNameEn,
+        date: slot.date,
+        attendanceRate: rate,
+        presentCount: item?.presentCount || 0,
+        absentCount: item?.absentCount || 0,
+        lateCount: item?.lateCount || 0,
+        excusedCount: item?.excusedCount || 0,
+        totalStudents: item?.totalStudents || 0,
+        isToday: slot.date === todayStr,
+        isPast,
+        isUpcoming,
+        isHoliday: slot.isHoliday,
+        holidayName: slot.holidayName,
+        offDayReason: slot.offDayReason,
+        hasData,
+      };
+    });
+  }, [schoolWeekSlots, sessions, selectedClassFilter, activeWeekendDays, activeOfficialHolidays, lang]);
+
+  // Days with real recorded data
+  const recordedDays = weeklyData.filter((d) => d.attendanceRate !== null);
+
+  const weeklyAverage = recordedDays.length > 0
+    ? (recordedDays.reduce((acc, d) => acc + (d.attendanceRate || 0), 0) / recordedDays.length).toFixed(1)
+    : '0.0';
+
+  const highestDay = recordedDays.length > 0
+    ? [...recordedDays].sort((a, b) => (b.attendanceRate || 0) - (a.attendanceRate || 0))[0]
+    : null;
+
+  const lowestDay = recordedDays.length > 0
+    ? [...recordedDays].sort((a, b) => (a.attendanceRate || 0) - (b.attendanceRate || 0))[0]
+    : null;
+
+  // Rate difference between the last two recorded school days
+  const rateDiff = recordedDays.length >= 2
+    ? parseFloat(
+        (
+          (recordedDays[recordedDays.length - 1].attendanceRate || 0) -
+          (recordedDays[recordedDays.length - 2].attendanceRate || 0)
+        ).toFixed(1)
+      )
+    : 0;
+
+  // Dynamic Y-axis min
+  const minRate = recordedDays.length > 0
+    ? Math.min(...recordedDays.map((d) => d.attendanceRate || 100))
+    : 80;
+  const yAxisMin = Math.max(0, Math.floor((minRate - 10) / 10) * 10);
+
+  // Week range label
+  const weekStartStr = schoolWeekSlots[0]?.date || '';
+  const weekEndStr = schoolWeekSlots[schoolWeekSlots.length - 1]?.date || '';
+
+  // Custom Tooltip handling both recorded data and upcoming/holiday statuses
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data: WeeklyTrendDataPoint = payload[0].payload;
+
       return (
-        <div className="bg-slate-900 text-white rounded-xl p-3 shadow-xl border border-slate-700 text-xs space-y-1.5 min-w-[190px]">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-1">
+        <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-xl p-3.5 shadow-2xl border border-slate-700 text-xs space-y-2 min-w-[230px]">
+          <div className="flex items-center justify-between border-b border-slate-700 pb-1.5">
             <span className="font-bold text-emerald-400">
               {data.dayName} ({data.date})
             </span>
             {data.isToday && (
-              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded text-[10px]">
-                اليوم
+              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30">
+                {lang === 'ar' ? 'اليوم' : 'Today'}
+              </span>
+            )}
+            {data.isHoliday && (
+              <span className="bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded text-[10px] font-bold border border-purple-500/30">
+                {lang === 'ar' ? 'عطلة رسمية' : 'Holiday'}
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between text-[13px]">
-            <span className="text-slate-300">نسبة الحضور:</span>
-            <span className="font-mono font-bold text-white text-base">
-              {data.attendanceRate}%
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-1 pt-1 text-[11px] border-t border-slate-800 text-center">
-            <div className="bg-emerald-950/60 p-1 rounded border border-emerald-800/40">
-              <span className="text-slate-400 block text-[9px]">حاضر</span>
-              <span className="font-bold text-emerald-300">{data.presentCount}</span>
+
+          {data.isHoliday ? (
+            <div className="space-y-1 py-1">
+              <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
+                <Palmtree className="w-3.5 h-3.5 shrink-0" />
+                <span>{data.holidayName || (lang === 'ar' ? 'عطلة رسمية معتمدة' : 'Official Holiday')}</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                {lang === 'ar'
+                  ? 'يوم إجازة رسمية معتمدة بالتقويم المدرسي. لا تُعقد حصص دراسية ولا يُحتسب غياب للطلاب.'
+                  : 'Official school holiday. No attendance sessions scheduled; student absences are not counted.'}
+              </p>
             </div>
-            <div className="bg-rose-950/60 p-1 rounded border border-rose-800/40">
-              <span className="text-slate-400 block text-[9px]">غائب</span>
-              <span className="font-bold text-rose-300">{data.absentCount}</span>
+          ) : data.hasData ? (
+            <>
+              <div className="flex items-center justify-between text-[13px] pt-0.5">
+                <span className="text-slate-300 font-medium">
+                  {lang === 'ar' ? 'نسبة الحضور الفعلي:' : 'Attendance Rate:'}
+                </span>
+                <span className="font-mono font-bold text-emerald-400 text-base">
+                  {data.attendanceRate}%
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pb-0.5">
+                <span>{lang === 'ar' ? 'إجمالي طلاب الشعبة:' : 'Total Students:'}</span>
+                <span className="font-mono font-bold text-white">{data.totalStudents}</span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1 pt-1.5 text-[10px] border-t border-slate-800 text-center font-mono">
+                <div className="bg-emerald-950/70 p-1 rounded border border-emerald-800/40">
+                  <span className="text-slate-400 block text-[9px] font-sans">
+                    {lang === 'ar' ? 'حاضر' : 'Present'}
+                  </span>
+                  <span className="font-bold text-emerald-300">{data.presentCount}</span>
+                </div>
+                <div className="bg-sky-950/70 p-1 rounded border border-sky-800/40">
+                  <span className="text-slate-400 block text-[9px] font-sans">
+                    {lang === 'ar' ? 'بعذر' : 'Excused'}
+                  </span>
+                  <span className="font-bold text-sky-300">{data.excusedCount}</span>
+                </div>
+                <div className="bg-rose-950/70 p-1 rounded border border-rose-800/40">
+                  <span className="text-slate-400 block text-[9px] font-sans">
+                    {lang === 'ar' ? 'غائب' : 'Absent'}
+                  </span>
+                  <span className="font-bold text-rose-300">{data.absentCount}</span>
+                </div>
+                <div className="bg-amber-950/70 p-1 rounded border border-amber-800/40">
+                  <span className="text-slate-400 block text-[9px] font-sans">
+                    {lang === 'ar' ? 'متأخر' : 'Late'}
+                  </span>
+                  <span className="font-bold text-amber-300">{data.lateCount}</span>
+                </div>
+              </div>
+            </>
+          ) : data.isUpcoming ? (
+            <div className="space-y-1 py-1">
+              <div className="flex items-center gap-1.5 text-amber-300 font-semibold text-xs">
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <span>{lang === 'ar' ? 'يوم قادم ضمن الأسبوع الدراسي' : 'Upcoming School Day'}</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                {lang === 'ar'
+                  ? 'بانتظار بدء اليوم الدراسي ورصد واعتماد كشوف الحضور من المعلمين.'
+                  : 'Awaiting attendance session recording and teacher submission.'}
+              </p>
             </div>
-            <div className="bg-amber-950/60 p-1 rounded border border-amber-800/40">
-              <span className="text-slate-400 block text-[9px]">متأخر</span>
-              <span className="font-bold text-amber-300">{data.lateCount}</span>
+          ) : (
+            <div className="space-y-1 py-1 text-slate-400 text-[11px]">
+              <p>
+                {lang === 'ar'
+                  ? 'لم يتم اعتماد كشف حضور معتمد لهذا اليوم حتى الآن.'
+                  : 'No submitted attendance session recorded for this day yet.'}
+              </p>
             </div>
-          </div>
+          )}
         </div>
       );
     }
@@ -166,98 +274,154 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+    <div className="rounded-2xl p-5 shadow-xs space-y-4 bg-[var(--app-card-bg,#ffffff)] text-[var(--app-text-main,#0f172a)] dark:text-slate-100 border border-[var(--app-border,#e2e8f0)]">
       {/* Header and Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[var(--app-border,#f1f5f9)] dark:border-slate-800 pb-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
             <TrendingUp className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {lang === 'ar' ? 'منحنى نسبة الحضور اليومي للأسبوع الحالي' : 'Weekly Attendance Trends'}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                {lang === 'ar' ? 'منحنى نسبة الحضور اليومي للأسبوع الدراسي الكامل' : 'Complete School Week Attendance Trends'}
               </h3>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
-                Recharts Analytics
+              <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                {lang === 'ar' ? 'الأحد إلى الخميس (5 أيام)' : 'Sun - Thu (5 Days)'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">
-              {currentTenant.name} · متابعة التذبذب اليومي ونسب الانضباط مقارنة بالحد الوزاري (95%)
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {currentTenant.name} · {lang === 'ar' ? `الأسبوع: (${weekStartStr} إلى ${weekEndStr})` : `Week: (${weekStartStr} to ${weekEndStr})`}
             </p>
           </div>
         </div>
 
-        {/* Filter by class */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5" />
-            <span>{lang === 'ar' ? 'عرض النطاق:' : 'Scope:'}</span>
-          </span>
-          <select
-            value={selectedClassFilter}
-            onChange={(e) => setSelectedClassFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 cursor-pointer"
-          >
-            <option value="all">كامل المدرسة (المتوسط العام)</option>
-            <option value="10 / أ">فصل 10 / أ فقط</option>
-            <option value="10 / ب">فصل 10 / ب فقط</option>
-          </select>
+        {/* Scope and Week Navigator Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap text-xs">
+          {/* Week offset buttons */}
+          <div className="flex items-center gap-1 border border-[var(--app-border,#cbd5e1)] dark:border-slate-700 rounded-lg p-0.5 bg-slate-50 dark:bg-slate-900/60">
+            <button
+              type="button"
+              onClick={() => setWeekOffset((prev) => prev - 1)}
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded cursor-pointer transition-colors text-slate-700 dark:text-slate-200"
+              title={lang === 'ar' ? 'الأسبوع السابق' : 'Previous Week'}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setWeekOffset(0)}
+              className={`px-2 py-0.5 text-[11px] font-semibold rounded cursor-pointer transition-colors ${
+                weekOffset === 0
+                  ? 'bg-emerald-600 text-white'
+                  : 'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              {lang === 'ar' ? 'الأسبوع الحالي' : 'Current Week'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setWeekOffset((prev) => prev + 1)}
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded cursor-pointer transition-colors text-slate-700 dark:text-slate-200"
+              title={lang === 'ar' ? 'الأسبوع التالي' : 'Next Week'}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Filter by class */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" />
+            </span>
+            <select
+              value={selectedClassFilter}
+              onChange={(e) => setSelectedClassFilter(e.target.value)}
+              className="bg-[var(--app-card-bg,#ffffff)] text-slate-800 dark:text-slate-100 border border-[var(--app-border,#cbd5e1)] dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold cursor-pointer"
+            >
+              <option value="all">{lang === 'ar' ? 'كامل المدرسة' : 'Whole School'}</option>
+              {classesStats.map((c) => (
+                <option key={c.className} value={c.className}>
+                  {lang === 'ar' ? `فصل ${c.className}` : `Class ${c.className}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* KPI Highlights Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <span className="text-[11px] text-slate-500 block mb-0.5">
-            {lang === 'ar' ? 'متوسط الحضور الأسبوعي' : 'Weekly Average'}
+        <div className="p-3 rounded-xl border border-[var(--app-border,#e2e8f0)] bg-slate-50/50 dark:bg-slate-900/40">
+          <span className="text-[11px] opacity-70 block mb-0.5">
+            {lang === 'ar' ? 'متوسط حضور الأيام المرصودة' : 'Recorded Days Average'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-emerald-700">{weeklyAverage}%</span>
-            <span className="text-[10px] text-emerald-600 flex items-center font-medium">
-              <ArrowUpRight className="w-3 h-3" />
-              +1.4%
+            <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              {weeklyAverage}%
             </span>
+            {recordedDays.length >= 2 && (
+              <span
+                className={`text-[10px] flex items-center font-medium ${
+                  rateDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                }`}
+              >
+                {rateDiff >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {rateDiff >= 0 ? `+${rateDiff}%` : `${rateDiff}%`}
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
-          <span className="text-[11px] text-emerald-800 block mb-0.5">
-            {lang === 'ar' ? 'أعلى انضباط هذا الأسبوع' : 'Peak Attendance'}
+        <div className="p-3 rounded-xl border border-emerald-200/60 bg-emerald-50/40 dark:bg-emerald-950/20">
+          <span className="text-[11px] text-emerald-800 dark:text-emerald-300 block mb-0.5 font-medium">
+            {lang === 'ar' ? 'أعلى انضباط مسجل' : 'Peak Attendance'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-emerald-900">{highestDay.attendanceRate}%</span>
-            <span className="text-[11px] text-emerald-700 font-semibold">({highestDay.dayName})</span>
+            <span className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300">
+              {highestDay ? `${highestDay.attendanceRate}%` : '-'}
+            </span>
+            {highestDay && (
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                ({highestDay.dayName})
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
-          <span className="text-[11px] text-amber-800 block mb-0.5">
-            {lang === 'ar' ? 'أدنى نسبة (تأهب وانتباه)' : 'Lowest Day'}
+        <div className="p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20">
+          <span className="text-[11px] text-amber-800 dark:text-amber-300 block mb-0.5 font-medium">
+            {lang === 'ar' ? 'أدنى نسبة مسجلة' : 'Lowest Day'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-amber-900">{lowestDay.attendanceRate}%</span>
-            <span className="text-[11px] text-amber-800 font-semibold">({lowestDay.dayName})</span>
+            <span className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300">
+              {lowestDay ? `${lowestDay.attendanceRate}%` : '-'}
+            </span>
+            {lowestDay && (
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                ({lowestDay.dayName})
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="bg-white p-3 rounded-xl border border-slate-200">
-          <span className="text-[11px] text-slate-500 block mb-0.5">
-            {lang === 'ar' ? 'الحد الأدنى للوزارة' : 'Target Benchmark'}
+        <div className="p-3 rounded-xl border border-[var(--app-border,#e2e8f0)] bg-slate-50/50 dark:bg-slate-900/40">
+          <span className="text-[11px] opacity-70 block mb-0.5">
+            {lang === 'ar' ? 'المستهدف الوزاري' : 'Target Benchmark'}
           </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold font-mono text-slate-800">95.0%</span>
-            <span className="text-[11px] text-slate-400">حد التميز</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold font-mono opacity-90">95.0%</span>
+            <span className="text-[11px] opacity-50">{lang === 'ar' ? 'حد التميز' : 'Standard'}</span>
           </div>
         </div>
       </div>
 
-      {/* Recharts Area and Line Graph */}
+      {/* Recharts Area Graph showing all 5 School Days */}
       <div className="h-64 w-full pt-2">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={baseWeeklyData}
-            margin={{ top: 10, right: 20, left: -10, bottom: 0 }}
+            data={weeklyData}
+            margin={{ top: 15, right: 35, left: 0, bottom: 5 }}
           >
             <defs>
               <linearGradient id="attendanceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -266,20 +430,20 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--app-chart-grid, #f1f5f9)" />
 
             <XAxis
               dataKey="dayName"
               tickLine={false}
               axisLine={{ stroke: '#cbd5e1' }}
-              tick={{ fill: '#475569', fontSize: 11, fontFamily: 'Cairo, sans-serif' }}
+              tick={{ fontSize: 11, fontFamily: 'Cairo, sans-serif' }}
             />
 
             <YAxis
-              domain={[80, 100]}
+              domain={[yAxisMin, 100]}
               tickLine={false}
               axisLine={{ stroke: '#cbd5e1' }}
-              tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }}
+              tick={{ fontSize: 10, fontFamily: 'monospace' }}
               unit="%"
             />
 
@@ -292,15 +456,16 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
               strokeDasharray="4 4"
               strokeWidth={1.5}
               label={{
-                value: 'المستهدف 95%',
-                position: 'insideTopLeft',
+                value: lang === 'ar' ? 'المستهدف 95%' : 'Target 95%',
+                position: 'insideTopRight',
                 fill: '#059669',
                 fontSize: 10,
                 fontFamily: 'Cairo, sans-serif',
+                offset: 8,
               }}
             />
 
-            {/* Filled Area */}
+            {/* Filled Area with connectNulls={false} to preserve upcoming school days on the X-axis */}
             <Area
               type="monotone"
               dataKey="attendanceRate"
@@ -308,21 +473,105 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
               strokeWidth={3}
               fillOpacity={1}
               fill="url(#attendanceGradient)"
+              connectNulls={false}
               activeDot={{ r: 6, stroke: '#047857', strokeWidth: 2, fill: '#ffffff' }}
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Footer Insight Note */}
-      <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-        <div className="flex items-center gap-1.5 text-slate-700">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-          <span>
-            ملاحظة تحليلية: لوحظ انخفاض طفيف يوم الخميس (91.2%) بسبب عطلة نهاية الأسبوع، بينما حقق يوم الثلاثاء أعلى نسبة انضباط (98.4%).
+      {/* Complete 5-Day School Week Interactive Status Strip */}
+      <div className="space-y-1.5 pt-1 border-t border-[var(--app-border,#f1f5f9)] dark:border-slate-800">
+        <div className="flex items-center justify-between text-xs text-slate-800 dark:text-emerald-400 font-bold">
+          <span className="flex items-center gap-1.5">
+            <CalendarDays className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === 'ar' ? 'حالة أيام الأسبوع الدراسي الخمسة (الأحد - الخميس):' : '5-Day School Week Status (Sun - Thu):'}</span>
+          </span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-normal">
+            {lang === 'ar' ? 'انقر على اليوم لرؤية التفاصيل' : 'Hover over days for details'}
           </span>
         </div>
-        <span className="font-mono text-slate-400 hidden md:inline">محدّث لحظياً</span>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+          {weeklyData.map((slot) => {
+            const isRecorded = slot.attendanceRate !== null;
+            return (
+              <div
+                key={slot.date}
+                className={`p-2.5 rounded-xl border transition-all ${
+                  slot.isToday
+                    ? 'border-emerald-500 bg-emerald-500/10 shadow-xs'
+                    : slot.isHoliday
+                    ? 'border-purple-300 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/40 border-dashed'
+                    : isRecorded
+                    ? 'border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60'
+                    : 'border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/40'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-xs text-slate-800 dark:text-slate-100">{slot.dayName}</span>
+                  {slot.isToday && (
+                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                      {lang === 'ar' ? 'اليوم' : 'Today'}
+                    </span>
+                  )}
+                  {slot.isHoliday && (
+                    <span className="text-[9px] bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 px-1 rounded font-bold">
+                      {lang === 'ar' ? 'عطلة' : 'Off'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mb-1.5">{slot.date}</div>
+
+                <div>
+                  {slot.isHoliday ? (
+                    <div className="text-[10px] text-purple-700 dark:text-purple-300 font-bold truncate" title={slot.holidayName}>
+                      {slot.holidayName || (lang === 'ar' ? 'عطلة رسمية' : 'Holiday')}
+                    </div>
+                  ) : isRecorded ? (
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                        {slot.attendanceRate}%
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                        ({slot.presentCount}/{slot.totalStudents})
+                      </span>
+                    </div>
+                  ) : slot.isUpcoming ? (
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium">
+                      <Clock className="w-3 h-3" />
+                      <span>{lang === 'ar' ? 'بانتظار الرصد' : 'Upcoming'}</span>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                      {lang === 'ar' ? 'لم يرصد' : 'Not recorded'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Footer Insight Note */}
+      <div className="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg border border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200">
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="font-medium text-slate-700 dark:text-slate-200">
+            {highestDay && lowestDay
+              ? lang === 'ar'
+                ? `ملاحظة تحليلية: حقق يوم ${highestDay.dayName} (${highestDay.date}) أعلى انضباط بنسبة ${highestDay.attendanceRate}%، بينما سجل يوم ${lowestDay.dayName} (${lowestDay.date}) أدنى نسبة (${lowestDay.attendanceRate}%). العطلات الرسمية لا تؤثر سلباً على معدلات غياب الطلاب.`
+                : `Analytical insight: ${highestDay.dayName} (${highestDay.date}) achieved peak attendance of ${highestDay.attendanceRate}%, while ${lowestDay.dayName} (${lowestDay.date}) recorded lowest (${lowestDay.attendanceRate}%). Official holidays do not negatively impact student absence rates.`
+              : lang === 'ar'
+              ? 'ملاحظة تحليلية: يتم احتساب مؤشرات الانضباط تلقائياً من سجلات الرصد الفعلية مع استبعاد العطلات الرسمية ونهاية الأسبوع.'
+              : 'Analytical insight: Attendance metrics are computed strictly from real records, excluding official holidays and weekends.'}
+          </span>
+        </div>
+        <span className="font-mono text-slate-500 dark:text-slate-400 text-[10px] hidden md:inline shrink-0">
+          {lang === 'ar' ? 'محدّث لحظياً' : 'Live Updated'}
+        </span>
       </div>
     </div>
   );

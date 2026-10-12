@@ -26,7 +26,7 @@ export function computeDailyDigestData(params: {
   const overallAttendanceRate =
     totalStudents > 0
       ? parseFloat((students.reduce((acc, s) => acc + s.attendanceRate, 0) / totalStudents).toFixed(1))
-      : 95.0;
+      : 100.0;
 
   // 2. Detect Anomalies
   const anomalies: DailyDigestAnomaly[] = [];

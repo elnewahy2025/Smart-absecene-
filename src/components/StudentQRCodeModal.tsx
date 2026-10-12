@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Student } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
@@ -12,6 +13,7 @@ import {
   Share2,
   Scan,
 } from 'lucide-react';
+import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 
 interface StudentQRCodeModalProps {
   student: Student;
@@ -24,46 +26,79 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
   onClose,
   onScanInSession,
 }) => {
-  const { currentTenant, lang } = useAttendance();
+  const { currentTenant, schoolProfile, lang } = useAttendance();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
+  const schoolId = currentTenant?.id || 'school-1';
+  const schoolCode = schoolProfile?.schoolCode || currentTenant?.code || 'ANDALUS-101';
+  const schoolName = schoolProfile?.schoolName || currentTenant?.name || 'مدرستي';
+  const academicYear = schoolProfile?.academicYear?.hijriYear || currentTenant?.academicYear || '1446-1447 هـ';
+
   // Structured QR payload that can be parsed by scanners
   const qrPayload = JSON.stringify({
     app: 'SMART_ATTENDANCE',
-    schoolId: currentTenant.id,
-    schoolCode: currentTenant.code,
-    studentId: student.id,
-    studentNumber: student.studentNumber,
-    nationalId: student.nationalId,
-    fullName: student.fullName,
-    className: student.className,
-    grade: student.grade,
+    schoolId,
+    schoolCode,
+    studentId: student?.id,
+    studentNumber: student?.studentNumber,
+    nationalId: student?.nationalId,
+    fullName: student?.fullName,
+    className: student?.className,
+    grade: student?.grade,
   });
 
   useEffect(() => {
-    if (canvasRef.current) {
-      QRCode.toCanvas(
-        canvasRef.current,
-        qrPayload,
-        {
+    let isMounted = true;
+
+    async function generateQR() {
+      try {
+        const url = await QRCode.toDataURL(qrPayload, {
           width: 200,
           margin: 1,
           color: {
             dark: '#0f172a',
             light: '#ffffff',
           },
-          errorCorrectionLevel: 'H',
-        },
-        (error) => {
-          if (error) console.error('Error generating QR code:', error);
-          else if (canvasRef.current) {
-            setQrDataUrl(canvasRef.current.toDataURL('image/png'));
-          }
+          errorCorrectionLevel: 'M',
+        });
+        if (isMounted) {
+          setQrDataUrl(url);
         }
-      );
+      } catch (err) {
+        console.error('Error generating QR data URL:', err);
+      }
+
+      if (canvasRef.current) {
+        try {
+          QRCode.toCanvas(
+            canvasRef.current,
+            qrPayload,
+            {
+              width: 200,
+              margin: 1,
+              color: {
+                dark: '#0f172a',
+                light: '#ffffff',
+              },
+              errorCorrectionLevel: 'M',
+            },
+            (error) => {
+              if (error) console.error('Error rendering QR to canvas:', error);
+            }
+          );
+        } catch (e) {
+          console.error('QRCode.toCanvas exception:', e);
+        }
+      }
     }
+
+    generateQR();
+
+    return () => {
+      isMounted = false;
+    };
   }, [qrPayload]);
 
   // Download high-resolution PNG card
@@ -92,12 +127,12 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.font = 'bold 26px Cairo, sans-serif';
-    ctx.fillText(currentTenant.name, 300, 70);
+    ctx.fillText(schoolName, 300, 70);
 
     ctx.font = '16px Cairo, sans-serif';
     ctx.fillStyle = '#a7f3d0';
     ctx.fillText('بطاقة الحضور والانضباط المدرسي الذكية', 300, 110);
-    ctx.fillText(`${currentTenant.academicYear} · ${student.grade}`, 300, 140);
+    ctx.fillText(`${academicYear} · ${student.grade || ''}`, 300, 140);
 
     // Student Info Section
     ctx.fillStyle = '#0f172a';
@@ -143,15 +178,40 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
     link.click();
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadVectorPdf = async () => {
+    if (cardRef.current) {
+      const html = cardRef.current.innerHTML;
+      const title = `بطاقة حضور QR - ${student.fullName} (${student.studentNumber})`;
+      const filename = `بطاقة_حضور_${student.fullName.replace(/\s+/g, '_')}_${student.studentNumber}.pdf`;
+      await downloadNativePdfFromHtml({
+        htmlContent: `<div style="direction:rtl; text-align:center; font-family:'Cairo', sans-serif; max-width:400px; margin:0 auto; padding:20px;">${html}</div>`,
+        title,
+        filename,
+      });
+    }
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 print:p-0 print:bg-white print:static print:block">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 print:shadow-none print:p-0 print:border-none print:max-w-none">
+  const handlePrint = () => {
+    if (cardRef.current) {
+      const html = cardRef.current.innerHTML;
+      const title = `بطاقة حضور QR - ${student.fullName} (${student.studentNumber})`;
+      printNativePdfFromHtml({
+        htmlContent: `<div style="direction:rtl; text-align:center; font-family:'Cairo', sans-serif; max-width:400px; margin:0 auto; padding:20px;">${html}</div>`,
+        title,
+      });
+    }
+  };
+
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto w-screen h-screen print:p-0 print:bg-white print:static print:block"
+      style={{ margin: 0, padding: '0.75rem', left: 0, top: 0, right: 0, bottom: 0 }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 max-h-[94dvh] overflow-y-auto my-auto print:shadow-none print:p-0 print:border-none print:max-w-none border border-slate-200">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden modal-controls-header">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
               <QrCode className="w-4 h-4" />
@@ -182,13 +242,13 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
           <div className="bg-gradient-to-r from-emerald-800 to-emerald-700 text-white p-3.5 space-y-1">
             <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-200">
               <Building className="w-3.5 h-3.5" />
-              <span>{currentTenant.name}</span>
+              <span>{schoolName}</span>
             </div>
             <h4 className="font-bold text-sm tracking-wide">
               {lang === 'ar' ? 'بطاقة الحضور والانضباط المدرسي' : 'Student Attendance ID Badge'}
             </h4>
             <span className="text-[10px] text-emerald-100/90 block">
-              {currentTenant.academicYear} · {student.grade}
+              {academicYear} · {student.grade || ''}
             </span>
           </div>
 
@@ -208,7 +268,10 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
 
             {/* QR Code Container */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 inline-block mx-auto shadow-2xs">
-              <canvas ref={canvasRef} className="mx-auto block" />
+              {qrDataUrl && (
+                <img src={qrDataUrl} alt="QR Code" className="w-44 h-44 mx-auto block" />
+              )}
+              <canvas ref={canvasRef} className={qrDataUrl ? 'hidden' : 'mx-auto block'} />
               <div className="text-[10px] text-slate-500 font-medium mt-1">
                 {lang === 'ar' ? 'مسح سريع لتسجيل الحضور بدون لمس' : 'Scan for touchless check-in'}
               </div>
@@ -230,21 +293,30 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
 
         {/* Action Controls */}
         <div className="space-y-2 pt-1 text-xs print:hidden">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={handleDownloadVectorPdf}
+              className="flex items-center justify-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 px-2 rounded-lg transition-colors cursor-pointer shadow-xs text-[11px]"
+              title="تنزيل كملف PDF رسمي عالي الدقة"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'تنزيل PDF أصلي' : 'Vector PDF'}</span>
+            </button>
+
             <button
               onClick={handleDownloadCard}
-              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-3 rounded-lg transition-colors cursor-pointer shadow-xs"
+              className="flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-2 rounded-lg transition-colors cursor-pointer shadow-xs text-[11px]"
             >
-              <Download className="w-4 h-4" />
-              <span>{lang === 'ar' ? 'تحميل كصورة (PNG)' : 'Download PNG'}</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'صورة (PNG)' : 'PNG'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-3 rounded-lg transition-colors cursor-pointer shadow-xs"
+              className="flex items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-2 rounded-lg transition-colors cursor-pointer shadow-xs text-[11px]"
             >
-              <Printer className="w-4 h-4" />
-              <span>{lang === 'ar' ? 'طباعة البطاقة' : 'Print Badge'}</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'طباعة مباشرة' : 'Print'}</span>
             </button>
           </div>
 
@@ -264,4 +336,8 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };

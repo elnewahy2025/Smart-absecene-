@@ -2,25 +2,24 @@ import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { UserRole } from '../types/attendance';
 import {
-  CalendarDays,
-  FileCheck2,
-  MessageSquare,
-  ShieldAlert,
-  Send,
-  BarChart3,
-  Users2,
-  Settings2,
-  Building2,
-  UserCheck,
   Menu,
-  X,
   Languages,
-  LogIn,
   LogOut,
   Flame,
-  Bell,
+  UserCheck,
+  CalendarDays,
   Mail,
+  ShieldAlert,
+  Users2,
+  FileCheck2,
+  Send,
+  BarChart3,
+  Settings2,
+  MessageSquare,
+  Bell,
+  PanelLeft,
 } from 'lucide-react';
+import { ThemeSwitcherDropdown } from './ThemeSwitcherDropdown';
 
 export type ActiveTab =
   | 'sessions'
@@ -37,202 +36,165 @@ export type ActiveTab =
 interface HeaderNavProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
+  onSignOut?: () => void;
+  onToggleSidebarMobile?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebarCollapse?: () => void;
 }
 
-export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab }) => {
+export const HeaderNav: React.FC<HeaderNavProps> = ({
+  activeTab,
+  setActiveTab,
+  onSignOut,
+  onToggleSidebarMobile,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse,
+}) => {
   const {
     currentTenant,
-    tenants,
-    setTenantId,
+    tenantDomainConfig,
     currentUser,
-    setUserRole,
     lang,
     setLang,
-    notifications,
-    justifications,
     firebaseUser,
     signInWithGoogle,
     signOutGoogle,
   } = useAttendance();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  const pendingJustificationsCount = justifications.filter((j) => j.status === 'pending').length;
-  const failedNotificationsCount = notifications.filter((n) => n.status === 'failed').length;
-
-  const roleLabels: Record<UserRole, { ar: string; en: string }> = {
-    admin: { ar: 'مدير المدرسة', en: 'Principal (Admin)' },
-    registrar: { ar: 'شؤون الطلبة والتوجيه', en: 'Counselor / Registrar' },
-    teacher: { ar: 'معلم المادة', en: 'Teacher' },
-    parent: { ar: 'ولي أمر', en: 'Parent' },
+  const getPageTitle = (tab: ActiveTab): { ar: string; en: string; icon: React.ReactNode } => {
+    switch (tab) {
+      case 'sessions':
+        return { ar: 'كشوف الحضور والغياب اليومية', en: 'Daily Attendance Sessions', icon: <CalendarDays className="w-5 h-5 text-emerald-600" /> };
+      case 'digest':
+        return { ar: 'نشرة الصباح الاستباقية والرادار الذكي', en: 'Morning Daily Digest', icon: <Mail className="w-5 h-5 text-teal-600" /> };
+      case 'emergency':
+        return { ar: 'كشف الطوارئ والإخلاء ونقاط التجمع', en: 'Emergency Evacuation Roster', icon: <ShieldAlert className="w-5 h-5 text-rose-600" /> };
+      case 'students':
+        return { ar: 'إدارة واستيراد الطلاب والشعب', en: 'Students & Roster Registry', icon: <Users2 className="w-5 h-5 text-indigo-600" /> };
+      case 'justifications':
+        return { ar: 'تدقيق وتحليل الأعذار بالذكاء الاصطناعي', en: 'Excuses & AI Analysis', icon: <FileCheck2 className="w-5 h-5 text-amber-600" /> };
+      case 'outbox':
+        return { ar: 'طابور الإشعارات والرسائل النصية والواتساب', en: 'Notification Outbox', icon: <Send className="w-5 h-5 text-sky-600" /> };
+      case 'reports':
+        return { ar: 'مركز التقارير والتحفيز والطباعة المجمعة', en: 'Reports & Batch Print', icon: <BarChart3 className="w-5 h-5 text-violet-600" /> };
+      case 'settings':
+        return { ar: 'سجل التدقيق وسياسات المنشأة والصلاحيات', en: 'Audit & School Settings', icon: <Settings2 className="w-5 h-5 text-slate-700" /> };
+      case 'chatbot':
+        return { ar: 'المساعد المدرسي الذكي (Gemini Assistant)', en: 'Gemini Assistant', icon: <MessageSquare className="w-5 h-5 text-purple-600" /> };
+      case 'parent_portal':
+        return { ar: 'بوابة ولي الأمر وإشعارات الأبناء', en: 'Parent Portal & Alerts', icon: <Bell className="w-5 h-5 text-amber-500" /> };
+    }
   };
 
-  const navItems: { id: ActiveTab; labelAr: string; labelEn: string; icon: React.ReactNode; badge?: number }[] = [
-    {
-      id: 'sessions',
-      labelAr: 'كشوف الحضور والغياب',
-      labelEn: 'Attendance Sessions',
-      icon: <CalendarDays className="w-4 h-4" />,
-    },
-    {
-      id: 'justifications',
-      labelAr: 'تدقيق وتحليل الأعذار',
-      labelEn: 'Excuses & AI Analysis',
-      icon: <FileCheck2 className="w-4 h-4" />,
-      badge: pendingJustificationsCount > 0 ? pendingJustificationsCount : undefined,
-    },
-    {
-      id: 'digest',
-      labelAr: 'نشرة الصباح الاستباقية',
-      labelEn: 'Morning Daily Digest',
-      icon: <Mail className="w-4 h-4 text-emerald-500" />,
-    },
-    {
-      id: 'chatbot',
-      labelAr: 'المساعد المدرسي الذكي',
-      labelEn: 'Gemini Assistant',
-      icon: <MessageSquare className="w-4 h-4" />,
-    },
-    {
-      id: 'emergency',
-      labelAr: 'كشف الطوارئ والإخلاء',
-      labelEn: 'Emergency Roster',
-      icon: <ShieldAlert className="w-4 h-4" />,
-    },
-    {
-      id: 'outbox',
-      labelAr: 'طابور الإشعارات والرسائل',
-      labelEn: 'Notification Outbox',
-      icon: <Send className="w-4 h-4" />,
-      badge: failedNotificationsCount > 0 ? failedNotificationsCount : undefined,
-    },
-    {
-      id: 'reports',
-      labelAr: 'التقارير والتحليلات',
-      labelEn: 'Reports & Analytics',
-      icon: <BarChart3 className="w-4 h-4" />,
-    },
-    {
-      id: 'students',
-      labelAr: 'إدارة واستيراد الطلاب',
-      labelEn: 'Students & 2-Stage Import',
-      icon: <Users2 className="w-4 h-4" />,
-    },
-    {
-      id: 'settings',
-      labelAr: 'سجل التدقيق والإعدادات',
-      labelEn: 'Audit & Settings',
-      icon: <Settings2 className="w-4 h-4" />,
-    },
-    {
-      id: 'parent_portal',
-      labelAr: 'بوابة وإشعارات ولي الأمر',
-      labelEn: 'Parent Portal & Alerts',
-      icon: <Bell className="w-4 h-4 text-amber-500" />,
-    },
-  ];
-
-  const isParent = currentUser.role === 'parent';
-
-  // Parents must NEVER see administrative tabs or roster of other students
-  const visibleNavItems = navItems
-    .filter((item) => {
-      if (isParent) {
-        return item.id === 'parent_portal' || item.id === 'justifications' || item.id === 'chatbot';
-      }
-      return true;
-    })
-    .map((item) => {
-      if (isParent && item.id === 'justifications') {
-        return {
-          ...item,
-          labelAr: 'أعذار واستئذان الأبناء',
-          labelEn: 'Child Excuses',
-        };
-      }
-      return item;
-    });
+  const currentTitle = getPageTitle(activeTab);
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-      {/* Top Banner: Tenant Selector + Role Switcher + Lang */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-        {/* School / Tenant Selection */}
-        <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-emerald-600" />
-          <span className="font-semibold text-slate-700">
-            {lang === 'ar' ? 'المدرسة النشطة:' : 'Active School:'}
-          </span>
-          <select
-            value={currentTenant.id}
-            onChange={(e) => setTenantId(e.target.value)}
-            className="bg-slate-50 border border-slate-300 text-slate-800 rounded-md px-2.5 py-1 font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500 cursor-pointer text-xs"
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-2xs text-[var(--app-text-main,#0f172a)] dark:text-slate-100">
+      <div className="max-w-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 text-xs">
+        {/* Left / Right (in RTL): Menu Trigger + Breadcrumb Page Header */}
+        <div className="flex items-center gap-3">
+          {/* Mobile Sidebar Trigger */}
+          <button
+            onClick={onToggleSidebarMobile}
+            className="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            title={lang === 'ar' ? 'فتح القائمة الجانبية' : 'Open Sidebar'}
           >
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.city})
-              </option>
-            ))}
-          </select>
-          <span className="text-slate-400 hidden sm:inline">|</span>
-          <span className="text-slate-500 hidden sm:inline">
-            {currentTenant.academicYear} - {currentTenant.currentTerm}
-          </span>
+            <Menu className="w-5 h-5" />
+          </button>
+
+          {/* Desktop Toggle Sidebar Button */}
+          {onToggleSidebarCollapse && (
+            <button
+              onClick={onToggleSidebarCollapse}
+              className="hidden lg:flex p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+              title={isSidebarCollapsed ? (lang === 'ar' ? 'توسيع القائمة' : 'Expand') : (lang === 'ar' ? 'طي القائمة' : 'Collapse')}
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Active Page Title & Indicator */}
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              {currentTitle.icon}
+            </span>
+            <div>
+              <h1 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight">
+                {lang === 'ar' ? currentTitle.ar : currentTitle.en}
+              </h1>
+              <p className="text-[10px] text-slate-400 leading-none">
+                {currentTenant.name} · {currentTenant.academicYear} ({currentTenant.currentTerm})
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* User Role Switcher & Language */}
-        <div className="flex items-center gap-2 ml-auto">
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
-            <UserCheck className="w-3.5 h-3.5 text-slate-500 mr-1" />
-            <span className="text-slate-500 text-[11px] font-medium hidden md:inline">
-              {lang === 'ar' ? 'معاينة بدور:' : 'Preview as:'}
-            </span>
-            {(['admin', 'registrar', 'teacher', 'parent'] as UserRole[]).map((r) => {
-              const active = currentUser.role === r;
-              return (
-                <button
-                  key={r}
-                  onClick={() => {
-                    setUserRole(r);
-                    if (r === 'parent') {
-                      setActiveTab('parent_portal');
-                    }
-                  }}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    active
-                      ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {lang === 'ar' ? roleLabels[r].ar : roleLabels[r].en}
-                </button>
-              );
-            })}
+        {/* Right / Left (in RTL): Actions, User Role Badge, Lang & Logout */}
+        <div className="flex items-center gap-2">
+          {/* Active User Identity & Authenticated Role Badge (Fixed from login) */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg">
+            <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[140px] hidden sm:inline" title={currentUser.name}>
+                {currentUser.name}
+              </span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                  currentUser.role === 'admin'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                    : currentUser.role === 'registrar'
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800'
+                    : currentUser.role === 'teacher'
+                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                }`}
+                title={lang === 'ar' ? 'الصفة / الدور المعتمد من تسجيل الدخول' : 'Authenticated Role from Login'}
+              >
+                {currentUser.role === 'admin'
+                  ? (lang === 'ar' ? 'مدير المدرسة (Admin)' : 'Admin')
+                  : currentUser.role === 'registrar'
+                  ? (lang === 'ar' ? 'شؤون الطلاب (Registrar)' : 'Registrar')
+                  : currentUser.role === 'teacher'
+                  ? (lang === 'ar' ? 'معلم الفصل (Teacher)' : 'Teacher')
+                  : (lang === 'ar' ? 'ولي أمر (Parent)' : 'Parent')}
+              </span>
+            </div>
           </div>
 
-          {/* Lang toggle */}
+          {/* Theme & Dark Mode Switcher */}
+          <ThemeSwitcherDropdown lang={lang} />
+
+          {/* Language Toggle */}
           <button
             onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer"
             title="تبديل اللغة / Toggle Language"
           >
             <Languages className="w-3.5 h-3.5" />
-            <span>{lang === 'ar' ? 'English' : 'عربي'}</span>
+            <span>{lang === 'ar' ? 'EN' : 'عربي'}</span>
           </button>
 
-          {/* Firebase Authentication Status & Google Login */}
+          {/* Sign Out Button */}
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50 border border-red-200 dark:border-red-900/60 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+              title={lang === 'ar' ? 'تسجيل الخروج من البوابة' : 'Sign out from school portal'}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{lang === 'ar' ? 'خروج' : 'Sign out'}</span>
+            </button>
+          )}
+
+          {/* Firebase Authentication Status */}
           {firebaseUser ? (
-            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-emerald-900">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] font-semibold max-w-[130px] truncate" title={firebaseUser.email || ''}>
-                  {firebaseUser.displayName || firebaseUser.email}
-                </span>
-                <span className="text-[10px] bg-emerald-200/80 text-emerald-800 px-1 py-0.2 rounded font-mono">
-                  Firebase
-                </span>
-              </div>
+            <div className="hidden md:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg text-emerald-900 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold max-w-[100px] truncate" title={firebaseUser.email || ''}>
+                {firebaseUser.displayName || firebaseUser.email}
+              </span>
               <button
                 onClick={async () => {
                   try {
@@ -241,8 +203,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
                     console.error(e);
                   }
                 }}
-                className="text-emerald-700 hover:text-red-600 p-0.5 transition-colors cursor-pointer"
-                title={lang === 'ar' ? 'تسجيل الخروج' : 'Sign out'}
+                className="text-emerald-700 hover:text-red-600 p-0.5 cursor-pointer"
+                title={lang === 'ar' ? 'تسجيل الخروج السحابي' : 'Sign out'}
               >
                 <LogOut className="w-3 h-3" />
               </button>
@@ -260,109 +222,15 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab })
                   setAuthLoading(false);
                 }
               }}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded-md text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              title={lang === 'ar' ? 'تسجيل الدخول عبر حساب Google وحفظ البيانات سحابياً في Firebase' : 'Sign in with Google to sync to Firebase Firestore'}
+              className="hidden md:flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-2 py-1 rounded-lg text-[11px] shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+              title={lang === 'ar' ? 'تسجيل الدخول عبر Google ومزامنة Firebase' : 'Sign in with Google'}
             >
-              <Flame className="w-3.5 h-3.5 text-white" />
-              <span>{lang === 'ar' ? 'دخول عبر Google (Firebase)' : 'Sign in (Firebase)'}</span>
+              <Flame className="w-3.5 h-3.5" />
+              <span>Firebase</span>
             </button>
           )}
         </div>
       </div>
-
-      {/* Main Bar: Brand + Navigation Links */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-            ح
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-base leading-tight">
-                {lang === 'ar' ? 'مدرستي حضور' : 'Smart Attendance'}
-              </span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">
-                PRO 2026
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-none">
-              {lang === 'ar' ? 'نظام الحضور والغياب المدرسي الذكي' : 'Integrated Attendance Engine & AI Excuses'}
-            </p>
-          </div>
-        </div>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-1">
-          {visibleNavItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer relative ${
-                  isActive
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                {item.icon}
-                <span>{lang === 'ar' ? item.labelAr : item.labelEn}</span>
-                {item.badge !== undefined && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold leading-none ${
-                      isActive ? 'bg-emerald-400 text-slate-950' : 'bg-red-500 text-white'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Mobile menu trigger */}
-        <div className="lg:hidden flex items-center">
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-4 space-y-1 shadow-lg">
-          {visibleNavItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'bg-slate-900 text-white font-semibold' : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  {item.icon}
-                  <span>{lang === 'ar' ? item.labelAr : item.labelEn}</span>
-                </div>
-                {item.badge !== undefined && (
-                  <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </header>
   );
 };

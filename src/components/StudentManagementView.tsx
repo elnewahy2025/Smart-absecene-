@@ -21,10 +21,20 @@ import {
   QrCode,
   Scan,
   Printer,
+  Award,
+  UserPlus,
+  ArrowRightLeft,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { StudentQRCodeModal } from './StudentQRCodeModal';
 import { QRScannerModal } from './QRScannerModal';
 import { BatchQRModal } from './BatchQRModal';
+import { StudentBehaviourModal } from './attendance/StudentBehaviourModal';
+import { SchoolClassStatsCards } from './students/SchoolClassStatsCards';
+import { AddStudentModal } from './students/AddStudentModal';
+import { TransferStudentModal } from './students/TransferStudentModal';
+import { DeleteStudentConfirmationModal } from './students/DeleteStudentConfirmationModal';
 
 interface ParsedImportRow {
   rowNumber: number;
@@ -41,10 +51,39 @@ interface ParsedImportRow {
 }
 
 export const StudentManagementView: React.FC = () => {
-  const { students, importStudents, lang, currentTenant, currentUser } = useAttendance();
+  const {
+    students,
+    importStudents,
+    addStudent,
+    transferStudent,
+    restoreStudent,
+    deleteStudent,
+    classesStats,
+    schoolEnrollmentStats,
+    lang,
+    currentTenant,
+    currentUser,
+    canImportStudents,
+    behaviourIncidents,
+    addBehaviourIncident,
+  } = useAttendance();
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'transferred' | 'all'>('active');
+  const [interventionOnly, setInterventionOnly] = useState<boolean>(false);
+
+  // Intervention count across active school students (rate < 90% or absences >= 3)
+  const activeStudentsList = students.filter((s) => s.enrollmentStatus !== 'transferred');
+  const interventionStudentsCount = activeStudentsList.filter(
+    (s) => s.attendanceRate < 90 || s.totalAbsences >= 3
+  ).length;
+
+  // Single Student Modals
+  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const [studentToTransfer, setStudentToTransfer] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   
   // 2-Stage Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -61,6 +100,9 @@ export const StudentManagementView: React.FC = () => {
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [isBatchQRModalOpen, setIsBatchQRModalOpen] = useState(false);
 
+  // Student Behaviour Modal state
+  const [selectedStudentForBehaviour, setSelectedStudentForBehaviour] = useState<Student | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sample CSV text with deliberate mix of valid and duplicate rows for testing
@@ -74,6 +116,10 @@ export const StudentManagementView: React.FC = () => {
 
   // Filter existing students in view
   const filteredStudents = students.filter((s) => {
+    if (statusFilter === 'active' && s.enrollmentStatus === 'transferred') return false;
+    if (statusFilter === 'transferred' && s.enrollmentStatus !== 'transferred') return false;
+    if (interventionOnly && (s.attendanceRate >= 90 && s.totalAbsences < 3)) return false;
+    if (selectedGradeFilter !== 'all' && s.grade !== selectedGradeFilter) return false;
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -81,7 +127,8 @@ export const StudentManagementView: React.FC = () => {
         s.fullName.toLowerCase().includes(q) ||
         s.nationalId.includes(q) ||
         s.studentNumber.includes(q) ||
-        s.guardianPhone.includes(q)
+        s.guardianPhone.includes(q) ||
+        (s.destinationSchool && s.destinationSchool.toLowerCase().includes(q))
       );
     }
     return true;
@@ -260,8 +307,8 @@ export const StudentManagementView: React.FC = () => {
       const studentNumber = parts[colIndices.studentNumber] || '';
       const nationalId = parts[colIndices.nationalId] || '';
       const fullName = parts[colIndices.fullName] || '';
-      const grade = parts[colIndices.grade] || 'الصف العاشر';
-      const className = parts[colIndices.className] || '10 / أ';
+      const grade = parts[colIndices.grade] || classesStats[0]?.grade || 'المرحلة الدراسية';
+      const className = parts[colIndices.className] || classesStats[0]?.className || 'غير محدد';
       const guardianName = parts[colIndices.guardianName] || 'ولي أمر الطالب';
       const guardianPhone = parts[colIndices.guardianPhone] || '+966500000000';
       const bloodType = parts[colIndices.bloodType] || 'O+';
@@ -320,7 +367,9 @@ export const StudentManagementView: React.FC = () => {
         studentNumber: r.studentNumber,
         grade: r.grade,
         className: r.className,
-        classId: r.className === '10 / أ' ? 'class-1a' : 'class-1b',
+        classId:
+          classesStats.find((c) => c.className === r.className)?.classId ||
+          `class-${r.className.replace(/[^a-zA-Z0-9]/g, '')}`,
         guardianName: r.guardianName,
         guardianPhone: r.guardianPhone,
         bloodType: r.bloodType,
@@ -389,24 +438,46 @@ export const StudentManagementView: React.FC = () => {
         </div>
       </div>
 
+      {/* Dynamic School & Class Statistics Cards and Filters */}
+      <SchoolClassStatsCards
+        enrollmentStats={schoolEnrollmentStats}
+        classesStats={classesStats}
+        selectedClass={selectedClass}
+        onSelectClass={setSelectedClass}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        selectedGradeFilter={selectedGradeFilter}
+        onSelectGradeFilter={setSelectedGradeFilter}
+        lang={lang}
+      />
+
       {/* Top Banner and Actions */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="app-section-header rounded-xl border p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold text-slate-900">
+          <h3 className="text-base font-bold">
             {lang === 'ar' ? 'سجل الطلاب المقيدين في المدرسة' : 'Enrolled Students Registry'}
           </h3>
-          <p className="text-xs text-slate-500">
-            {currentTenant.name} · {students.length} طالب مقيد في النظام
+          <p className="text-xs opacity-85 mt-0.5">
+            {currentTenant.name} · {schoolEnrollmentStats.activeStudentsCount} طالب نشط ({schoolEnrollmentStats.totalStudentsCount} إجمالي السجلات)
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* New Single Student Add Button */}
+          <button
+            onClick={() => setIsAddStudentModalOpen(true)}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'إضافة طالب جديد' : 'Add Student'}</span>
+          </button>
+
           <button
             onClick={() => setIsScannerModalOpen(true)}
             className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             <Scan className="w-4 h-4 text-emerald-400" />
-            <span>{lang === 'ar' ? 'قارئ الحضور بالـ QR (بدون لمس)' : 'Touchless QR Scanner'}</span>
+            <span>{lang === 'ar' ? 'قارئ الحضور بالـ QR' : 'QR Scanner'}</span>
           </button>
 
           <button
@@ -414,46 +485,107 @@ export const StudentManagementView: React.FC = () => {
             className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs"
           >
             <Printer className="w-4 h-4 text-slate-600" />
-            <span>{lang === 'ar' ? 'طباعة بطاقات الفصل بالـ QR' : 'Batch QR Badges Print'}</span>
+            <span>{lang === 'ar' ? 'طباعة بطاقات الفصل' : 'Batch QR Badges'}</span>
           </button>
 
-          <button
-            onClick={() => {
-              setRawCsvText(sampleImportText);
-              setIsImportModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer border border-slate-300"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>{lang === 'ar' ? 'معاينة عينة استيراد تجريبية' : 'Test Sample Import'}</span>
-          </button>
+          {canImportStudents && (
+            <button
+              onClick={() => {
+                setRawCsvText(sampleImportText);
+                setIsImportModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer border border-slate-300"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>{lang === 'ar' ? 'معاينة عينة استيراد' : 'Test Import'}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs w-full sm:w-auto">
-          <label htmlFor="student-class-filter" className="font-semibold text-slate-700">
-            {lang === 'ar' ? 'تصفية حسب الفصل:' : 'Filter by Class:'}
-          </label>
-          <select
-            id="student-class-filter"
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer text-xs"
+      {/* Filter and Search Bar with Quick Intervention Drilldown */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs w-full md:w-auto">
+          {/* Class Select */}
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="student-class-filter" className="font-semibold text-slate-700">
+              {lang === 'ar' ? 'الفصل:' : 'Class:'}
+            </label>
+            <select
+              id="student-class-filter"
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer text-xs"
+            >
+              <option value="all">{lang === 'ar' ? 'جميع الفصول' : 'All Classes'}</option>
+              {classesStats.map((c) => (
+                <option key={c.className} value={c.className}>
+                  {c.className} ({c.activeStudents} {lang === 'ar' ? 'طالب' : 'students'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick Intervention Filter Button - Percentage Prominent + Count Beside */}
+          <button
+            onClick={() => setInterventionOnly(!interventionOnly)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              interventionOnly
+                ? 'bg-rose-600 text-white border-rose-700 shadow-xs ring-2 ring-rose-500/20'
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+            }`}
+            title={lang === 'ar' ? 'تصفية فورية للطلاب المحتاجين للتدخل ومتابعة الغياب' : 'Filter students requiring intervention'}
           >
-            <option value="all">{lang === 'ar' ? 'جميع الفصول' : 'All Classes'}</option>
-            <option value="10 / أ">10 / أ</option>
-            <option value="10 / ب">10 / ب</option>
-            <option value="11 / أ">11 / أ</option>
-          </select>
+            <AlertTriangle className="w-3.5 h-3.5 text-current shrink-0" />
+            <span>
+              {lang === 'ar' ? 'الطلاب بحاجة لتدخل:' : 'Intervention Needed:'}
+            </span>
+            <span className="font-mono font-black">
+              %{activeStudentsList.length > 0
+                ? Math.round((interventionStudentsCount / activeStudentsList.length) * 100)
+                : 0}
+            </span>
+            <span className="text-[11px] opacity-90 font-medium">
+              ({interventionStudentsCount})
+            </span>
+          </button>
+
+          {/* Active Grade Filter indicator if selected */}
+          {selectedGradeFilter !== 'all' && (
+            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-1 rounded-lg text-[11px] font-bold">
+              <span>المرحلة: {selectedGradeFilter}</span>
+              <button
+                onClick={() => setSelectedGradeFilter('all')}
+                className="text-indigo-600 hover:text-indigo-900 cursor-pointer text-xs font-black"
+                title="إلغاء تصفية المرحلة"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Reset all filters if any are applied */}
+          {(selectedClass !== 'all' || selectedGradeFilter !== 'all' || interventionOnly || statusFilter !== 'active') && (
+            <button
+              onClick={() => {
+                setSelectedClass('all');
+                setSelectedGradeFilter('all');
+                setInterventionOnly(false);
+                setStatusFilter('active');
+                setSearchQuery('');
+              }}
+              className="text-slate-500 hover:text-slate-900 underline text-[11px] cursor-pointer"
+            >
+              {lang === 'ar' ? 'إعادة ضبط التصفية' : 'Reset filters'}
+            </button>
+          )}
         </div>
 
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full md:w-72">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
           <input
             type="text"
-            placeholder={lang === 'ar' ? 'بحث بالاسم، السجل، أو رقم الجوال...' : 'Search student...'}
+            placeholder={lang === 'ar' ? 'بحث بالاسم، السجل، المدرسة، أو الهاتف...' : 'Search student...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-50 border border-slate-300 rounded-lg pr-9 pl-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
@@ -476,52 +608,152 @@ export const StudentManagementView: React.FC = () => {
                 <th className="py-3 px-4">{lang === 'ar' ? 'هاتف التواصل' : 'Phone'}</th>
                 <th className="py-3 px-4">{lang === 'ar' ? 'فصيلة الدم' : 'Blood'}</th>
                 <th className="py-3 px-4">{lang === 'ar' ? 'نسبة الحضور' : 'Attendance %'}</th>
+                <th className="py-3 px-4 text-center">{lang === 'ar' ? 'السلوك والمواظبة' : 'Behavior'}</th>
                 <th className="py-3 px-4 text-center">{lang === 'ar' ? 'بطاقة الـ QR' : 'QR Badge'}</th>
+                <th className="py-3 px-4 text-center">{lang === 'ar' ? 'إدارة القيد' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-slate-500">
-                    {lang === 'ar' ? 'لا يوجد طلاب مطابقين' : 'No students found'}
+                  <td colSpan={12} className="text-center py-8 text-slate-500">
+                    {lang === 'ar' ? 'لا يوجد طلاب مطابقين للتصفية' : 'No students found'}
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((s, idx) => (
-                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">{s.fullName}</td>
-                    <td className="py-3 px-4 font-mono text-slate-600">{s.studentNumber}</td>
-                    <td className="py-3 px-4 font-mono text-slate-600">{s.nationalId}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{s.className}</td>
-                    <td className="py-3 px-4 text-slate-700">{s.guardianName}</td>
-                    <td className="py-3 px-4 font-mono text-slate-600" dir="ltr">{s.guardianPhone}</td>
-                    <td className="py-3 px-4">
-                      <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700 font-bold">
-                        {s.bloodType || 'O+'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`font-mono font-bold ${
-                          s.attendanceRate >= 95 ? 'text-emerald-700' : 'text-amber-700'
-                        }`}
-                      >
-                        {s.attendanceRate}%
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => setSelectedStudentForQR(s)}
-                        className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
-                        title="عرض وتحميل بطاقة الحضور بالـ QR"
-                      >
-                        <QrCode className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>رمز الـ QR</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredStudents.map((s, idx) => {
+                  const studentIncidents = behaviourIncidents.filter((b) => b.studentId === s.id);
+                  const pointsSum = studentIncidents.reduce((sum, item) => sum + item.points, 0);
+                  const isTransferred = s.enrollmentStatus === 'transferred';
+
+                  return (
+                    <tr key={s.id} className={`hover:bg-slate-50 transition-colors ${isTransferred ? 'bg-amber-50/30' : ''}`}>
+                      <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        <div className="flex items-center gap-1.5">
+                          <span>{s.fullName}</span>
+                          {isTransferred && (
+                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300">
+                              {lang === 'ar' ? 'منقول' : 'Transferred'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-600">{s.studentNumber}</td>
+                      <td className="py-3 px-4 font-mono text-slate-600">{s.nationalId}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-800">
+                        <div>{s.className}</div>
+                        {isTransferred && s.destinationSchool && (
+                          <div className="text-[10px] text-amber-800 font-medium truncate max-w-[150px]" title={s.destinationSchool}>
+                            ← {s.destinationSchool}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">{s.guardianName}</td>
+                      <td className="py-3 px-4 font-mono text-slate-600" dir="ltr">{s.guardianPhone}</td>
+                      <td className="py-3 px-4">
+                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700 font-bold">
+                          {s.bloodType || 'O+'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs inline-block ${
+                                s.attendanceRate >= 95
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : s.attendanceRate >= 85
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-800 border border-rose-300 font-black'
+                              }`}
+                            >
+                              %{s.attendanceRate}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-medium font-mono">
+                              ({s.totalAbsences} {lang === 'ar' ? 'غياب' : 'abs'})
+                            </span>
+                          </div>
+                          {s.attendanceRate < 85 || s.totalAbsences >= 5 ? (
+                            <span className="text-[10px] text-rose-700 font-bold mt-0.5 flex items-center gap-0.5">
+                              ⚠️ {lang === 'ar' ? 'بحاجة لتدخل عاجل' : 'Needs Intervention'}
+                            </span>
+                          ) : s.attendanceRate < 90 || s.totalAbsences >= 3 ? (
+                            <span className="text-[10px] text-amber-700 font-medium mt-0.5">
+                              ⚡ {lang === 'ar' ? 'إنذار متابعة' : 'Watch list'}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => setSelectedStudentForBehaviour(s)}
+                          className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                          title="عرض وتدوين سجل السلوك والمكافآت"
+                        >
+                          <Award className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>
+                            {studentIncidents.length > 0
+                              ? `${pointsSum >= 0 ? '+' : ''}${pointsSum} (${studentIncidents.length})`
+                              : lang === 'ar' ? 'سجل السلوك' : 'Behavior'}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => setSelectedStudentForQR(s)}
+                          className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                          title="عرض وتحميل بطاقة الحضور بالـ QR"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>رمز الـ QR</span>
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {isTransferred ? (
+                            <>
+                              <button
+                                onClick={() => restoreStudent(s.id)}
+                                className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                title="إلغاء إجراء النقل واستعادة قيد الطالب للدوام"
+                              >
+                                <RotateCcw className="w-3 h-3 text-emerald-700" />
+                                <span>{lang === 'ar' ? 'استعادة' : 'Restore'}</span>
+                              </button>
+                              <button
+                                onClick={() => setStudentToDelete(s)}
+                                className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                title="حذف نهائي لسجل الطالب"
+                              >
+                                <Trash2 className="w-3 h-3 text-red-600" />
+                                <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setStudentToTransfer(s)}
+                                className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                title="نقل رسمي لمدرسة أخرى وإخفاؤه من كشوف الحضور"
+                              >
+                                <ArrowRightLeft className="w-3 h-3 text-amber-700" />
+                                <span>{lang === 'ar' ? 'نقل لمدرسة' : 'Transfer'}</span>
+                              </button>
+                              <button
+                                onClick={() => setStudentToDelete(s)}
+                                className="inline-flex items-center p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                title="حذف سجل الطالب نهائياً"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -860,6 +1092,7 @@ export const StudentManagementView: React.FC = () => {
           student={selectedStudentForQR}
           onClose={() => setSelectedStudentForQR(null)}
           onScanInSession={(std) => {
+            setSelectedStudentForQR(null);
             setIsScannerModalOpen(true);
           }}
         />
@@ -879,6 +1112,47 @@ export const StudentManagementView: React.FC = () => {
           onClose={() => setIsBatchQRModalOpen(false)}
         />
       )}
+
+      {/* Student Behaviour & Positive Recognition Modal */}
+      {selectedStudentForBehaviour && (
+        <StudentBehaviourModal
+          isOpen={true}
+          onClose={() => setSelectedStudentForBehaviour(null)}
+          student={selectedStudentForBehaviour}
+          incidents={behaviourIncidents}
+          onAddIncident={addBehaviourIncident}
+          lang={lang}
+          currentUserRole={currentUser.role}
+          currentUserName={currentUser.name}
+        />
+      )}
+
+      {/* Add Single Student Modal */}
+      <AddStudentModal
+        isOpen={isAddStudentModalOpen}
+        onClose={() => setIsAddStudentModalOpen(false)}
+        onAddStudent={addStudent}
+        classesStats={classesStats}
+        lang={lang}
+      />
+
+      {/* Transfer Student to Another School Modal */}
+      <TransferStudentModal
+        isOpen={!!studentToTransfer}
+        student={studentToTransfer}
+        onClose={() => setStudentToTransfer(null)}
+        onConfirmTransfer={transferStudent}
+        lang={lang}
+      />
+
+      {/* Permanent Delete Student Confirmation Modal */}
+      <DeleteStudentConfirmationModal
+        isOpen={!!studentToDelete}
+        student={studentToDelete}
+        onClose={() => setStudentToDelete(null)}
+        onConfirmDelete={deleteStudent}
+        lang={lang}
+      />
     </div>
   );
 };
