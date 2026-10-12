@@ -18,10 +18,12 @@ import {
   MessageSquare,
   Bell,
   PanelLeft,
+  LayoutDashboard,
 } from 'lucide-react';
 import { ThemeSwitcherDropdown } from './ThemeSwitcherDropdown';
 
 export type ActiveTab =
+  | 'dashboard'
   | 'sessions'
   | 'justifications'
   | 'digest'
@@ -65,6 +67,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
 
   const getPageTitle = (tab: ActiveTab): { ar: string; en: string; icon: React.ReactNode } => {
     switch (tab) {
+      case 'dashboard':
+        return { ar: 'لوحة القيادة والمؤشرات التنفيذية', en: 'Executive Dashboard', icon: <LayoutDashboard className="w-5 h-5 text-emerald-600" /> };
       case 'sessions':
         return { ar: 'كشوف الحضور والغياب اليومية', en: 'Daily Attendance Sessions', icon: <CalendarDays className="w-5 h-5 text-emerald-600" /> };
       case 'digest':
@@ -85,6 +89,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
         return { ar: 'المساعد المدرسي الذكي (Gemini Assistant)', en: 'Gemini Assistant', icon: <MessageSquare className="w-5 h-5 text-purple-600" /> };
       case 'parent_portal':
         return { ar: 'بوابة ولي الأمر وإشعارات الأبناء', en: 'Parent Portal & Alerts', icon: <Bell className="w-5 h-5 text-amber-500" /> };
+      default:
+        return { ar: 'لوحة القيادة والمؤشرات التنفيذية', en: 'Executive Dashboard', icon: <LayoutDashboard className="w-5 h-5 text-emerald-600" /> };
     }
   };
 

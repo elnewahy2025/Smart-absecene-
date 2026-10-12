@@ -25,7 +25,6 @@ import {
   Palmtree,
 } from 'lucide-react';
 import { QRScannerModal } from './QRScannerModal';
-import { WeeklyAttendanceTrendCard } from './WeeklyAttendanceTrendCard';
 import { BulkEditConfirmationModal } from './attendance/BulkEditConfirmationModal';
 import { ClassCalendarView } from './attendance/ClassCalendarView';
 import { GamifiedCelebrationModal } from './attendance/GamifiedCelebrationModal';
@@ -328,8 +327,6 @@ export const AttendanceSessionsView: React.FC = () => {
         </div>
       )}
 
-      {/* Weekly Daily Attendance Percentage Trends Visualization (Recharts) */}
-      <WeeklyAttendanceTrendCard />
 
       {/* Official Holiday / Weekend Alert Banner when current filter date is an off-day */}
       {(() => {

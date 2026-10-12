@@ -117,59 +117,28 @@ export const EmergencyRosterView: React.FC = () => {
 
   return (
     <div className="space-y-6 print-root-active">
-      {/* Disclaimer / Architectural Note Banner as required by spec */}
-      <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 shadow-xs flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h4 className="font-bold text-sm text-amber-950">
-            {lang === 'ar'
-              ? 'كشف آخر حالة حضور مسجلة (مخصص لإجراءات الطوارئ والسلامة المدرسية)'
-              : 'Last Recorded Attendance Roster for Emergencies'}
-          </h4>
-          <p className="leading-relaxed">
-            {lang === 'ar'
-              ? 'تنويه تنظيمي: يعكس هذا الكشف آخر تحديث معتمد في كشوف الحضور للحصص. يُستخدم كمرجع أساسي لحصر أعداد المتواجدين والغائبين عند الإخلاء، ويلزم التحقق الميداني المباشر من كل طالب في نقطة التجمع.'
-              : 'Regulatory Notice: This roster reflects the latest submitted class attendance session for headcounts during evacuation. Physical verification at the assembly point is required.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Overview Headcount KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 block">{lang === 'ar' ? 'إجمالي المقيدين' : 'Total Enrolled'}</span>
-          <span className="text-2xl font-bold text-slate-900">{totalEnrolled}</span>
-        </div>
-
-        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl shadow-xs">
-          <span className="text-xs text-emerald-700 block font-semibold">
-            {lang === 'ar' ? 'المتواجدون بالمبنى (آخر كشف)' : 'On Campus'}
+      {/* High-Density Emergency Operational Bar */}
+      <div className="bg-slate-900 text-white rounded-xl p-3 sm:px-4 sm:py-2.5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+          <span className="font-bold">
+            {lang === 'ar' ? 'كشف حصر الطوارئ والإخلاء' : 'Emergency Evacuation Headcount'}
           </span>
-          <span className="text-2xl font-bold text-emerald-800">{totalPresentOnCampus}</span>
         </div>
-
-        <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl shadow-xs">
-          <span className="text-xs text-rose-700 block font-semibold">
-            {lang === 'ar' ? 'غائبون رسميًا اليوم' : 'Absent Today'}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 font-medium">
+          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+            {lang === 'ar' ? 'بالمبنى:' : 'On Campus:'} <strong className="font-mono text-white">{totalPresentOnCampus}</strong>
           </span>
-          <span className="text-2xl font-bold text-rose-800">{totalAbsentToday}</span>
-        </div>
-
-        <div className="bg-sky-50 border border-sky-200 p-4 rounded-xl shadow-xs">
-          <span className="text-xs text-sky-700 block font-semibold">
-            {lang === 'ar' ? 'مستأذنون / انصراف مبكر' : 'Left Early'}
+          <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg">
+            {lang === 'ar' ? 'غائبون:' : 'Absent:'} <strong className="font-mono text-white">{totalAbsentToday}</strong>
           </span>
-          <span className="text-2xl font-bold text-sky-800">{totalLeftEarly}</span>
-        </div>
-
-        <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl shadow-xs col-span-2 md:col-span-1">
-          <span className="text-xs text-indigo-700 block font-semibold">
-            {lang === 'ar' ? 'تم حصرهم بنقطة الإخلاء' : 'Verified at Rally Point'}
+          <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2.5 py-1 rounded-lg">
+            {lang === 'ar' ? 'مستأذنون:' : 'Left Early:'} <strong className="font-mono text-white">{totalLeftEarly}</strong>
           </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-bold text-indigo-800">{totalVerifiedAtPoint}</span>
-            <span className="text-xs text-indigo-600 font-mono">/ {totalPresentOnCampus}</span>
-          </div>
+          <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg">
+            {lang === 'ar' ? 'حُصروا بنقطة الإخلاء:' : 'At Rally Point:'}{' '}
+            <strong className="font-mono text-white">{totalVerifiedAtPoint} / {totalPresentOnCampus}</strong>
+          </span>
         </div>
       </div>
 

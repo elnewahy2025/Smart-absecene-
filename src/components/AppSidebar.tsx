@@ -20,6 +20,7 @@ import {
   Sparkles,
   School,
   Bell,
+  LayoutDashboard,
 } from 'lucide-react';
 
 interface SubNavItem {
@@ -89,6 +90,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       titleEn: 'Daily Operations',
       icon: <CalendarDays className="w-4 h-4 text-emerald-600" />,
       items: [
+        {
+          id: 'dashboard',
+          labelAr: 'لوحة القيادة والمؤشرات التنفيذية',
+          labelEn: 'Executive Dashboard',
+          icon: <LayoutDashboard className="w-4 h-4 text-emerald-600" />,
+        },
         {
           id: 'sessions',
           labelAr: 'كشوف الحضور والغياب اليومية',
@@ -188,7 +195,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         return {
           ...sec,
           items: sec.items.filter((i) =>
-            ['sessions', 'emergency', 'justifications', 'reports'].includes(i.id)
+            ['dashboard', 'sessions', 'emergency', 'justifications', 'reports'].includes(i.id)
           ),
         };
       }

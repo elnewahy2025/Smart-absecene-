@@ -13,6 +13,7 @@ import { StudentManagementView } from './components/StudentManagementView';
 import { AuditSettingsView } from './components/AuditSettingsView';
 import { ParentPortalView } from './components/ParentPortalView';
 import { DailyEmailDigestView } from './components/DailyEmailDigestView';
+import { ExecutiveDashboardView } from './components/ExecutiveDashboardView';
 import { UnknownDomainView } from './components/UnknownDomainView';
 import { LoginPage } from './components/LoginPage';
 import { resolveTenantFromHostname } from './config/tenantRegistry';
@@ -25,7 +26,7 @@ const MainAppContent: React.FC = () => {
   const { lang, currentTenant, currentUser, setUserRole } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
-  const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'sessions');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'dashboard');
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('connected');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -47,7 +48,7 @@ const MainAppContent: React.FC = () => {
     if (userProfile.role === 'parent') {
       setActiveTab('parent_portal');
     } else {
-      setActiveTab('sessions');
+      setActiveTab('dashboard');
     }
     setIsAuthenticated(true);
   };
@@ -67,8 +68,8 @@ const MainAppContent: React.FC = () => {
   useEffect(() => {
     if (isParent && activeTab !== 'parent_portal' && activeTab !== 'justifications' && activeTab !== 'chatbot') {
       setActiveTab('parent_portal');
-    } else if (isTeacher && !['sessions', 'justifications', 'chatbot', 'emergency', 'reports'].includes(activeTab)) {
-      setActiveTab('sessions');
+    } else if (isTeacher && !['dashboard', 'sessions', 'justifications', 'chatbot', 'emergency', 'reports'].includes(activeTab)) {
+      setActiveTab('dashboard');
     }
   }, [isParent, isTeacher, activeTab]);
 
@@ -159,6 +160,9 @@ const MainAppContent: React.FC = () => {
             </>
           ) : (
             <>
+              {activeTab === 'dashboard' && (
+                <ExecutiveDashboardView onNavigateTab={(tab) => setActiveTab(tab)} />
+              )}
               {activeTab === 'sessions' && <AttendanceSessionsView />}
               {activeTab === 'justifications' && <JustificationsView />}
               {activeTab === 'digest' && (

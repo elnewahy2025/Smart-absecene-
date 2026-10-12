@@ -31,7 +31,6 @@ import { StudentQRCodeModal } from './StudentQRCodeModal';
 import { QRScannerModal } from './QRScannerModal';
 import { BatchQRModal } from './BatchQRModal';
 import { StudentBehaviourModal } from './attendance/StudentBehaviourModal';
-import { SchoolClassStatsCards } from './students/SchoolClassStatsCards';
 import { AddStudentModal } from './students/AddStudentModal';
 import { TransferStudentModal } from './students/TransferStudentModal';
 import { DeleteStudentConfirmationModal } from './students/DeleteStudentConfirmationModal';
@@ -400,57 +399,6 @@ export const StudentManagementView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Setup Assistant Banner for Administrators */}
-      <div className="bg-gradient-to-r from-emerald-900 to-slate-900 rounded-xl p-5 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-              التهيئة الأولية للنظام
-            </span>
-            <span className="text-slate-400 text-xs">· إعداد الفصول والطلاب</span>
-          </div>
-          <h2 className="text-lg font-bold">
-            {lang === 'ar' ? 'استيراد قوائم الطلاب عبر ملفات CSV' : 'Bulk Student CSV Onboarding'}
-          </h2>
-          <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-            {lang === 'ar'
-              ? 'يمكن لإدارة المدرسة استيراد بيانات مئات الطلاب دفعة واحدة لإنشاء سجلات الفصول وتأسيس كشوف الحضور بسرعة، مع فحص آلي لمنع تكرار السجلات والتحقق من صحة السجلات المدنية.'
-              : 'School administrators can import student rosters in bulk to set up classes and roll-calls quickly with automatic duplicate detection.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={handleDownloadTemplate}
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3.5 py-2.5 rounded-lg border border-white/20 transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-emerald-300" />
-            <span>{lang === 'ar' ? 'تحميل قالب CSV الجاهز' : 'Download Template'}</span>
-          </button>
-
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors cursor-pointer shadow-sm"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{lang === 'ar' ? 'استيراد ملف CSV جديد' : 'Import CSV File'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Dynamic School & Class Statistics Cards and Filters */}
-      <SchoolClassStatsCards
-        enrollmentStats={schoolEnrollmentStats}
-        classesStats={classesStats}
-        selectedClass={selectedClass}
-        onSelectClass={setSelectedClass}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        selectedGradeFilter={selectedGradeFilter}
-        onSelectGradeFilter={setSelectedGradeFilter}
-        lang={lang}
-      />
-
       {/* Top Banner and Actions */}
       <div className="app-section-header rounded-xl border p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -469,23 +417,40 @@ export const StudentManagementView: React.FC = () => {
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             <UserPlus className="w-4 h-4" />
-            <span>{lang === 'ar' ? 'إضافة طالب جديد' : 'Add Student'}</span>
+            <span>{lang === 'ar' ? 'إضافة طالب' : 'Add Student'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+          >
+            <Upload className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'استيراد CSV' : 'Import CSV'}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-1.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs"
+            title={lang === 'ar' ? 'تحميل قالب ملف CSV الجاهز' : 'Download CSV Template'}
+          >
+            <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === 'ar' ? 'القالب' : 'Template'}</span>
           </button>
 
           <button
             onClick={() => setIsScannerModalOpen(true)}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             <Scan className="w-4 h-4 text-emerald-400" />
-            <span>{lang === 'ar' ? 'قارئ الحضور بالـ QR' : 'QR Scanner'}</span>
+            <span>{lang === 'ar' ? 'قارئ QR' : 'Scan QR'}</span>
           </button>
 
           <button
             onClick={() => setIsBatchQRModalOpen(true)}
-            className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs"
           >
-            <Printer className="w-4 h-4 text-slate-600" />
-            <span>{lang === 'ar' ? 'طباعة بطاقات الفصل' : 'Batch QR Badges'}</span>
+            <Printer className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+            <span>{lang === 'ar' ? 'بطاقات QR' : 'QR Badges'}</span>
           </button>
 
           {canImportStudents && (
