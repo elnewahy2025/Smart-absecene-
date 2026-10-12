@@ -1337,6 +1337,23 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     if (currentUserRole === 'parent' && !parentChildIds.includes(studentId)) {
       throw new Error('Unauthorized: Parents can only submit excuses for their own children.');
     }
+
+    // Strict compliance check with Settings page academic calendar & off-days
+    const terms = schoolProfile.academicYear?.terms || [];
+    const termStarts = terms.map((t) => t.startDate).filter(Boolean).sort();
+    const termEnds = terms.map((t) => t.endDate).filter(Boolean).sort();
+    const yearStart = termStarts[0] || '2026-09-01';
+    const yearEnd = termEnds[termEnds.length - 1] || '2027-06-24';
+
+    if (absenceDate < yearStart || absenceDate > yearEnd) {
+      throw new Error(`تاريخ الغياب (${absenceDate}) يقع خارج حدود العام الدراسي المعتمد (${yearStart} إلى ${yearEnd}) في صفحة الإعدادات.`);
+    }
+
+    const offCheck = isOffDay(absenceDate);
+    if (offCheck.isOff) {
+      throw new Error(`تاريخ الغياب (${absenceDate}) يوافق ${offCheck.reason} المعتمد في صفحة الإعدادات. لا يمكن تسجيل غياب في يوم إجازة رسمية.`);
+    }
+
     const student = allStudents.find((s) => s.id === studentId);
     const newJust: Justification = {
       id: `just-${Date.now()}`,
@@ -1742,6 +1759,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     const existingNatIds = new Set(students.map((s) => s.nationalId));
     const existingStdNums = new Set(students.map((s) => s.studentNumber));
 
+    const approvedClasses = (schoolProfile?.classes || []).map((c) => ({
+      name: c.name.trim(),
+      normalized: c.name.replace(/\s+/g, '').toLowerCase(),
+      grade: c.grade.trim(),
+      id: c.id,
+    }));
+
     const additions: Student[] = [];
 
     newStudentsList.forEach((raw, i) => {
@@ -1749,6 +1773,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const studentNumber = raw.studentNumber?.trim() || `2026${Date.now() + i}`;
 
       if (existingNatIds.has(nationalId) || existingStdNums.has(studentNumber)) {
+        duplicates++;
+        return;
+      }
+
+      const rawClass = (raw.className || '').trim();
+      const normalizedClass = rawClass.replace(/\s+/g, '').toLowerCase();
+      const matchedClass = approvedClasses.find(
+        (c) => c.normalized === normalizedClass || c.name === rawClass
+      );
+
+      // Enforce strict Settings compliance: reject students with classes not in Settings
+      if (!matchedClass && approvedClasses.length > 0) {
         duplicates++;
         return;
       }
@@ -1762,9 +1798,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         studentNumber,
         nationalId,
         fullName: raw.fullName?.trim() || `طالب جديد ${i + 1}`,
-        grade: raw.grade?.trim() || 'الصف العاشر',
-        className: raw.className?.trim() || '10 / أ',
-        classId: raw.classId?.trim() || 'class-1a',
+        grade: matchedClass ? matchedClass.grade : (raw.grade?.trim() || 'الصف العاشر'),
+        className: matchedClass ? matchedClass.name : (rawClass || '10 / أ'),
+        classId: matchedClass ? matchedClass.id : (raw.classId?.trim() || 'class-1a'),
         guardianName: raw.guardianName?.trim() || 'ولي أمر معتمد',
         guardianPhone: raw.guardianPhone?.trim() || '+966500000000',
         guardianRelationship: raw.guardianRelationship || 'الأب',

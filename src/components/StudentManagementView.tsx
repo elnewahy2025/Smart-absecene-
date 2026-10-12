@@ -59,6 +59,7 @@ export const StudentManagementView: React.FC = () => {
     deleteStudent,
     classesStats,
     schoolEnrollmentStats,
+    schoolProfile,
     lang,
     currentTenant,
     currentUser,
@@ -73,10 +74,11 @@ export const StudentManagementView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'active' | 'transferred' | 'all'>('active');
   const [interventionOnly, setInterventionOnly] = useState<boolean>(false);
 
-  // Intervention count across active school students (rate < 90% or absences >= 3)
+  // Intervention threshold bound strictly to settings (schoolProfile.unexcusedWarningThreshold)
+  const warningThreshold = schoolProfile?.unexcusedWarningThreshold ?? 3;
   const activeStudentsList = students.filter((s) => s.enrollmentStatus !== 'transferred');
   const interventionStudentsCount = activeStudentsList.filter(
-    (s) => s.attendanceRate < 90 || s.totalAbsences >= 3
+    (s) => s.attendanceRate < 90 || s.totalAbsences >= warningThreshold
   ).length;
 
   // Single Student Modals
@@ -117,7 +119,7 @@ export const StudentManagementView: React.FC = () => {
   const filteredStudents = students.filter((s) => {
     if (statusFilter === 'active' && s.enrollmentStatus === 'transferred') return false;
     if (statusFilter === 'transferred' && s.enrollmentStatus !== 'transferred') return false;
-    if (interventionOnly && (s.attendanceRate >= 90 && s.totalAbsences < 3)) return false;
+    if (interventionOnly && (s.attendanceRate >= 90 && s.totalAbsences < warningThreshold)) return false;
     if (selectedGradeFilter !== 'all' && s.grade !== selectedGradeFilter) return false;
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
     if (searchQuery) {
@@ -133,14 +135,19 @@ export const StudentManagementView: React.FC = () => {
     return true;
   });
 
-  // Download official CSV template with UTF-8 BOM
+  // Download official CSV template with UTF-8 BOM, generated directly from Settings classes
   const handleDownloadTemplate = () => {
+    const configuredClasses = schoolProfile?.classes && schoolProfile.classes.length > 0
+      ? schoolProfile.classes
+      : [{ name: '10 / أ', grade: 'الصف العاشر' }];
+
+    const templateRows = configuredClasses.map((cls, idx) =>
+      `2026030${idx + 1},109811122${idx + 1},طالب تجريبي ${idx + 1},${cls.grade},${cls.name},ولي أمر الطالب ${idx + 1},+96650111223${idx},O+`
+    ).join('\n');
+
     const csvContent =
       '\uFEFF' +
-      `الرقم المدرسي,السجل المدني,اسم الطالب,المرحلة,الفصل,ولي الأمر,الهاتف,فصيلة الدم
-20260301,1098111221,عبد العزيز بن فهد الدوسري,الصف العاشر,10 / أ,فهد الدوسري,+966501112233,O+
-20260302,1098111222,زياد بن ناصر القحطاني,الصف العاشر,10 / أ,ناصر القحطاني,+966502223344,A+
-20260303,1098111223,معاذ بن خالد العتيبي,الصف العاشر,10 / ب,خالد العتيبي,+966503334455,B+`;
+      `الرقم المدرسي,السجل المدني,اسم الطالب,المرحلة,الفصل,ولي الأمر,الهاتف,فصيلة الدم\n${templateRows}`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -299,6 +306,13 @@ export const StudentManagementView: React.FC = () => {
 
     const dataLines = headerIndex === 0 ? lines.slice(1) : lines;
 
+    const approvedClasses = (schoolProfile?.classes || []).map((c) => ({
+      name: c.name.trim(),
+      normalized: c.name.replace(/\s+/g, '').toLowerCase(),
+      grade: c.grade.trim(),
+      id: c.id,
+    }));
+
     dataLines.forEach((line, index) => {
       const parts = parseCsvLine(line);
       if (parts.length < 2) return;
@@ -311,6 +325,11 @@ export const StudentManagementView: React.FC = () => {
       const guardianName = parts[colIndices.guardianName] || 'ولي أمر الطالب';
       const guardianPhone = parts[colIndices.guardianPhone] || '+966500000000';
       const bloodType = parts[colIndices.bloodType] || 'O+';
+
+      const normalizedClass = className.replace(/\s+/g, '').toLowerCase();
+      const matchedConfiguredClass = approvedClasses.find(
+        (c) => c.normalized === normalizedClass || c.name === className.trim()
+      );
 
       let isValid = true;
       let errorReason: string | undefined = undefined;
@@ -330,6 +349,12 @@ export const StudentManagementView: React.FC = () => {
       } else if ((nationalId && seenInThisFile.has(nationalId)) || (studentNumber && seenInThisFile.has(studentNumber))) {
         isValid = false;
         errorReason = 'سجل مكرر أكثر من مرة داخل نفس الملف المرفوع';
+      } else if (!matchedConfiguredClass) {
+        isValid = false;
+        errorReason = `مخالف لصفحة الإعدادات: الفصل الدراسي (${className}) غير مسجل في فصول المدرسة المعتمدة`;
+      } else if (grade && grade !== 'المرحلة الدراسية' && matchedConfiguredClass.grade !== grade.trim()) {
+        isValid = false;
+        errorReason = `مخالف لصفحة الإعدادات: المرحلة (${grade}) تخالف المرحلة المعتمدة للفصل في الإعدادات (${matchedConfiguredClass.grade})`;
       }
 
       if (nationalId) seenInThisFile.add(nationalId);
@@ -390,6 +415,9 @@ export const StudentManagementView: React.FC = () => {
 
   const validCount = validatedRows.filter((r) => r.isValid).length;
   const errorCount = validatedRows.filter((r) => !r.isValid).length;
+  const settingsViolationCount = validatedRows.filter(
+    (r) => !r.isValid && r.errorReason && r.errorReason.includes('صفحة الإعدادات')
+  ).length;
 
   const previewDisplayRows = validatedRows.filter((r) => {
     if (previewFilter === 'valid') return r.isValid;
@@ -909,6 +937,25 @@ export const StudentManagementView: React.FC = () => {
                   </div>
                 ) : (
                   <>
+                    {/* Settings Violation Warning Banner */}
+                    {settingsViolationCount > 0 && (
+                      <div className="bg-rose-50 border-2 border-rose-300 p-3.5 rounded-xl text-rose-950 flex items-start gap-3 shadow-2xs">
+                        <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <h5 className="font-bold text-xs text-rose-900">
+                            {lang === 'ar'
+                              ? `⚠️ تحذير نظامي: تم رفض (${settingsViolationCount}) سجلات لمخالفتها البيانات المعتمدة في صفحة الإعدادات`
+                              : `⚠️ Regulatory Alert: (${settingsViolationCount}) rows rejected due to Settings mismatch`}
+                          </h5>
+                          <p className="text-[11px] text-rose-800 leading-relaxed">
+                            {lang === 'ar'
+                              ? 'طبقاً للائحة الحوكمة المدرسية، يُمنع منعاً باتاً استيراد أي طالب بفصل أو مرحلة دراسية غير معتمدة في صفحة إعدادات المدرسة. تم استبعاد السجلات المخالفة تلقائياً ولن يتم اعتماد سوى السجلات المتوافقة تماماً.'
+                              : 'Per governance rules, student records with unapproved classes or grades in School Settings are strictly rejected.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Validation Summary Cards */}
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">

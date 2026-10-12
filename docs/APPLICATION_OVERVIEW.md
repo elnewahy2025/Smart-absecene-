@@ -1,29 +1,33 @@
 # Application Overview
 
-This project is a school attendance and compliance platform designed for Arabic-language school operations. The product is oriented around daily attendance tracking, parent notifications, excuse review, emergency rosters, and reports.
+This project is a comprehensive school attendance, compliance, and discipline platform designed for Arabic-language school operations. The product is oriented around daily attendance tracking, parent notifications, excuse review, emergency rosters, executive analytics, and strict school settings compliance.
 
-## Product purpose
+## Core Governance Principle: Universal Settings Adherence
 
-The platform aims to help school administrators, teachers, and parents manage:
+Every feature, calculation, date filter, UI dropdown, and ingestion pipeline throughout the system operates under **Strict Universal Settings Adherence**:
+- **Academic Calendar**: Bound strictly to the official academic year (`2026-09-01` to `2027-06-24` in Default Profile). No month prior to Term 1 (such as Month 8) or beyond Term 3 is accepted.
+- **Off-Days & Holidays**: Weekends (Friday/Saturday) and official holidays defined in Settings are systematically recognized; excuse submissions or sessions on off-days are flagged or rejected.
+- **Dynamic Curriculum & Class Catalog**: Lesson periods, subjects, grades, and classes are populated directly from `schoolProfile`.
+- **File Ingestion Protection**: Uploaded student CSV rosters or excuse files containing data conflicting with Settings are rejected, with clear user warnings.
+- **Policy Thresholds**: Warning calculations and at-risk metrics directly adhere to `unexcusedWarningThreshold` configured in Settings.
 
-- daily attendance and late tracking
-- recurring absence and violation management
-- parent communication via SMS and WhatsApp-style notifications
-- medical excuse / justification verification
-- emergency headcounts
-- daily executive summaries and reporting
+## Product Capabilities
 
-## Intended user roles
+- Daily session attendance tracking with real-time class and timetable period synchronization.
+- Multi-criteria absence inquiry with dynamic academic month/term dropdown filters.
+- Parent communication via automated notices and warning letters based on school thresholds.
+- Medical excuse & justification submission workflow with automatic date and off-day validation.
+- Emergency headcounts and evacuation roll-calls.
+- Executive analytics dashboard and Gemini AI-powered daily digests.
+- Multi-tenant school isolation with role-based access control (Admin, Registrar, Teacher, Parent).
 
-- Admin
-- Registrar
-- Teacher
-- Parent
+## Intended User Roles
 
-## User experience
+- **Admin / Principal**: Full school oversight, settings configuration, executive digests, and compliance management.
+- **Registrar**: Student roster management, strict CSV ingestion, and enrollment tracking.
+- **Teacher**: Timetable lesson attendance recording and student status reporting.
+- **Parent**: Dedicated portal for monitoring children's attendance and submitting medical excuses.
 
-The frontend is designed as a dashboard with multiple modules, each matching a school operations need. The app is heavily Arabic-first, with RTL layout and Arabic user-facing labels.
+## User Experience
 
-## Product maturity
-
-The code shows a strong prototype or internal demo level of maturity. It includes many polished UX components and realistic workflows but is not fully hardened for production security or enterprise-grade multi-tenancy.
+The application is architected with a native Arabic RTL interface, high-contrast accessible visual cues, interactive charts, and instant compliance validation banners.

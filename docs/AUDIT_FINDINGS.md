@@ -20,3 +20,13 @@ All previously reported security, multi-tenancy, and authorization findings have
 
 ### 4. Automated Testing & Verification: [RESOLVED ✅]
 - Vitest suite configured with automated tests across RBAC permissions (`rbac.test.ts`), tenant domain resolution (`tenantResolution.test.ts`), and attendance digest computation (`digestEngine.test.ts`).
+
+### 5. Universal Settings Adherence & File Upload Rejection: [RESOLVED ✅]
+- Full platform-wide binding to `TenantSchoolProfile` / `schoolProfile` from Settings:
+  - Academic year terms start Month 9 (`2026-09-01`); Month 8 (`2026-08`) is strictly removed and prohibited across all inquiries and reports.
+  - Off-days (weekends, official holidays) strictly excluded from school days and excuse submissions.
+  - CSV student roster uploads strictly validate classrooms and grades against `schoolProfile.classes`. Non-compliant records are rejected with explicit reasons and a red regulatory warning banner.
+  - Excuse submissions and attendance session roll-calls validate against academic terms and off-days.
+  - Thresholds for unexcused warnings and chronic absence dynamically bind to Settings values.
+  - Tested and verified via `src/utils/settingsComplianceAudit.test.ts` (61/61 passing vitest tests).
+

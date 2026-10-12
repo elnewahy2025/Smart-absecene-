@@ -20,10 +20,23 @@ Notes: This is the central coordination point for the application. It mixes mult
 
 Purpose: Bulk import student rows from CSV or sample data.
 
-Notes: Csv validation logic exists in the UI and state layer, but robust server-side validation is absent.
+Validation & Settings Policy:
+- Validates student ID, national ID, phone numbers, and class name against `schoolProfile.classes`.
+- If an imported row specifies a class or grade not registered in the Settings page (`schoolProfile.classes`), the row is categorically rejected with an explicit violation error (`مخالف لصفحة الإعدادات: الفصل غير مسجل`).
+- Stage 2 preview alerts administrators with a regulatory red banner when violations occur and disables commitment if no valid rows exist.
+- State-level filter in `AttendanceContext.importStudents` enforces that unregistered classes are dropped.
+
+## `createJustification`
+
+Purpose: Submit a medical excuse or absence justification with supporting documents.
+
+Validation & Settings Policy:
+- The absence date is validated against the active school profile's academic year start/end dates and individual term intervals. Dates prior to Term 1 (e.g. Month 8) or beyond Term 3 are rejected.
+- The date is checked against `isSchoolOffDay`: if it falls on a weekend (Friday/Saturday) or official holiday declared in the Settings calendar, submission is strictly blocked with an explanatory error.
+- UI form enforces date pickers with `min`/`max` bounds and displays instant visual warnings.
 
 ## `reviewJustification`
 
 Purpose: Approve or reject a justification and update attendance state if needed.
 
-Notes: Important policy logic but does not appear fully protected from unauthorized mutation in the present implementation.
+Notes: Important policy logic synchronized with attendance statistics and parent notification delivery.

@@ -134,12 +134,13 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
       .slice(0, 5);
   }, [classesStats]);
 
-  // 5. High-Risk Student Count (approaching denial: >= 3 absences)
+  // 5. High-Risk Student Count bound strictly to school settings (unexcusedWarningThreshold)
+  const warningLimit = schoolProfile?.unexcusedWarningThreshold ?? 3;
   const atRiskStudents = useMemo(() => {
     return students
-      .filter((s) => (!s.enrollmentStatus || s.enrollmentStatus === 'active') && s.totalAbsences >= 3)
+      .filter((s) => (!s.enrollmentStatus || s.enrollmentStatus === 'active') && s.totalAbsences >= warningLimit)
       .sort((a, b) => b.totalAbsences - a.totalAbsences);
-  }, [students]);
+  }, [students, warningLimit]);
 
   // 6. Pending justifications requiring administrative review
   const pendingJustifications = useMemo(() => {

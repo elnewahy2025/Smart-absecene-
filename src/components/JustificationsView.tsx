@@ -21,6 +21,8 @@ export const JustificationsView: React.FC = () => {
     justifications,
     students,
     currentUser,
+    schoolProfile,
+    isOffDay,
     lang,
     createJustification,
     reviewJustification,
@@ -238,6 +240,32 @@ export const JustificationsView: React.FC = () => {
     e.preventDefault();
     if (!selectedStudentId) return;
 
+    // Strict validation against School Settings
+    const terms = schoolProfile.academicYear?.terms || [];
+    const termStarts = terms.map((t) => t.startDate).filter(Boolean).sort();
+    const termEnds = terms.map((t) => t.endDate).filter(Boolean).sort();
+    const yearStart = termStarts[0] || '2026-09-01';
+    const yearEnd = termEnds[termEnds.length - 1] || '2027-06-24';
+
+    if (absenceDate < yearStart || absenceDate > yearEnd) {
+      alert(
+        lang === 'ar'
+          ? `تم رفض تقديم العذر: تاريخ الغياب (${absenceDate}) يقع خارج حدود العام الدراسي المعتمد (${yearStart} إلى ${yearEnd}) في صفحة الإعدادات.`
+          : `Absence date (${absenceDate}) is outside the academic year (${yearStart} to ${yearEnd}) configured in Settings.`
+      );
+      return;
+    }
+
+    const offCheck = isOffDay(absenceDate);
+    if (offCheck.isOff) {
+      alert(
+        lang === 'ar'
+          ? `تم رفض تقديم العذر: تاريخ الغياب (${absenceDate}) يوافق ${offCheck.reason || 'إجازة رسمية'} المعتمد في صفحة الإعدادات. لا يمكن تسجيل غياب في يوم إجازة رسمية.`
+          : `Absence date (${absenceDate}) coincides with an official holiday or weekend (${offCheck.reason || 'official off-day'}).`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await createJustification(
@@ -261,7 +289,8 @@ export const JustificationsView: React.FC = () => {
       setAiAnalysisResult(null);
       setGuardianExplanation('');
       setActiveSubTab('review');
-    } catch (err) {
+    } catch (err: any) {
+      alert(err.message || 'تعذر تسجيل العذر لمخالفته شروط النظام.');
       console.error(err);
     } finally {
       setIsSubmitting(false);

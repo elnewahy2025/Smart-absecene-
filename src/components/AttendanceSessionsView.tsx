@@ -44,6 +44,7 @@ export const AttendanceSessionsView: React.FC = () => {
     canEditSession,
     canReopenSessions,
     classesStats,
+    schoolProfile,
     isOffDay,
   } = useAttendance();
 
@@ -74,10 +75,20 @@ export const AttendanceSessionsView: React.FC = () => {
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
   const [celebrationStats, setCelebrationStats] = useState({ rate: 100, present: 0, total: 0 });
 
-  // New session form state
+  // Configured timetable periods & subjects from Settings
+  const configuredLessonPeriods = (schoolProfile?.timetablePeriods || []).filter(
+    (p) => p.type === 'lesson'
+  );
+  const configuredSubjects = (schoolProfile?.subjects || []).map((s) => s.name);
+
+  // New session form state bound to Settings defaults
   const [newSessionType, setNewSessionType] = useState<'daily' | 'period'>('period');
-  const [newPeriodNum, setNewPeriodNum] = useState<number>(3);
-  const [newSubject, setNewSubject] = useState<string>('اللغة العربية');
+  const [newPeriodNum, setNewPeriodNum] = useState<number>(
+    configuredLessonPeriods[0]?.periodNumber || 1
+  );
+  const [newSubject, setNewSubject] = useState<string>(
+    configuredSubjects[0] || 'اللغة العربية'
+  );
   const [newClass, setNewClass] = useState<string>(classesStats[0]?.className || '');
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || sessions[0];
@@ -285,6 +296,17 @@ export const AttendanceSessionsView: React.FC = () => {
 
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
+    const today = new Date().toISOString().split('T')[0];
+    const offCheck = isOffDay(today);
+    if (offCheck.isOff) {
+      const proceed = confirm(
+        lang === 'ar'
+          ? `تنبيه: اليوم يوافق ${offCheck.reason || 'إجازة رسمية'} المعتمد في صفحة الإعدادات. هل أنت متأكد من إنشاء كشف حضور في يوم إجازة رسمية؟`
+          : `Today is an official off-day (${offCheck.reason || 'official off-day'}). Are you sure you want to create a session?`
+      );
+      if (!proceed) return;
+    }
+
     const matchedClass = classesStats.find((c) => c.className === newClass);
     const targetClassId = matchedClass?.classId || `class-${newClass.replace(/[^a-zA-Z0-9]/g, '')}`;
     const targetGrade = matchedClass?.grade || 'المرحلة الدراسية';
@@ -1135,33 +1157,55 @@ export const AttendanceSessionsView: React.FC = () => {
                 <>
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">
-                      {lang === 'ar' ? 'رقم الحصة:' : 'Period Number:'}
+                      {lang === 'ar' ? 'الحصة الدراسية (وفق الجدول المعتمد بالإعدادات):' : 'Period:'}
                     </label>
                     <select
                       value={newPeriodNum}
                       onChange={(e) => setNewPeriodNum(parseInt(e.target.value))}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                     >
-                      {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                        <option key={num} value={num}>
-                          {lang === 'ar' ? `الحصة رقم (${num})` : `Period ${num}`}
-                        </option>
-                      ))}
+                      {configuredLessonPeriods.length > 0 ? (
+                        configuredLessonPeriods.map((p) => (
+                          <option key={p.id} value={p.periodNumber}>
+                            {p.nameAr || `الحصة ${p.periodNumber}`} ({p.startTime} - {p.endTime})
+                          </option>
+                        ))
+                      ) : (
+                        [1, 2, 3, 4, 5, 6, 7].map((num) => (
+                          <option key={num} value={num}>
+                            {lang === 'ar' ? `الحصة رقم (${num})` : `Period ${num}`}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">
-                      {lang === 'ar' ? 'المادة الدراسية:' : 'Subject:'}
+                      {lang === 'ar' ? 'المادة الدراسية (المعتمدة بالإعدادات):' : 'Subject:'}
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={newSubject}
-                      onChange={(e) => setNewSubject(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
-                      placeholder="مثال: الرياضيات، الأحياء، اللغة الإنجليزية..."
-                    />
+                    {configuredSubjects.length > 0 ? (
+                      <select
+                        value={newSubject}
+                        onChange={(e) => setNewSubject(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
+                      >
+                        {configuredSubjects.map((subj) => (
+                          <option key={subj} value={subj}>
+                            {subj}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        required
+                        value={newSubject}
+                        onChange={(e) => setNewSubject(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
+                        placeholder="مثال: الرياضيات، الأحياء، اللغة الإنجليزية..."
+                      />
+                    )}
                   </div>
                 </>
               )}

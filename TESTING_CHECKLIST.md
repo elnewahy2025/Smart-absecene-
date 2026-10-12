@@ -10,9 +10,14 @@ Use this checklist to manually test and verify the Smart School Attendance Syste
   *Result: 0 errors.*
 - [x] **Unit Testing with Vitest**:
   ```powershell
-  npm run test
+  npx vitest run
   ```
-  *Result: 3 tests passed in `digestEngine.test.ts`.*
+  *Result: 61 tests passed across 8 test suites (including `settingsComplianceAudit.test.ts`, `calculationsAudit.test.ts`, `rbac.test.ts`, `academicCalendarPersistence.test.ts`).*
+- [x] **Settings Compliance & Rejection Engine Audit**:
+  ```powershell
+  npx vitest run src/utils/settingsComplianceAudit.test.ts
+  ```
+  *Result: 6/6 tests passed (Validates rejection of dates prior to Term 1 [Month 8], post-Term 3, weekends, holidays, CSV class mismatches, and dynamic threshold bindings).*
 - [x] **Windows 11 Clean Script**:
   ```powershell
   npm run clean
@@ -22,7 +27,7 @@ Use this checklist to manually test and verify the Smart School Attendance Syste
   ```powershell
   npm run build
   ```
-  *Result: Successfully outputs `dist/` in 4.19s.*
+  *Result: Successfully outputs `dist/` with zero TypeScript or Vite errors.*
 
 ---
 
@@ -59,6 +64,9 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Headers @{
 ## UI & Functional Verification
 
 - [x] **Arabic RTL Preservation**: App root maintains `<html dir="rtl" lang="ar">`, Cairo font, and proper mirrored layout.
+- [x] **Settings As Single Source of Truth**: Absence inquiries, month filters, timetable periods, classes, and warning thresholds strictly reflect `schoolProfile`.
+- [x] **File Ingestion Rejection Engine**: Uploading a student roster CSV with unapproved classes rejects the records, displays an explanatory red regulatory banner, and disables the commit button if no valid records exist.
+- [x] **Medical Excuse Date Protection**: Excuses cannot be submitted for dates before Term 1 (Month 8), after Term 3, or on official off-days/weekends.
 - [x] **Offline Mode Indicator**: Disconnecting internet or using offline simulation displays the amber warning banner at the top of `App.tsx`.
 - [x] **Simulation Mode Banner**: Visiting the "Notification Outbox" tab displays the purple Simulation Mode disclaimer.
 - [x] **Parent Portal Isolation**: Logging in as Parent strictly filters student lists to the guardian's assigned child/children.

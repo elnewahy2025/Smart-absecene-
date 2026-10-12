@@ -1,5 +1,6 @@
 import React from 'react';
 import { Student } from '../../types/attendance';
+import { useAttendance } from '../../context/AttendanceContext';
 import {
   UploadCloud,
   Sparkles,
@@ -65,6 +66,42 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
   isSubmitting,
   onSubmit,
 }) => {
+  const { schoolProfile, isOffDay } = useAttendance();
+
+  const academicYearBounds = React.useMemo(() => {
+    const terms = schoolProfile?.academicYear?.terms || [];
+    const termStarts = terms.map((t) => t.startDate).filter(Boolean).sort();
+    const termEnds = terms.map((t) => t.endDate).filter(Boolean).sort();
+    return {
+      start: termStarts[0] || '2026-09-01',
+      end: termEnds[termEnds.length - 1] || '2027-06-24',
+    };
+  }, [schoolProfile]);
+
+  const dateValidation = React.useMemo(() => {
+    if (!absenceDate) return null;
+    if (absenceDate < academicYearBounds.start || absenceDate > academicYearBounds.end) {
+      return {
+        isInvalid: true,
+        message:
+          lang === 'ar'
+            ? `التاريخ (${absenceDate}) مخالف للبيانات المعتمدة في صفحة الإعدادات: يقع خارج العام الدراسي (${academicYearBounds.start} إلى ${academicYearBounds.end}).`
+            : `Date (${absenceDate}) is outside the academic year (${academicYearBounds.start} to ${academicYearBounds.end}).`,
+      };
+    }
+    const offCheck = isOffDay(absenceDate);
+    if (offCheck.isOff) {
+      return {
+        isInvalid: true,
+        message:
+          lang === 'ar'
+            ? `التاريخ (${absenceDate}) مخالف لمعلومات صفحة الإعدادات: يوافق ${offCheck.reason || 'إجازة رسمية'}. لا يمكن تسجيل غياب في يوم إجازة رسمية.`
+            : `Date (${absenceDate}) coincides with an official holiday or weekend (${offCheck.reason || 'official off-day'}).`,
+      };
+    }
+    return { isInvalid: false, message: null };
+  }, [absenceDate, academicYearBounds, isOffDay, lang]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Form Side */}
@@ -116,10 +153,22 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
               <input
                 type="date"
                 required
+                min={academicYearBounds.start}
+                max={academicYearBounds.end}
                 value={absenceDate}
                 onChange={(e) => setAbsenceDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                className={`w-full bg-slate-50 border rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 ${
+                  dateValidation?.isInvalid
+                    ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/40'
+                    : 'border-slate-300 focus:ring-emerald-500'
+                }`}
               />
+              {dateValidation?.isInvalid && (
+                <div className="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 text-[11px] font-semibold flex items-start gap-1.5 shadow-2xs">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{dateValidation.message}</span>
+                </div>
+              )}
             </div>
 
             <div>
@@ -246,7 +295,12 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
           <div className="pt-2 flex items-center justify-end">
             <button
               type="submit"
-              disabled={isSubmitting || !guardianExplanation}
+              disabled={isSubmitting || !guardianExplanation || !!dateValidation?.isInvalid}
+              title={
+                dateValidation?.isInvalid
+                  ? dateValidation.message || undefined
+                  : undefined
+              }
               className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-xs px-6 py-2.5 rounded-lg transition-colors cursor-pointer shadow-xs"
             >
               <Send className="w-4 h-4" />

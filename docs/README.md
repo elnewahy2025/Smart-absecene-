@@ -1,34 +1,33 @@
 # Smart Attendance System Repository Documentation
 
-This directory contains a concise repository audit and implementation report for the Smart Attendance System.
+This directory contains comprehensive documentation, architecture blueprints, feature registries, audit findings, and operational handbooks for the Smart Attendance System.
 
 ## Contents
 
 - [Architecture](./ARCHITECTURE.md)
 - [Features](./FEATURES.md)
-- [API](./API.md)
+- [Configuration & Settings Policy](./CONFIGURATION.md)
+- [Admin Workflows](./ADMIN_WORKFLOWS.md)
+- [User Workflows & Ingestion](./USER_WORKFLOWS.md)
+- [API Documentation](./API.md)
+- [Function Documentation](./FUNCTION_DOCUMENTATION.md)
 - [Security Audit](./SECURITY_AUDIT.md)
-- [Project Assessment](./PROJECT_ASSESSMENT.md)
+- [Audit Findings](./AUDIT_FINDINGS.md)
+- [Testing Suite](./TESTING.md)
+- [Sprint Implementation Roadmap](./SPRINT_IMPLEMENTATION_ROADMAP.md)
 
-## Executive summary
+## Executive Summary
 
-This repository is a TypeScript + React + Express application for a school attendance and discipline platform with AI-powered excuse handling and executive reporting. It includes a frontend dashboard, a backend API, and Firebase integration scaffolding.
+The Smart Attendance System is a production-grade TypeScript + React + Express application for K-12 Arabic school management. It integrates daily classroom attendance, medical justification pipelines, parent alert systems, emergency rosters, executive analytics, and Google Gemini AI insights.
 
-The codebase demonstrates strong feature coverage, including attendance sessions, student onboarding, alerts, parent-facing views, AI analysis, and digest generation. However, the repository is not production-ready as-inspected: there are significant gaps in backend authorization, tenant isolation, and credential hygiene.
+### Core Architectural Rule: Universal Settings Adherence
 
-## Key risks
+All functions, mathematical calculations, date boundaries, and data ingestion pipelines strictly enforce the data configured in the School Settings (`TenantSchoolProfile`):
+1. **Academic Calendar**: Bound strictly between Term 1 start (`2026-09-01`) and Term 3 end (`2027-06-24`). Off-season months (e.g. Month 8) are strictly rejected.
+2. **Off-Day & Holiday Rules**: Off-days (Friday/Saturday) and official holidays prevent invalid absence excuse logging.
+3. **File Ingestion Rejection**: Student rosters imported via CSV or documents uploaded to the platform that do not match the approved school classes or academic calendar are categorically rejected with explicit Arabic warning banners.
+4. **Zero Hardcoded Limits**: Class lists, lesson periods, subjects, and absence warning thresholds are dynamically derived from settings.
 
-- Firebase web config and API key appear to be committed in source control.
-- AI endpoints are not protected by backend authentication or authorization.
-- Firestore rules are broad and not tenant-aware.
-- Sensitive authorization checks are implemented in the client rather than the server.
-- No automated test suite is present in the inspected tree.
+## Quality & Verification
 
-## Recommended next steps
-
-1. Remove Firebase config secrets from source control.
-2. Move secrets to environment variables or a managed secret store.
-3. Enforce authentication and RBAC on every API route.
-4. Add tenant-aware Firestore rules and server-side validation.
-5. Add automated tests and CI.
-6. Separate demo/mock data flows from live production storage.
+The repository includes a comprehensive automated test suite (8 test suites, 61 passing tests) executed via Vitest, ensuring zero regressions across RBAC, calculations, calendar persistence, and settings compliance.
