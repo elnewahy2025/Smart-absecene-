@@ -422,25 +422,39 @@ export const StudentAbsenceInquiryView: React.FC = () => {
         </div>
 
         {currentStudent && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-white cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+              className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              title="توليد وتنزيل ملف PDF أصلي حقيقي ذو نصوص قابلة للتحديد (Vector PDF)"
             >
-              {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              <span>{isGeneratingPdf ? (isAr ? 'جارٍ التصدير...' : 'Exporting...') : (isAr ? 'تصدير PDF أصلي' : 'Export PDF')}</span>
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                  <span>{isAr ? 'جارٍ إنشاء مستند PDF...' : 'Generating PDF...'}</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4 text-slate-950" />
+                  <span>{isAr ? 'تنزيل مستند PDF رسمي معتمد' : 'Download Official PDF Report'}</span>
+                </>
+              )}
             </button>
+
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
+              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm"
+              title="طباعة مباشرة للمستند الرسمي عبر إطار معزول"
             >
-              <Printer className="w-4 h-4" />
-              <span>{isAr ? 'طباعة مباشرة' : 'Print'}</span>
+              <Printer className="w-4 h-4 text-white" />
+              <span>{isAr ? 'طباعة مباشرة للمستند' : 'Print Document'}</span>
             </button>
+
             <button
               onClick={handleSendWarning}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer transition-colors shadow-xs"
+              className="flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-sm"
+              title="إرسال إنذار فوري لولي الأمر"
             >
               <Send className="w-4 h-4" />
               <span>{isAr ? 'إرسال إنذار فوري' : 'Send Warning'}</span>
