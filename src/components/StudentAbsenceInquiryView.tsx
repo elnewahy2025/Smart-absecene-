@@ -1140,12 +1140,17 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             {/* Ministry & School Official Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '16px' }}>
               <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#0f172a', whiteSpace: 'pre-line' }}>
                   {schoolProfile?.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
                 </div>
-                <div style={{ fontWeight: '600' }}>{schoolProfile?.schoolName || 'المدرسة'}</div>
-                <div style={{ color: '#64748b' }}>كود المنشأة: {schoolProfile?.schoolCode || '—'}</div>
-                {schoolProfile?.directorateAr && <div style={{ color: '#64748b' }}>{schoolProfile.directorateAr}</div>}
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginTop: '3px' }}>
+                  {schoolProfile?.schoolName || 'المدرسة'}
+                </div>
+                <div style={{ color: '#64748b', fontSize: '11px' }}>كود المنشأة: {schoolProfile?.schoolCode || '—'}</div>
+                {/* Only display directorate if NOT already included inside ministryHeaderAr to prevent repetition */}
+                {schoolProfile?.directorateAr && !schoolProfile?.ministryHeaderAr?.includes(schoolProfile.directorateAr) && (
+                  <div style={{ color: '#475569', fontSize: '11px' }}>{schoolProfile.directorateAr}</div>
+                )}
               </div>
 
               <div style={{ textAlign: 'center', lineHeight: '1.4' }}>

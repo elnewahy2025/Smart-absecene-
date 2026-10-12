@@ -167,13 +167,13 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
           {/* Official Ministry / School Header */}
           <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 text-xs">
             <div className="space-y-1 text-right">
-              <div className="font-bold text-sm text-slate-900 whitespace-pre-line">
+              <div className="font-bold text-sm text-slate-900 whitespace-pre-line leading-relaxed">
                 {schoolProfile.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
               </div>
-              <div className="text-slate-700 font-semibold">{schoolProfile.schoolName || currentTenant.name}</div>
+              <div className="text-slate-800 font-bold text-sm mt-1">{schoolProfile.schoolName || currentTenant.name}</div>
               <div className="text-[11px] text-slate-500">كود المنشأة: {schoolProfile.schoolCode || currentTenant.code}</div>
-              {schoolProfile.directorateAr && (
-                <div className="text-[10px] text-slate-500">{schoolProfile.directorateAr}</div>
+              {schoolProfile.directorateAr && !schoolProfile.ministryHeaderAr?.includes(schoolProfile.directorateAr) && (
+                <div className="text-[11px] text-slate-600">{schoolProfile.directorateAr}</div>
               )}
             </div>
 
