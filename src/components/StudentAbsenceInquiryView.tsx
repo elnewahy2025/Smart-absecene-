@@ -487,13 +487,13 @@ export const StudentAbsenceInquiryView: React.FC = () => {
           </div>
         </div>
 
-        {/* Student Selector Quick Strip */}
+        {/* Student Selector Structured Table */}
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between mb-2 text-xs">
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="font-bold text-slate-700 dark:text-slate-300">
               {isAr
-                ? `الطلاب المطابقون (${filteredStudents.length} طالب):`
-                : `Matched Students (${filteredStudents.length}):`}
+                ? `قائمة الطلاب (${filteredStudents.length} طالب) — انقر على أي طالب لعرض ملفه:`
+                : `Student Roster (${filteredStudents.length} students) — Click any row to view record:`}
             </span>
             {selectedStudentId && (
               <button
@@ -505,48 +505,107 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-            {filteredStudents.slice(0, 15).map((s) => {
-              const isSelected = s.id === selectedStudentId;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedStudentId(s.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border shrink-0 cursor-pointer flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-primary text-white border-primary shadow-xs scale-102'
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                  }`}
-                >
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {s.fullName?.charAt(0) || 'ط'}
-                  </div>
-                  <div className="text-start">
-                    <span className="block font-bold leading-tight">{s.fullName}</span>
-                    <span className="text-[10px] opacity-75 font-mono">{s.className}</span>
-                  </div>
-                  {s.totalAbsences >= 5 && (
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="غياب حرج" />
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="max-h-64 overflow-y-auto scrollbar-thin">
+              <table className="w-full text-xs text-start">
+                <thead className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="py-2.5 px-3 text-start w-10">#</th>
+                    <th className="py-2.5 px-3 text-start">{isAr ? 'اسم الطالب' : 'Student Name'}</th>
+                    <th className="py-2.5 px-3 text-start">{isAr ? 'الصف / الفصل' : 'Grade & Class'}</th>
+                    <th className="py-2.5 px-3 text-center">{isAr ? 'الهوية الوطنية' : 'National ID'}</th>
+                    <th className="py-2.5 px-3 text-center">{isAr ? 'نسبة الحضور' : 'Rate'}</th>
+                    <th className="py-2.5 px-3 text-center">{isAr ? 'إجمالي الغياب' : 'Absences'}</th>
+                    <th className="py-2.5 px-3 text-center w-24">{isAr ? 'الحالة' : 'Status'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredStudents.map((s, idx) => {
+                    const isSelected = s.id === selectedStudentId;
+                    return (
+                      <tr
+                        key={s.id}
+                        onClick={() => setSelectedStudentId(s.id)}
+                        className={`transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-primary/10 dark:bg-primary/20 font-bold'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                                isSelected
+                                  ? 'bg-primary text-white'
+                                  : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              {s.fullName?.charAt(0) || 'ط'}
+                            </div>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {s.fullName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                          {s.grade} • فصل {s.className}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-500 text-[11px]">
+                          {s.nationalId || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold">
+                          <span
+                            className={
+                              (s.attendanceRate || 100) >= 90
+                                ? 'text-teal-600 dark:text-teal-400'
+                                : (s.attendanceRate || 100) >= 80
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-rose-600 dark:text-rose-400'
+                            }
+                          >
+                            %{s.attendanceRate || 100}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {s.totalAbsences || 0} {isAr ? 'يوم' : 'd'}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {isSelected ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white">
+                              {isAr ? 'محدد حالياً' : 'Selected'}
+                            </span>
+                          ) : (s.totalAbsences || 0) >= 5 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                              {isAr ? 'حرج' : 'Critical'}
+                            </span>
+                          ) : (s.totalAbsences || 0) >= 3 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                              {isAr ? 'إنذار' : 'Warning'}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
+                              {isAr ? 'منضبط' : 'Good'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                        {isAr ? 'لا يوجد طلاب مطابقون لشروط البحث المحددة.' : 'No students found matching your criteria.'}
+                      </td>
+                    </tr>
                   )}
-                </button>
-              );
-            })}
-
-            {filteredStudents.length === 0 && (
-              <div className="w-full text-center py-4 text-xs text-slate-400">
-                {isAr ? 'لا يوجد طلاب مطابقون لشروط البحث المحددة.' : 'No students matching the criteria.'}
-              </div>
-            )}
-
-            {filteredStudents.length > 15 && (
-              <div className="text-[11px] text-slate-400 flex items-center px-2 shrink-0">
-                {isAr ? `+ ${filteredStudents.length - 15} طالب آخر (استخدم البحث للتحديد)` : `+ more`}
-              </div>
-            )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
