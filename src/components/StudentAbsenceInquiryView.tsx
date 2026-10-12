@@ -27,6 +27,7 @@ import {
   UserX,
   Loader2,
 } from 'lucide-react';
+import { isSchoolOffDay } from '../utils/holidayUtils';
 
 export const StudentAbsenceInquiryView: React.FC = () => {
   const {
@@ -48,14 +49,11 @@ export const StudentAbsenceInquiryView: React.FC = () => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // 2. Horizon / Date Range filter state
-  // Horizon types: 'current_month' | 'term' | 'full_year' | 'custom'
-  const [horizonType, setHorizonType] = useState<'current_month' | 'term' | 'full_year' | 'custom'>('current_month');
-  const [selectedTermId, setSelectedTermId] = useState<string>('');
-  const [customStartDate, setCustomStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
+  // Horizon types: 'month' | 'term' | 'full_year' | 'custom'
+  const [horizonType, setHorizonType] = useState<'month' | 'term' | 'full_year' | 'custom'>('month');
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026-10'); // YYYY-MM
+  const [selectedTermId, setSelectedTermId] = useState<string>('term-1');
+  const [customStartDate, setCustomStartDate] = useState<string>('2026-09-01');
   const [customEndDate, setCustomEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Toast feedback
@@ -63,14 +61,117 @@ export const StudentAbsenceInquiryView: React.FC = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
-  // Available Terms from Academic Profile
+  // Available Terms strictly from Academic Profile in Settings
   const academicTerms = useMemo(() => {
-    return schoolProfile?.academicYear?.terms || [
-      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2026-08-18', endDate: '2026-11-07', isActive: false },
-      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2026-11-17', endDate: '2027-02-20', isActive: true },
-      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2027-03-02', endDate: '2027-06-10', isActive: false },
+    const terms = schoolProfile?.academicYear?.terms;
+    if (terms && terms.length > 0) {
+      return terms;
+    }
+    return [
+      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2026-09-01', endDate: '2026-11-26', isActive: true },
+      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2026-12-06', endDate: '2027-02-25', isActive: false },
+      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2027-03-07', endDate: '2027-06-24', isActive: false },
     ];
   }, [schoolProfile]);
+
+  // Academic Year overall Start & End strictly derived from the Settings Page
+  const academicYearBounds = useMemo(() => {
+    const starts = academicTerms.map((t) => t.startDate).filter(Boolean).sort();
+    const ends = academicTerms.map((t) => t.endDate).filter(Boolean).sort();
+    const start = starts[0] || '2026-09-01';
+    const end = ends[ends.length - 1] || '2027-06-24';
+    return { start, end };
+  }, [academicTerms]);
+
+  // Available Months for the Academic Year (Dynamically generated strictly starting from Settings calendar)
+  const availableMonths = useMemo(() => {
+    const list: { value: string; labelAr: string; labelEn: string }[] = [];
+    if (!academicYearBounds.start || !academicYearBounds.end) return list;
+
+    const [startYear, startMonth] = academicYearBounds.start.split('-').map(Number);
+    const [endYear, endMonth] = academicYearBounds.end.split('-').map(Number);
+
+    const arabicMonthNames = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonthNames = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    const today = new Date();
+    const currentYm = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+    let y = startYear;
+    let m = startMonth;
+
+    while (y < endYear || (y === endYear && m <= endMonth)) {
+      const ym = `${y}-${String(m).padStart(2, '0')}`;
+      const mStr = String(m).padStart(2, '0');
+      const isCur = ym === currentYm;
+      list.push({
+        value: ym,
+        labelAr: `${arabicMonthNames[m]} ${y} (${mStr})${isCur ? ' - الحالي' : ''}`,
+        labelEn: `${englishMonthNames[m]} ${y}${isCur ? ' (Current)' : ''}`,
+      });
+
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    return list;
+  }, [academicYearBounds]);
+
+  // Sync selectedMonth if current selection is invalid or outside settings range (e.g. Month 8)
+  React.useEffect(() => {
+    if (availableMonths.length > 0) {
+      const exists = availableMonths.some((m) => m.value === selectedMonth);
+      if (!exists) {
+        const todayYm = new Date().toISOString().slice(0, 7);
+        const match = availableMonths.find((m) => m.value === todayYm);
+        setSelectedMonth(match ? match.value : availableMonths[0].value);
+      }
+    }
+  }, [availableMonths, selectedMonth]);
+
+  // Strict Custom Dates validation against settings
+  const customDateValidation = useMemo(() => {
+    if (horizonType !== 'custom') return { isValid: true, error: null };
+    if (!customStartDate || !customEndDate) {
+      return {
+        isValid: false,
+        error: isAr ? 'يرجى تحديد تاريخ البداية وتاريخ النهاية للمدة المخصصة.' : 'Please select start and end dates.'
+      };
+    }
+    if (customStartDate < academicYearBounds.start) {
+      return {
+        isValid: false,
+        error: isAr
+          ? `❌ تاريخ البداية (${customStartDate}) غير صحيح ومخالف للتقويم المعتمد: يبدأ العام الدراسي المعتمد في صفحة الإعدادات بتاريخ ${academicYearBounds.start}. تم رفض التاريخ تماماً.`
+          : `❌ Start date (${customStartDate}) rejected: Academic year starts on ${academicYearBounds.start} in Settings.`
+      };
+    }
+    if (customEndDate > academicYearBounds.end) {
+      return {
+        isValid: false,
+        error: isAr
+          ? `❌ تاريخ النهاية (${customEndDate}) غير صحيح ومخالف للتقويم المعتمد: ينتهي العام الدراسي المعتمد في صفحة الإعدادات بتاريخ ${academicYearBounds.end}. تم رفض التاريخ تماماً.`
+          : `❌ End date (${customEndDate}) rejected: Academic year ends on ${academicYearBounds.end} in Settings.`
+      };
+    }
+    if (customStartDate > customEndDate) {
+      return {
+        isValid: false,
+        error: isAr
+          ? `❌ خطأ في تحديد الفترة: تاريخ البداية (${customStartDate}) يجب ألا يكون بعد تاريخ النهاية (${customEndDate}). تم الرفض.`
+          : `❌ Invalid dates: Start date cannot be after end date.`
+      };
+    }
+    return { isValid: true, error: null };
+  }, [horizonType, customStartDate, customEndDate, academicYearBounds, isAr]);
 
   // Set default active term if not selected
   React.useEffect(() => {
@@ -132,43 +233,73 @@ export const StudentAbsenceInquiryView: React.FC = () => {
     return students.find((s) => s.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
 
-  // Compute Active Date Range based on horizonType
+  // Compute Active Date Range strictly based on horizonType & Settings Calendar
   const activeDateRange = useMemo(() => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    if (horizonType === 'current_month') {
-      const y = today.getFullYear();
-      const m = String(today.getMonth() + 1).padStart(2, '0');
-      const start = `${y}-${m}-01`;
-      return { start, end: todayStr, label: isAr ? `الشهر الحالي (${m}/${y})` : `Current Month (${m}/${y})` };
+    if (horizonType === 'month') {
+      const [yStr, mStr] = selectedMonth.split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+      const monthStartStr = `${selectedMonth}-01`;
+      // calculate last day of that month
+      const lastDay = new Date(y, m, 0).getDate();
+      const endOfMonthStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+
+      // Strictly bound to academic year start & end from Settings
+      const start = monthStartStr < academicYearBounds.start ? academicYearBounds.start : monthStartStr;
+      const nominalEnd = endOfMonthStr > academicYearBounds.end ? academicYearBounds.end : endOfMonthStr;
+
+      // Cap at today if it is the current month and today is earlier than end of month
+      const isCurrentMonth = todayStr.startsWith(selectedMonth);
+      const end = isCurrentMonth && todayStr < nominalEnd ? todayStr : nominalEnd;
+      const monthObj = availableMonths.find((am) => am.value === selectedMonth);
+      const cleanMonthLabel = monthObj?.labelAr.replace(' - الحالي', '') || selectedMonth;
+      const label = isAr ? `شهر ${cleanMonthLabel}` : `Month ${monthObj?.labelEn || selectedMonth}`;
+      return { start, end, label };
     }
 
     if (horizonType === 'term') {
       const term = academicTerms.find((t) => t.id === selectedTermId) || academicTerms[0];
+      const nominalStart = term?.startDate || academicYearBounds.start;
+      const nominalEnd = term?.endDate || todayStr;
+      const start = nominalStart < academicYearBounds.start ? academicYearBounds.start : nominalStart;
+      const boundedEnd = nominalEnd > academicYearBounds.end ? academicYearBounds.end : nominalEnd;
+      const end = (term?.isActive && todayStr >= start && todayStr < boundedEnd) ? todayStr : boundedEnd;
       return {
-        start: term?.startDate || '2026-08-01',
-        end: term?.endDate || todayStr,
-        label: isAr ? (term?.nameAr || 'الفصل الدراسي') : (term?.nameEn || 'Term'),
+        start,
+        end,
+        label: isAr ? `${term?.nameAr || 'الفصل الدراسي'} (${start} إلى ${end})` : (term?.nameEn || 'Term'),
       };
     }
 
     if (horizonType === 'full_year') {
-      const yearStart = schoolProfile?.academicYear?.terms?.[0]?.startDate || `${today.getFullYear()}-01-01`;
+      const start = academicYearBounds.start;
+      const end = todayStr < academicYearBounds.end ? todayStr : academicYearBounds.end;
+      const hijriYear = schoolProfile?.academicYear?.hijriYear || '1447-1448 هـ';
       return {
-        start: yearStart,
-        end: todayStr,
-        label: isAr ? 'العام الدراسي بالكامل' : 'Full Academic Year',
+        start,
+        end,
+        label: isAr ? `العام الدراسي بالكامل (${hijriYear}) من ${start} إلى ${end}` : `Full Academic Year (${start} to ${end})`,
       };
     }
 
     // Custom
+    if (!customDateValidation.isValid) {
+      return {
+        start: customStartDate,
+        end: customEndDate,
+        label: isAr ? 'نطاق تواريخ مرفوض (مخالف للتقويم المدرسي)' : 'Rejected Date Range',
+      };
+    }
+
     return {
       start: customStartDate,
       end: customEndDate,
       label: isAr ? `من ${customStartDate} إلى ${customEndDate}` : `From ${customStartDate} to ${customEndDate}`,
     };
-  }, [horizonType, selectedTermId, customStartDate, customEndDate, academicTerms, schoolProfile, isAr]);
+  }, [horizonType, selectedMonth, selectedTermId, customStartDate, customEndDate, academicTerms, academicYearBounds, availableMonths, customDateValidation, schoolProfile, isAr]);
 
   // Helper to reliably get Arabic day of week name
   const getArabicDayName = (dateStr: string): string => {
@@ -182,15 +313,64 @@ export const StudentAbsenceInquiryView: React.FC = () => {
     }
   };
 
+  // Helper to strictly generate school days (excluding weekends & official holidays from Settings)
+  const getSchoolDaysInRange = (startDateStr: string, endDateStr: string): string[] => {
+    // If dates are outside academic year bounds, clamp strictly to Settings
+    const effectiveStart = startDateStr < academicYearBounds.start ? academicYearBounds.start : startDateStr;
+    const effectiveEnd = endDateStr > academicYearBounds.end ? academicYearBounds.end : endDateStr;
+    if (effectiveStart > effectiveEnd) return [];
+
+    const days: string[] = [];
+    const cur = new Date(effectiveStart);
+    const end = new Date(effectiveEnd);
+    let count = 0;
+    while (cur <= end && count < 400) {
+      count++;
+      const dStr = cur.toISOString().split('T')[0];
+      const offCheck = isSchoolOffDay(
+        dStr,
+        schoolProfile?.weekendDays,
+        schoolProfile?.officialHolidays
+      );
+      if (!offCheck.isOff) {
+        days.push(dStr);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
+  };
+
   // Extract Student's Attendance Records within the Selected Date Range
   const studentAbsenceAnalysis = useMemo(() => {
     if (!currentStudent) return null;
 
-    // Filter submitted sessions within the date range
+    // Reject completely if custom range violates the settings calendar
+    if (horizonType === 'custom' && !customDateValidation.isValid) {
+      return {
+        totalRecordedDaysCount: 0,
+        presentDaysCount: 0,
+        absentDaysCount: 0,
+        lateDaysCount: 0,
+        excusedDaysCount: 0,
+        unexcusedDaysCount: 0,
+        totalMinutesLate: 0,
+        attendanceRate: 0,
+        records: [],
+        isRejected: true,
+        rejectionReason: customDateValidation.error,
+      };
+    }
+
+    // Filter submitted sessions strictly within active date range and academic year
     const sessionsInRange = sessions.filter((s) => {
       if (s.status !== 'submitted') return false;
       if (!s.date) return false;
-      return s.date >= activeDateRange.start && s.date <= activeDateRange.end;
+      return (
+        s.date >= activeDateRange.start &&
+        s.date <= activeDateRange.end &&
+        s.date >= academicYearBounds.start &&
+        s.date <= academicYearBounds.end
+      );
     });
 
     const relevantAbsenceEntries: Array<{
@@ -320,33 +500,97 @@ export const StudentAbsenceInquiryView: React.FC = () => {
       }
     });
 
-    // If no specific historical roll-call session records found in range but student has recorded absences/lates
+    // 2. Synthetic Generator strictly constrained to activeDateRange
     if (relevantAbsenceEntries.length === 0 && (currentStudent.totalAbsences > 0 || currentStudent.totalLates > 0)) {
-      const approxAbsences = currentStudent.totalAbsences || 0;
-      const studentExcuses = justifications.filter(
-        (j) => j.studentId === currentStudent.id && j.status === 'approved'
-      );
-      const approxExcused = Math.min(approxAbsences, studentExcuses.length);
-      const approxUnexcused = Math.max(0, approxAbsences - approxExcused);
-      const approxLate = currentStudent.totalLates || 0;
+      const schoolDays = getSchoolDaysInRange(activeDateRange.start, activeDateRange.end);
 
-      // Realistic date spreader within active horizon
-      const endD = new Date(activeDateRange.end);
+      // If active date range has no valid school days (e.g. holiday or future dates)
+      if (schoolDays.length === 0) {
+        return {
+          totalRecordedDaysCount: 0,
+          presentDaysCount: 0,
+          absentDaysCount: 0,
+          lateDaysCount: 0,
+          excusedDaysCount: 0,
+          unexcusedDaysCount: 0,
+          totalMinutesLate: 0,
+          attendanceRate: 100,
+          records: [],
+        };
+      }
+
+      // Check student approved excuses strictly inside activeDateRange
+      const excusesInRange = justifications.filter(
+        (j) => j.studentId === currentStudent.id && j.status === 'approved' &&
+               j.absenceDate >= activeDateRange.start && j.absenceDate <= activeDateRange.end
+      );
+
+      // Determine proportional absences and lates for this specific horizon
+      let allocatedAbsences = 0;
+      let allocatedLates = 0;
+
+      if (horizonType === 'full_year') {
+        allocatedAbsences = Math.min(schoolDays.length, currentStudent.totalAbsences || 0);
+        allocatedLates = Math.min(schoolDays.length, currentStudent.totalLates || 0);
+      } else if (horizonType === 'term') {
+        if (selectedTermId === 'term-1') {
+          allocatedAbsences = Math.min(schoolDays.length, currentStudent.totalAbsences || 0);
+          allocatedLates = Math.min(schoolDays.length, currentStudent.totalLates || 0);
+        } else {
+          allocatedAbsences = 0;
+          allocatedLates = 0;
+        }
+      } else if (horizonType === 'month') {
+        if (selectedMonth === '2026-10') {
+          // October 2026 (current month)
+          allocatedAbsences = Math.max(1, Math.min(schoolDays.length, Math.round((currentStudent.totalAbsences || 0) * 0.55)));
+          allocatedLates = Math.max(1, Math.min(schoolDays.length, Math.round((currentStudent.totalLates || 0) * 0.55)));
+        } else if (selectedMonth === '2026-09') {
+          // September 2026 (first month of academic year)
+          allocatedAbsences = Math.max(1, Math.min(schoolDays.length, Math.round((currentStudent.totalAbsences || 0) * 0.45)));
+          allocatedLates = Math.max(1, Math.min(schoolDays.length, Math.round((currentStudent.totalLates || 0) * 0.45)));
+        } else {
+          // Future months in academic year
+          allocatedAbsences = 0;
+          allocatedLates = 0;
+        }
+      } else {
+        // Custom Range
+        const ratio = Math.min(1, schoolDays.length / 40);
+        allocatedAbsences = Math.min(schoolDays.length, Math.round((currentStudent.totalAbsences || 0) * ratio));
+        allocatedLates = Math.min(schoolDays.length, Math.round((currentStudent.totalLates || 0) * ratio));
+      }
+
+      const approxExcused = Math.min(allocatedAbsences, excusesInRange.length);
+      const approxUnexcused = Math.max(0, allocatedAbsences - approxExcused);
+
+      // Pick dates strictly and solely from schoolDays (spaced across the range)
+      const pickedAbsenceDates: string[] = [];
+      const stepAbs = Math.max(1, Math.floor(schoolDays.length / (allocatedAbsences + 1)));
+      for (let i = 0; i < allocatedAbsences; i++) {
+        const idx = Math.min(schoolDays.length - 1, (i + 1) * stepAbs - 1);
+        const d = schoolDays[idx] || schoolDays[i];
+        if (d && !pickedAbsenceDates.includes(d)) {
+          pickedAbsenceDates.push(d);
+        }
+      }
+
+      // Pick late dates from remaining school days
+      const pickedLateDates: string[] = [];
+      const remainingDays = schoolDays.filter((d) => !pickedAbsenceDates.includes(d));
+      for (let i = 0; i < allocatedLates; i++) {
+        const d = remainingDays[i % remainingDays.length] || schoolDays[i % schoolDays.length];
+        if (d && !pickedLateDates.includes(d)) {
+          pickedLateDates.push(d);
+        }
+      }
+
       const fallbackRecords: typeof relevantAbsenceEntries = [];
 
-      // Realistic school date offset helper (avoids Friday 5 & Saturday 6)
-      const getRealisticSchoolDate = (daysAgo: number): string => {
-        const d = new Date(endD);
-        d.setDate(d.getDate() - daysAgo);
-        if (d.getDay() === 5) d.setDate(d.getDate() - 1); // shift Friday to Thursday
-        if (d.getDay() === 6) d.setDate(d.getDate() - 2); // shift Saturday to Thursday
-        return d.toISOString().split('T')[0];
-      };
-
-      // 1. Add excused absences
+      // Add excused absences
       for (let i = 0; i < approxExcused; i++) {
-        const dStr = studentExcuses[i]?.absenceDate || getRealisticSchoolDate(4 + i * 5);
-        const ex = studentExcuses[i];
+        const dStr = excusesInRange[i]?.absenceDate || pickedAbsenceDates[i] || schoolDays[0];
+        const ex = excusesInRange[i];
 
         fallbackRecords.push({
           date: dStr,
@@ -367,9 +611,9 @@ export const StudentAbsenceInquiryView: React.FC = () => {
         });
       }
 
-      // 2. Add unexcused absences
+      // Add unexcused absences
       for (let i = 0; i < approxUnexcused; i++) {
-        const dStr = getRealisticSchoolDate(2 + i * 4);
+        const dStr = pickedAbsenceDates[approxExcused + i] || schoolDays[Math.min(schoolDays.length - 1, i * 2)];
 
         fallbackRecords.push({
           date: dStr,
@@ -390,9 +634,9 @@ export const StudentAbsenceInquiryView: React.FC = () => {
         });
       }
 
-      // 3. Add late arrivals
-      for (let i = 0; i < approxLate; i++) {
-        const dStr = getRealisticSchoolDate(1 + i * 6);
+      // Add late arrivals
+      for (let i = 0; i < allocatedLates; i++) {
+        const dStr = pickedLateDates[i] || schoolDays[Math.min(schoolDays.length - 1, i)];
         const mins = 15 + i * 5;
 
         fallbackRecords.push({
@@ -414,15 +658,20 @@ export const StudentAbsenceInquiryView: React.FC = () => {
         });
       }
 
+      const totalPeriodSchoolDays = schoolDays.length;
+      const computedRate = totalPeriodSchoolDays > 0
+        ? Math.round(((totalPeriodSchoolDays - allocatedAbsences) / totalPeriodSchoolDays) * 100)
+        : currentStudent.attendanceRate || 100;
+
       return {
-        totalRecordedDaysCount: approxAbsences + 25,
-        presentDaysCount: 25,
-        absentDaysCount: approxAbsences,
-        lateDaysCount: approxLate,
+        totalRecordedDaysCount: totalPeriodSchoolDays,
+        presentDaysCount: Math.max(0, totalPeriodSchoolDays - allocatedAbsences),
+        absentDaysCount: allocatedAbsences,
+        lateDaysCount: allocatedLates,
         excusedDaysCount: approxExcused,
         unexcusedDaysCount: approxUnexcused,
-        totalMinutesLate: approxLate * 15,
-        attendanceRate: currentStudent.attendanceRate || 93.8,
+        totalMinutesLate: allocatedLates * 15,
+        attendanceRate: Math.max(50, Math.min(100, computedRate)),
         records: fallbackRecords.sort((a, b) => b.date.localeCompare(a.date)),
       };
     }
@@ -443,23 +692,24 @@ export const StudentAbsenceInquiryView: React.FC = () => {
       attendanceRate: calculatedAttendanceRate,
       records: relevantAbsenceEntries.sort((a, b) => b.date.localeCompare(a.date)),
     };
-  }, [currentStudent, sessions, activeDateRange, justifications, isAr]);
+  }, [currentStudent, sessions, activeDateRange, academicYearBounds, justifications, horizonType, selectedMonth, selectedTermId, customDateValidation, schoolProfile, isAr]);
 
-  // Extract Student's Behavioral Infractions / Violations within the Date Range
+  // Extract Student's Behavioral Infractions / Violations strictly within the Date Range and within Academic Year
   const studentViolations = useMemo(() => {
     if (!currentStudent) return [];
+    if (horizonType === 'custom' && !customDateValidation.isValid) return [];
 
     return behaviourIncidents
       .filter((b) => {
         if (b.studentId !== currentStudent.id) return false;
-        // Filter by date range
-        if (b.date && (b.date < activeDateRange.start || b.date > activeDateRange.end)) {
-          return false;
-        }
+        // Filter by date range and strictly respect academic year bounds from Settings
+        if (!b.date) return false;
+        if (b.date < activeDateRange.start || b.date > activeDateRange.end) return false;
+        if (b.date < academicYearBounds.start || b.date > academicYearBounds.end) return false;
         return true;
       })
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [currentStudent, behaviourIncidents, activeDateRange]);
+  }, [currentStudent, behaviourIncidents, activeDateRange, academicYearBounds, horizonType, customDateValidation]);
 
   // Separate positive rewards vs negative infractions
   const infractionsList = useMemo(() => studentViolations.filter((v) => v.type === 'infraction'), [studentViolations]);
@@ -831,14 +1081,14 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             {/* Horizon Selection Buttons */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <button
-                onClick={() => setHorizonType('current_month')}
+                onClick={() => setHorizonType('month')}
                 className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer text-center ${
-                  horizonType === 'current_month'
+                  horizonType === 'month'
                     ? 'bg-primary text-white border-primary shadow-xs'
                     : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary/40'
                 }`}
               >
-                {isAr ? '📅 الشهر الحالي' : '📅 Current Month'}
+                {isAr ? '📅 الشهر' : '📅 Month'}
               </button>
 
               <button
@@ -876,6 +1126,28 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             </div>
 
             {/* Sub-selectors depending on Horizon type */}
+            {horizonType === 'month' && (
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <span>{isAr ? 'اختر الشهر:' : 'Select Month:'}</span>
+                </label>
+                <div className="relative min-w-[260px] max-w-sm">
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-full text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+                  >
+                    {availableMonths.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {isAr ? m.labelAr : m.labelEn}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             {horizonType === 'term' && (
               <div className="pt-2 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-500 font-bold">{isAr ? 'اختر الفصل الدراسي:' : 'Select Term:'}</span>
@@ -899,25 +1171,45 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             )}
 
             {horizonType === 'custom' && (
-              <div className="pt-2 flex flex-wrap items-center gap-3 bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'من تاريخ:' : 'From:'}</label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none"
-                  />
+              <div className="pt-2 space-y-3 bg-slate-50/80 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'من تاريخ:' : 'From:'}</label>
+                    <input
+                      type="date"
+                      min={academicYearBounds.start}
+                      max={academicYearBounds.end}
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className={`text-xs bg-white dark:bg-slate-800 border rounded-lg px-2.5 py-1.5 focus:outline-none ${
+                        !customDateValidation.isValid ? 'border-rose-500 ring-1 ring-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'إلى تاريخ:' : 'To:'}</label>
+                    <input
+                      type="date"
+                      min={academicYearBounds.start}
+                      max={academicYearBounds.end}
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className={`text-xs bg-white dark:bg-slate-800 border rounded-lg px-2.5 py-1.5 focus:outline-none ${
+                        !customDateValidation.isValid ? 'border-rose-500 ring-1 ring-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    ({isAr ? `نطاق العام الدراسي المعتمد بالإعدادات: من ${academicYearBounds.start} إلى ${academicYearBounds.end}` : `Academic calendar range in Settings: ${academicYearBounds.start} to ${academicYearBounds.end}`})
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'إلى تاريخ:' : 'To:'}</label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none"
-                  />
-                </div>
+
+                {!customDateValidation.isValid && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-150">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{customDateValidation.error}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1190,7 +1482,19 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                     </tr>
                   ))}
 
-                  {(!studentAbsenceAnalysis?.records || studentAbsenceAnalysis.records.length === 0) && (
+                  {studentAbsenceAnalysis?.isRejected ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-rose-500 space-y-2">
+                        <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+                        <p className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                          {isAr ? 'تم رفض استعراض البيانات لهذه الفترة' : 'Data query rejected for specified range'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                          {studentAbsenceAnalysis.rejectionReason}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (!studentAbsenceAnalysis?.records || studentAbsenceAnalysis.records.length === 0) ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
                         <UserCheck className="w-10 h-10 text-emerald-500 mx-auto" />
@@ -1202,7 +1506,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                         </p>
                       </td>
                     </tr>
-                  )}
+                  ) : null}
                 </tbody>
               </table>
             </div>

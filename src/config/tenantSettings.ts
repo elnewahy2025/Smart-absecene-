@@ -38,13 +38,13 @@ export const DEFAULT_SCHOOL_1_PROFILE: TenantSchoolProfile = {
     socialWorkerEmail: 'counselor@andalus-school.edu.sa',
   },
   academicYear: {
-    code: '1446-1447',
-    hijriYear: '1446-1447 هـ',
-    gregorianYear: '2024-2025',
+    code: '1447-1448',
+    hijriYear: '1447-1448 هـ',
+    gregorianYear: '2026-2027',
     terms: [
-      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2024-08-18', endDate: '2024-11-07', isActive: false },
-      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2024-11-17', endDate: '2025-02-20', isActive: true },
-      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2025-03-02', endDate: '2025-06-26', isActive: false },
+      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2026-09-01', endDate: '2026-11-26', isActive: true },
+      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2026-12-06', endDate: '2027-02-25', isActive: false },
+      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2027-03-07', endDate: '2027-06-24', isActive: false },
     ],
   },
   timetablePeriods: [
@@ -124,13 +124,13 @@ export const DEFAULT_SCHOOL_2_PROFILE: TenantSchoolProfile = {
     socialWorkerEmail: 'counselor@falah-school.edu.sa',
   },
   academicYear: {
-    code: '1446-1447',
-    hijriYear: '1446-1447 هـ',
-    gregorianYear: '2024-2025',
+    code: '1447-1448',
+    hijriYear: '1447-1448 هـ',
+    gregorianYear: '2026-2027',
     terms: [
-      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2024-08-18', endDate: '2024-11-07', isActive: false },
-      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2024-11-17', endDate: '2025-02-20', isActive: true },
-      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2025-03-02', endDate: '2025-06-26', isActive: false },
+      { id: 'term-1', nameAr: 'الفصل الدراسي الأول', nameEn: 'Term 1', startDate: '2026-09-01', endDate: '2026-11-26', isActive: true },
+      { id: 'term-2', nameAr: 'الفصل الدراسي الثاني', nameEn: 'Term 2', startDate: '2026-12-06', endDate: '2027-02-25', isActive: false },
+      { id: 'term-3', nameAr: 'الفصل الدراسي الثالث', nameEn: 'Term 3', startDate: '2027-03-07', endDate: '2027-06-24', isActive: false },
     ],
   },
   timetablePeriods: [
