@@ -32,6 +32,7 @@ export type ActiveTab =
   | 'outbox'
   | 'reports'
   | 'students'
+  | 'student_inquiry'
   | 'settings'
   | 'parent_portal';
 
@@ -77,6 +78,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
         return { ar: 'كشف الطوارئ والإخلاء ونقاط التجمع', en: 'Emergency Evacuation Roster', icon: <ShieldAlert className="w-5 h-5 text-rose-600" /> };
       case 'students':
         return { ar: 'إدارة واستيراد الطلاب والشعب', en: 'Students & Roster Registry', icon: <Users2 className="w-5 h-5 text-indigo-600" /> };
+      case 'student_inquiry':
+        return { ar: 'استعلام ومتابعة غياب طالب', en: 'Student Absence Inquiry', icon: <UserCheck className="w-5 h-5 text-indigo-600" /> };
       case 'justifications':
         return { ar: 'تدقيق وتحليل الأعذار بالذكاء الاصطناعي', en: 'Excuses & AI Analysis', icon: <FileCheck2 className="w-5 h-5 text-amber-600" /> };
       case 'outbox':

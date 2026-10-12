@@ -21,6 +21,7 @@ import {
   School,
   Bell,
   LayoutDashboard,
+  Search,
 } from 'lucide-react';
 
 interface SubNavItem {
@@ -128,6 +129,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           labelEn: 'Students Registry & Import',
           icon: <Users2 className="w-4 h-4 text-indigo-600" />,
         },
+        {
+          id: 'student_inquiry',
+          labelAr: 'استعلام ومتابعة غياب طالب',
+          labelEn: 'Student Absence Inquiry',
+          icon: <Search className="w-4 h-4 text-emerald-600" />,
+        },
       ],
     },
     {
@@ -195,7 +202,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         return {
           ...sec,
           items: sec.items.filter((i) =>
-            ['dashboard', 'sessions', 'emergency', 'justifications', 'reports'].includes(i.id)
+            ['dashboard', 'sessions', 'emergency', 'student_inquiry', 'justifications', 'reports'].includes(i.id)
           ),
         };
       }

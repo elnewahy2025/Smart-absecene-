@@ -14,6 +14,7 @@ import { AuditSettingsView } from './components/AuditSettingsView';
 import { ParentPortalView } from './components/ParentPortalView';
 import { DailyEmailDigestView } from './components/DailyEmailDigestView';
 import { ExecutiveDashboardView } from './components/ExecutiveDashboardView';
+import { StudentAbsenceInquiryView } from './components/StudentAbsenceInquiryView';
 import { UnknownDomainView } from './components/UnknownDomainView';
 import { LoginPage } from './components/LoginPage';
 import { resolveTenantFromHostname } from './config/tenantRegistry';
@@ -173,6 +174,7 @@ const MainAppContent: React.FC = () => {
               {activeTab === 'outbox' && <NotificationOutboxView />}
               {activeTab === 'reports' && <ReportsView />}
               {activeTab === 'students' && <StudentManagementView />}
+              {activeTab === 'student_inquiry' && <StudentAbsenceInquiryView />}
               {activeTab === 'settings' && <AuditSettingsView />}
               {activeTab === 'parent_portal' && (
                 <ParentPortalView onOpenExcuseForm={() => setActiveTab('justifications')} />
