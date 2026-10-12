@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student, StudentBehaviourIncident, AttendanceRecord, Justification } from '../types/attendance';
+import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 import {
   UserCheck,
   Filter,
@@ -24,6 +25,7 @@ import {
   AlertCircle,
   HelpCircle,
   UserX,
+  Loader2,
 } from 'lucide-react';
 
 export const StudentAbsenceInquiryView: React.FC = () => {
@@ -58,6 +60,8 @@ export const StudentAbsenceInquiryView: React.FC = () => {
 
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
   // Available Terms from Academic Profile
   const academicTerms = useMemo(() => {
@@ -341,9 +345,46 @@ export const StudentAbsenceInquiryView: React.FC = () => {
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  // Handle Print Action
+  // Handle Download Vector PDF
+  const handleDownloadPdf = async () => {
+    if (!currentStudent || !printAreaRef.current) {
+      window.print();
+      return;
+    }
+
+    try {
+      setIsGeneratingPdf(true);
+      const html = printAreaRef.current.innerHTML;
+      const reportTitle = `${currentStudent.fullName} - ${activeDateRange.label} - تقرير الغياب والانضباط`;
+      const filename = `تقرير_${currentStudent.fullName.replace(/\s+/g, '_')}_${activeDateRange.start}_${activeDateRange.end}.pdf`;
+
+      await downloadNativePdfFromHtml({
+        htmlContent: html,
+        title: reportTitle,
+        filename,
+      });
+      setToastMsg(isAr ? 'تم تحميل ملف PDF بنجاح!' : 'PDF downloaded successfully!');
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err) {
+      console.error(err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  // Handle Direct Print Action
   const handlePrint = () => {
-    window.print();
+    if (printAreaRef.current) {
+      const html = printAreaRef.current.innerHTML;
+      const reportTitle = `${currentStudent?.fullName || ''} - تقرير الحضور والغياب`;
+      printNativePdfFromHtml({
+        htmlContent: html,
+        title: reportTitle,
+      });
+    } else {
+      window.print();
+    }
   };
 
   return (
@@ -381,13 +422,21 @@ export const StudentAbsenceInquiryView: React.FC = () => {
         </div>
 
         {currentStudent && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-white cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+            >
+              {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <span>{isGeneratingPdf ? (isAr ? 'جارٍ التصدير...' : 'Exporting...') : (isAr ? 'تصدير PDF أصلي' : 'Export PDF')}</span>
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
             >
               <Printer className="w-4 h-4" />
-              <span>{isAr ? 'طباعة تقرير الطالب' : 'Print Report'}</span>
+              <span>{isAr ? 'طباعة مباشرة' : 'Print'}</span>
             </button>
             <button
               onClick={handleSendWarning}
@@ -1062,6 +1111,178 @@ export const StudentAbsenceInquiryView: React.FC = () => {
               ? 'اختر الصف ثم الفصل من الأعلى، أو اكتب اسم الطالب في مربع البحث لاحتساب مرات الغياب والتأخر والمخالفات في أي مدة تريدها.'
               : 'Select grade and class above, or type in search box to view absence counts, tardiness, and conduct violations for any chosen horizon.'}
           </p>
+        </div>
+      )}
+      {/* =========================================================================
+          OFFICIAL PRINTABLE CANVAS (FOR VECTOR PDF & DIRECT PRINT)
+      ========================================================================= */}
+      {currentStudent && (
+        <div style={{ display: 'none' }}>
+          <div
+            ref={printAreaRef}
+            className="p-8 bg-white text-slate-900 space-y-6 font-sans"
+            style={{ width: '800px', backgroundColor: '#ffffff', color: '#0f172a', direction: 'rtl', fontFamily: 'Cairo, Tahoma, sans-serif' }}
+          >
+            {/* Ministry & School Official Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '16px' }}>
+              <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                  {schoolProfile?.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
+                </div>
+                <div style={{ fontWeight: '600' }}>{schoolProfile?.schoolName || 'المدرسة'}</div>
+                <div style={{ color: '#64748b' }}>كود المنشأة: {schoolProfile?.schoolCode || '—'}</div>
+                {schoolProfile?.directorateAr && <div style={{ color: '#64748b' }}>{schoolProfile.directorateAr}</div>}
+              </div>
+
+              <div style={{ textAlign: 'center', lineHeight: '1.4' }}>
+                <div style={{ fontWeight: '900', fontSize: '18px', color: '#0f172a' }}>تقرير سجل غياب وانضباط الطالب</div>
+                <div style={{ fontSize: '13px', color: '#047857', fontWeight: 'bold' }}>
+                  {activeDateRange.label}
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  تاريخ استخراج التقرير: {new Date().toLocaleDateString('ar-SA')}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'left', fontSize: '11px', lineHeight: '1.6', direction: 'ltr' }}>
+                <div>العام: {schoolProfile?.academicYear?.hijriYear || '1446-1447 هـ'}</div>
+                <div>الفصل: {currentStudent.className}</div>
+                <div>الصف: {currentStudent.grade}</div>
+              </div>
+            </div>
+
+            {/* Student Identity Card Box */}
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 16px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>اسم الطالب: </span>
+                <strong style={{ fontSize: '15px', color: '#0f172a' }}>{currentStudent.fullName}</strong>
+                <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>رقم السجل المدني: </span>
+                <strong style={{ fontSize: '13px', fontFamily: 'monospace' }}>{currentStudent.nationalId || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>ولي الأمر: </span>
+                <strong style={{ fontSize: '12px' }}>{currentStudent.guardianName || '—'}</strong>
+                <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>الهاتف: </span>
+                <strong style={{ fontSize: '12px', fontFamily: 'monospace' }}>{currentStudent.guardianPhone || '—'}</strong>
+              </div>
+            </div>
+
+            {/* Executive Statistical Summary Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', textAlign: 'center' }}>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#f0fdf4' }}>
+                <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold' }}>نسبة الحضور</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#15803d' }}>%{studentAbsenceAnalysis?.attendanceRate}</div>
+              </div>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#fef2f2' }}>
+                <div style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold' }}>إجمالي الغياب (بدون عذر)</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#b91c1c' }}>{studentAbsenceAnalysis?.unexcusedDaysCount} يوم</div>
+              </div>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#eff6ff' }}>
+                <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>غياب بعذر معتمد</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#1d4ed8' }}>{studentAbsenceAnalysis?.excusedDaysCount} يوم</div>
+              </div>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#fffbeb' }}>
+                <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 'bold' }}>مرات التأخر الصباحي</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#b45309' }}>{studentAbsenceAnalysis?.lateDaysCount} مرات</div>
+              </div>
+            </div>
+
+            {/* Absence Dates Table */}
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                سجل تواريخ الغياب والتأخر في الفترة:
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'right' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '30px', textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '100px' }}>التاريخ</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '120px' }}>نوع الحالة</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>التفاصيل وملاحظات العذر</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '120px' }}>المعلم / الراصد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentAbsenceAnalysis?.records.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace' }}>{i + 1}</td>
+                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontWeight: 'bold' }}>{r.date}</td>
+                      <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>
+                        {r.status === 'late' ? `تأخر (${r.minutesLate} دقيقة)` : r.isExcused ? 'غياب بعذر معتمد' : 'غياب بدون عذر'}
+                      </td>
+                      <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>
+                        {r.justificationReason || r.note || '—'}
+                      </td>
+                      <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>{r.teacherName || r.className}</td>
+                    </tr>
+                  ))}
+                  {(!studentAbsenceAnalysis?.records || studentAbsenceAnalysis.records.length === 0) && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>
+                        لا توجد أي أيام غياب أو تأخر مسجلة للطالب خلال هذه الفترة.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Conduct Violations Section if any */}
+            {infractionsList.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px', color: '#991b1b' }}>
+                  المخالفات السلوكية المسجلة في الفترة:
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'right' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#fef2f2', borderBottom: '2px solid #fecaca' }}>
+                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '30px', textAlign: 'center' }}>#</th>
+                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '90px' }}>التاريخ</th>
+                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '100px' }}>الدرجة</th>
+                      <th style={{ padding: '6px', border: '1px solid #fecaca' }}>وصف المخالفة</th>
+                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '120px' }}>الإجراء المتخذ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {infractionsList.map((inf, i) => (
+                      <tr key={inf.id} style={{ borderBottom: '1px solid #fecaca' }}>
+                        <td style={{ padding: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>{i + 1}</td>
+                        <td style={{ padding: '6px', border: '1px solid #fecaca', fontFamily: 'monospace' }}>{inf.date}</td>
+                        <td style={{ padding: '6px', border: '1px solid #fecaca', fontWeight: 'bold', color: '#b91c1c' }}>
+                          {inf.severity === 'major' ? 'جسيمة' : inf.severity === 'moderate' ? 'متوسطة' : 'بسيطة'}
+                        </td>
+                        <td style={{ padding: '6px', border: '1px solid #fecaca' }}>{inf.title} - {inf.description}</td>
+                        <td style={{ padding: '6px', border: '1px solid #fecaca' }}>{inf.actionTaken || 'متابعة المرشد'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Official Signatures & Stamp Footer */}
+            <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '2px solid #0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', textAlign: 'center' }}>
+              <div style={{ width: '200px' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '32px' }}>المرشد الطلابي / الوكيل</div>
+                <div style={{ borderTop: '1px dashed #94a3b8', paddingTop: '4px', color: '#64748b' }}>التوقيع: .....................</div>
+              </div>
+
+              <div style={{ width: '150px' }}>
+                <div style={{ border: '2px dashed #94a3b8', borderRadius: '50%', width: '90px', height: '90px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '10px' }}>
+                  ختم المدرسة
+                </div>
+              </div>
+
+              <div style={{ width: '200px' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '32px' }}>مدير المدرسة</div>
+                <div style={{ borderTop: '1px dashed #94a3b8', paddingTop: '4px', color: '#64748b' }}>
+                  {schoolProfile?.leadership?.principalName || 'التوقيع والاعتماد'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
