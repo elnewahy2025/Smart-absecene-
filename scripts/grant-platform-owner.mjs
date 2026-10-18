@@ -32,6 +32,13 @@ if (!email || !email.includes('@')) {
   process.exit(1);
 }
 
+// This script manages the real project, so ignore any emulator settings in .env
+// unless they are explicitly requested with --emulator.
+if (!process.argv.includes('--emulator')) {
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+}
+
 const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.resolve('serviceAccountKey.json');
 const inlineCredential = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
   ? Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')

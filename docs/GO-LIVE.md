@@ -135,6 +135,15 @@ node scripts/backfill-user-claims.mjs
 Prints `Updated N; skipped M`. Anyone skipped has no role/school — set it in
 **Settings → Users**. Each existing user must **sign out and back in** once.
 
+### Demo role accounts (optional)
+
+```powershell
+node scripts/seed-demo-roles.mjs            # one login per role + small demo data
+node scripts/seed-demo-roles.mjs --remove   # delete all of it again
+```
+
+Every seeded document carries `demoSeed: true`, so removal never touches real data.
+
 ## Step 8 — Visit your app
 
 Open your deployment URL (`https://smart-absecene-drul.vercel.app`), sign in as
