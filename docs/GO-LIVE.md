@@ -119,6 +119,15 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 ## Step 7 — Give users their roles
 
+First the owner. Owner emails never get a `users` profile written by the client,
+so this one needs its own script — run it **after** you have signed in once:
+
+```powershell
+node scripts/grant-platform-owner.mjs your-owner@example.com
+```
+
+Then everyone else:
+
 ```powershell
 node scripts/backfill-user-claims.mjs
 ```
@@ -128,9 +137,10 @@ Prints `Updated N; skipped M`. Anyone skipped has no role/school — set it in
 
 ## Step 8 — Visit your app
 
-Open the URL Render gave you (`https://smart-school-attendance.onrender.com`), sign in as
-the owner, and confirm you reach the dashboard. To use your own domain, add it in
-**Render → Settings → Custom Domains**.
+Open your deployment URL (`https://smart-absecene-drul.vercel.app`), sign in as
+the owner, and confirm you reach the dashboard. To use your own domain, add it to
+the school's `customDomains` in `src/config/tenantRegistry.ts` **and** to
+**Firebase → Authentication → Settings → Authorized domains**.
 
 ---
 
@@ -140,6 +150,8 @@ the owner, and confirm you reach the dashboard. To use your own domain, add it i
 | --- | --- | --- |
 | First load is slow | Free tier sleeps when idle | Expected; it wakes in ~30–60s |
 | `403 NO_ROLE_ASSIGNED` | User has no role claim | Set role in Settings → Users, re-run Step 7, user re-logins |
+| `auth/unauthorized-domain` on sign-in | Deployment host not in Firebase | Add it in **Firebase → Authentication → Settings → Authorized domains** |
+| "النطاق غير مسجل في النظام" | Host missing from the school's `customDomains` | Add the host in `src/config/tenantRegistry.ts`, commit, redeploy |
 | `503 AUTH_NOT_CONFIGURED` | Service account missing/wrong | Redo Step 1 and set `FIREBASE_SERVICE_ACCOUNT_BASE64` |
 | `503 GATEWAY_NOT_CONFIGURED` | School has no messaging gateway | Admin → Settings → Communications |
 | Blank page / emulator data | A `VITE_*` value missing at build | Re-check the `VITE_FIREBASE_*` vars in Render, then **Manual Deploy → Clear build cache & deploy** |
