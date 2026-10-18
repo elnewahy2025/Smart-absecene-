@@ -40,8 +40,8 @@ describe('Tenant AI Secrets Encryption & Management', () => {
 
   it('correctly masks API keys for display', () => {
     const masked = secrets.maskApiKey(testKeyA);
-    expect(masked.startsWith('AQ.Ab8R')).toBe(true);
-    expect(masked.endsWith('oNw')).toBe(true);
+    expect(masked.startsWith(testKeyA.slice(0, 7))).toBe(true);
+    expect(masked.endsWith(testKeyA.slice(-4))).toBe(true);
     expect(masked).toContain('••••');
     expect(masked).not.toBe(testKeyA);
   });
@@ -55,7 +55,7 @@ describe('Tenant AI Secrets Encryption & Management', () => {
 
     const safeConfig = secrets.getTenantAIConfig(tenantA);
     expect(safeConfig.hasCustomKey).toBe(true);
-    expect(safeConfig.maskedKey.startsWith('AQ.Ab8R')).toBe(true);
+    expect(safeConfig.maskedKey.startsWith(testKeyA.slice(0, 7))).toBe(true);
     expect((safeConfig as any).plainKey).toBeUndefined();
     expect(fs.existsSync(testSecretsPath)).toBe(true);
   });
