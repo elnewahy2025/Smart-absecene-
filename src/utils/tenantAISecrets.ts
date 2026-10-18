@@ -25,7 +25,7 @@ export interface TenantAIConfig {
   preferredModel?: string;
 }
 
-interface EncryptedPayload {
+export interface EncryptedPayload {
   iv: string; // hex
   tag: string; // hex
   data: string; // hex
@@ -59,6 +59,32 @@ function persistSecretsToDisk() {
     });
   } catch (err) {
     console.error('[SECURITY] Error persisting tenant-ai-secrets.json:', err);
+  }
+}
+
+// Optional durable backend (Firestore in production). When attached, writes go
+// there instead of the local file, which survives redeploys on hosts with an
+// ephemeral filesystem (e.g. free serverless / web-service tiers).
+export interface TenantSecretsStore {
+  loadAll: () => Promise<Record<string, EncryptedPayload>>;
+  put: (tenantId: string, payload: EncryptedPayload) => Promise<void>;
+  remove: (tenantId: string) => Promise<void>;
+}
+
+let durableStore: TenantSecretsStore | null = null;
+
+/**
+ * Attach a durable store and hydrate the in-memory cache from it. Reads stay
+ * synchronous against the cache; writes are written through to the store.
+ */
+export async function attachTenantSecretsStore(store: TenantSecretsStore): Promise<void> {
+  durableStore = store;
+  try {
+    const remote = await store.loadAll();
+    secretsCache = { ...secretsCache, ...remote };
+    console.log(`[SECURITY] Loaded ${Object.keys(remote).length} tenant AI secret(s) from the durable store.`);
+  } catch (err) {
+    console.error('[SECURITY] Failed to load tenant AI secrets from the durable store:', err);
   }
 }
 
@@ -125,7 +151,13 @@ export function setTenantApiKey(tenantId: string, plainKey: string, preferredMod
     preferredModel: preferredModel || 'gemini-3.5-flash',
   };
 
-  persistSecretsToDisk();
+  if (durableStore) {
+    durableStore
+      .put(tenantId, secretsCache[tenantId])
+      .catch((err) => console.error('[SECURITY] Failed to persist tenant AI key:', err));
+  } else {
+    persistSecretsToDisk();
+  }
 
   return {
     tenantId,
@@ -154,7 +186,13 @@ export function getTenantApiKey(tenantId: string): string | null {
 export function removeTenantApiKey(tenantId: string): boolean {
   if (secretsCache[tenantId]) {
     delete secretsCache[tenantId];
-    persistSecretsToDisk();
+    if (durableStore) {
+      durableStore
+        .remove(tenantId)
+        .catch((err) => console.error('[SECURITY] Failed to remove tenant AI key:', err));
+    } else {
+      persistSecretsToDisk();
+    }
     return true;
   }
   return false;

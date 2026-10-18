@@ -101,6 +101,7 @@ import {
   removeTenantApiKey,
   getTenantAIConfig,
   maskApiKey,
+  attachTenantSecretsStore,
 } from './src/utils/tenantAISecrets';
 import {
   sendSms,
@@ -1686,6 +1687,32 @@ function serveStaticBundle() {
   });
 }
 
+// Persist per-tenant AI keys in Firestore so they survive redeploys on hosts
+// with an ephemeral filesystem. Safe no-op when Firebase Admin is unavailable.
+async function hydrateTenantSecrets(): Promise<void> {
+  if (!firebaseAdminReady) {
+    console.warn('[SECURITY] Firebase Admin not ready; tenant AI secrets use the local file only.');
+    return;
+  }
+  const collection = admin.firestore().collection('tenant_ai_secrets');
+  await attachTenantSecretsStore({
+    loadAll: async () => {
+      const snapshot = await collection.get();
+      const out: Record<string, any> = {};
+      snapshot.forEach((doc) => {
+        out[doc.id] = doc.data();
+      });
+      return out;
+    },
+    put: async (tenantId, payload) => {
+      await collection.doc(tenantId).set(payload as any);
+    },
+    remove: async (tenantId) => {
+      await collection.doc(tenantId).delete();
+    },
+  });
+}
+
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     serveStaticBundle();
@@ -1707,6 +1734,8 @@ async function startServer() {
       serveStaticBundle();
     }
   }
+
+  await hydrateTenantSecrets();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smart School Attendance Server running on http://0.0.0.0:${PORT}`);

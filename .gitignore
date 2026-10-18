@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.production.example
 
 # Compiled server bundle (built from server.ts via esbuild)
 server.js
@@ -14,6 +15,7 @@ firebase-applet-config.local.*
 serviceAccountKey*.json
 service-account*.json
 tenant-ai-secrets.json
+tenant-ai-secrets.json.*.bak
 
 # Package-manager lockfiles: npm is the single source of truth
 bun.lock

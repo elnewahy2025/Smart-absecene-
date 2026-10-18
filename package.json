@@ -19,7 +19,10 @@
     "seed:auth": "tsx scripts/seed-firebase-auth.ts",
     "probe:security": "node scripts/security-probes.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-smart-school \"node scripts/test-firestore-rules.mjs\"",
-    "audit": "node scripts/ci-security-audit.mjs"
+    "audit": "node scripts/ci-security-audit.mjs",
+    "rotate:secrets": "node scripts/rotate-tenant-ai-secrets.mjs",
+    "migrate:secrets": "node scripts/migrate-ai-secrets-to-firestore.mjs",
+    "golive": "node scripts/golive-check.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

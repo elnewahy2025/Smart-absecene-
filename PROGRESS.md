@@ -77,6 +77,7 @@
 6. **Client accounts are no longer authenticated against bundled data.** Firebase Auth is the only login path; the local password fallback is deleted.
 7. **Password storage is a separate follow-up (C-4b).** The fields are inert after this change but still ship in the bundle; removing them touches three admin screens and the user type, so it is tracked rather than half-done.
 8. **Firebase web config moved to `.env`, but it is not a secret.** `VITE_FIREBASE_*` values must reach the browser and are public by design; they must be restricted by HTTP referrer and API scope. The real secret is the Admin service account, accepted as `FIREBASE_SERVICE_ACCOUNT_BASE64` (preferred) or `FIREBASE_SERVICE_ACCOUNT_JSON`, or via `GOOGLE_APPLICATION_CREDENTIALS`.
+9. **Hosting is Render (free Docker web service).** The `Dockerfile` builds both bundles and ships system Chromium; `render.yaml` is the blueprint. Because Vite inlines `VITE_*` at build time and Render passes service env vars as Docker build args, every `VITE_*` value is declared with `ARG` in the Dockerfile. Per-tenant AI keys are stored in Firestore (`tenant_ai_secrets`) rather than the JSON file, so no persistent disk is needed on the free tier.
 
 ---
 
@@ -142,6 +143,8 @@
 | 2026-10-18 | production boot `NODE_ENV=production node server.js` | **pass**: `/api/health` 200 with HSTS + `X-Content-Type-Options`; anonymous `/api/pdf/generate` → 401 |
 | 2026-10-18 | H-8 dead-file removal | **pass**: `src/lib/authGuard.ts` deleted; no code references; `lint`/`test`/`build` green |
 | 2026-10-18 | fabricated-default removal (DATA-2) | **pass**: 7 files stop inventing email/phone/guardian phone/blood type/relationship; bundle no longer contains `+966500000000` or `user@school.edu.sa` |
+| 2026-10-18 | deploy tooling (Render free / Docker) | **pass**: `Dockerfile` + `.dockerignore` + `render.yaml`; per-tenant AI keys persist in Firestore (`tenant_ai_secrets`) via `attachTenantSecretsStore` at boot; `rotate:secrets` / `migrate:secrets` / `golive` scripts added; `tsc`, 27 files / 192 tests, build, audit all green |
+| 2026-10-18 | `TENANT_ENCRYPTION_MASTER_KEY` rotated | **pass**: `rotate-tenant-ai-secrets.mjs` dry-run decrypted 2 keys, then re-encrypted them with a new key; both tenants verified readable via `getTenantApiKey`; `.bak` kept |
 
 ---
 

@@ -44,6 +44,18 @@ The application is architected with a decoupled full-stack TypeScript design:
 - **Frontend**: Vite-bundled React SPA, statically servable or served via Express.
 - **Backend API**: Express server (`server.ts` → `server.js`) with Firebase Admin authentication, domain-based tenant resolution middleware, and headless Chromium Puppeteer PDF generation.
 - **Data Persistence**: Firebase Firestore with strict multi-tenant security rules (`firestore.rules`).
+- **Per-tenant AI keys**: encrypted (AES-256-GCM) and stored in the Firestore collection `tenant_ai_secrets`, so they survive redeploys on hosts with an ephemeral filesystem (Render free, Cloud Run). A local `tenant-ai-secrets.json` is used only as a non-durable fallback (dev/tests).
+
+## Container Deployment (Render / Docker)
+
+The repo ships a multi-stage `Dockerfile` (build `dist/` + `server.js`, then a runtime image with system Chromium and production dependencies) and a `render.yaml` blueprint.
+
+```powershell
+docker build -t smart-school-attendance .
+docker run --rm -p 5050:5050 --env-file .env.production smart-school-attendance
+```
+
+On Render, create the service from the blueprint. Every `VITE_*` value must be set as a service environment variable: Render passes them to the Docker build as build arguments (declared with `ARG` in the Dockerfile), which is required because Vite inlines them at build time. Per-tenant AI keys live in Firestore, so no persistent disk is needed.
 
 ## Firebase Authentication (Production Domains)
 
