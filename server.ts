@@ -13,6 +13,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+// Vercel sets VERCEL=1 for serverless deployments: no system Chromium, read-only FS.
+const IS_VERCEL = Boolean(process.env.VERCEL);
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5050;
 const SHARED_AUTH_VALUE = process.env.APP_AUTH_TOKEN || '';
 const ALLOW_DEV_AUTH = process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production';
@@ -92,7 +94,6 @@ function getRequestHostname(req: express.Request): string {
   return (forwarded || req.get('host') || req.hostname || '').toString();
 }
 
-import puppeteer from 'puppeteer';
 import fs from 'fs';
 import admin from 'firebase-admin';
 import {
@@ -131,6 +132,52 @@ function getSystemChromePath(): string | undefined {
     }
   }
   return undefined;
+}
+
+// Chromium's sandbox is enabled by default. Some container hosts (e.g. hardened
+// runtimes without user-namespace support) cannot start the sandboxed renderer;
+// operators can opt out explicitly with PUPPETEER_NO_SANDBOX=true. Only the PDF
+// renderer is affected, and only requests to the print stylesheet / webfonts are
+// reachable from it (everything else is aborted).
+async function launchPdfBrowser(executablePath: string | undefined) {
+  // Serverless hosts ship no browser binary; use the packaged @sparticuz/chromium
+  // build (already patched to run inside the function sandbox) with puppeteer-core.
+  if (IS_VERCEL) {
+    const chromiumModule: any = await import('@sparticuz/chromium');
+    const chromium = chromiumModule.default ?? chromiumModule;
+    const puppeteerCoreModule: any = await import('puppeteer-core');
+    const puppeteerCore = puppeteerCoreModule.default ?? puppeteerCoreModule;
+
+    return puppeteerCore.launch({
+      args: [
+        ...(Array.isArray(chromium.args) ? chromium.args : []),
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--font-render-hinting=medium',
+      ],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless ?? true,
+    });
+  }
+
+  const disableSandbox = process.env.PUPPETEER_NO_SANDBOX === 'true';
+  // Loaded lazily so serverless bundles (which never take this path) do not carry
+  // the full puppeteer package with its bundled-browser downloader.
+  const puppeteerModule: any = await import('puppeteer');
+  const puppeteer = puppeteerModule.default ?? puppeteerModule;
+  return puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: [
+      ...(disableSandbox ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--font-render-hinting=medium',
+    ],
+  });
 }
 
 const pdfGenerateLimiter = rateLimit({
@@ -194,22 +241,7 @@ app.post(
 
     const executablePath = getSystemChromePath();
 
-    // Chromium's sandbox is enabled by default. Some container hosts (e.g. hardened
-    // runtimes without user-namespace support) cannot start the sandboxed renderer;
-    // operators can opt out explicitly with PUPPETEER_NO_SANDBOX=true. Only the PDF
-    // renderer is affected, and only requests to the print stylesheet / webfonts are
-    // reachable from it (everything else is aborted).
-    const disableSandbox = process.env.PUPPETEER_NO_SANDBOX === 'true';
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: [
-        ...(disableSandbox ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--font-render-hinting=medium',
-      ],
-    });
+    browser = await launchPdfBrowser(executablePath);
 
     const page = await browser.newPage();
     page.setDefaultTimeout(20000);
@@ -1454,7 +1486,7 @@ app.get('/api/health', (req, res) => {
     memoryUsageMB: Math.round(process.memoryUsage().rss / (1024 * 1024)),
     services: {
       aiGemini: Boolean(geminiKey),
-      pdfPuppeteer: Boolean(chromePath),
+      pdfPuppeteer: Boolean(chromePath) || IS_VERCEL,
       firebaseAdmin: firebaseAdminReady,
       firebaseAdminInitialized,
       adminKeyLoaded,
@@ -1569,9 +1601,15 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
     }
 
     const updated = [...dynamicList.filter((d: any) => d.tenantId !== sanitized.tenantId), sanitized];
-    fs.writeFileSync(dynamicPath, JSON.stringify(updated, null, 2), 'utf8');
-    dynamicTenantsMtime = 0;
-    refreshDynamicTenants();
+    try {
+      fs.writeFileSync(dynamicPath, JSON.stringify(updated, null, 2), 'utf8');
+      dynamicTenantsMtime = 0;
+      refreshDynamicTenants();
+    } catch (writeError: any) {
+      // Serverless hosts expose a read-only filesystem. Firestore is the durable
+      // tenant registry there, so the local JSON mirror is best-effort only.
+      console.warn('[TENANTS] Local registry mirror is not writable; relying on Firestore only.', writeError?.message || writeError);
+    }
     if (firebaseAdminReady) {
       try {
         await admin.firestore().doc(`tenants/${sanitized.tenantId}`).set(sanitized, { merge: true });
@@ -1718,6 +1756,19 @@ async function hydrateTenantSecrets(): Promise<void> {
   });
 }
 
+// One-time runtime bootstrap shared by the standalone server and the serverless
+// entry point (Vercel): wire the Firestore-backed tenant secret store. Idempotent,
+// so cold starts and the long-running server can both call it safely.
+let runtimeReady: Promise<void> | null = null;
+function prepareRuntime(): Promise<void> {
+  if (!runtimeReady) {
+    runtimeReady = hydrateTenantSecrets().catch((error: any) => {
+      console.warn('[BOOT] Tenant secret hydration failed; using local file fallback:', error?.message || error);
+    });
+  }
+  return runtimeReady;
+}
+
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     serveStaticBundle();
@@ -1740,7 +1791,7 @@ async function startServer() {
     }
   }
 
-  await hydrateTenantSecrets();
+  await prepareRuntime();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smart School Attendance Server running on http://0.0.0.0:${PORT}`);
@@ -1766,4 +1817,4 @@ if (isDirectRun) {
   });
 }
 
-export { app, startServer };
+export { app, startServer, prepareRuntime };

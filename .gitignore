@@ -10,6 +10,8 @@ coverage/
 
 # Compiled server bundle (built from server.ts via esbuild)
 server.js
+# Vercel CLI local project link
+.vercel
 firebase-applet-config.local.json
 firebase-applet-config.local.*
 serviceAccountKey*.json
