@@ -327,7 +327,7 @@ export const EmergencyRosterView: React.FC = () => {
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                          {student.bloodType || 'O+'}
+                          {student.bloodType || ''}
                         </span>
                         {student.medicalConditions && (
                           <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">

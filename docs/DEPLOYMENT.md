@@ -35,6 +35,8 @@ npm start              # node server.js  (serves dist/ on $PORT, default 5050)
 
 `server.js` is a build artifact and is git-ignored (`npm run clean` removes it). If `NODE_ENV` is not `production`, the server attempts the Vite dev middleware and automatically falls back to serving the static `dist/` build when Vite is unavailable.
 
+> **Build with production environment values.** Vite inlines every `VITE_*` variable **at build time**, so `dist/` contains whatever `.env` was present when `npm run build` ran (e.g. `VITE_PLATFORM_OWNER_EMAILS`, `VITE_FIREBASE_PROJECT_ID`, `VITE_USE_FIREBASE_EMULATOR`, `VITE_DEFAULT_TENANT_ID`). Never produce the production bundle from the local development `.env`: set the production values first (a committed `.env.production` or CI environment), then confirm `VITE_USE_FIREBASE_EMULATOR=false`, the real Firebase project id, and the real platform-owner email(s) are the ones baked into `dist/`.
+
 ## Production Architecture & Environment
 
 The application is architected with a decoupled full-stack TypeScript design:

@@ -166,7 +166,7 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
     ctx.fillStyle = '#64748b';
     ctx.font = '15px Cairo, sans-serif';
     ctx.fillText(`ولي الأمر: ${student.guardianName} (${student.guardianPhone})`, 300, 760);
-    ctx.fillText(`فصيلة الدم: ${student.bloodType || 'O+'}`, 300, 795);
+    ctx.fillText(`فصيلة الدم: ${student.bloodType || ''}`, 300, 795);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px Cairo, sans-serif';

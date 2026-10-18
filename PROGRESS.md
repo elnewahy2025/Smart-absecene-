@@ -41,6 +41,7 @@
 | H-4 | Settings read exposure | P0 | DONE | gateway moved to `settings_private`; rules: parent 403, admin allowed |
 | H-6 | Notification dispatch must report `simulated`, not `delivered` | P1 | DONE (superseded by NS-1) | API: `simulated: true`, receipt `simulated/not_sent`, no receipt id; UI chip added |
 | H-7 | Tenant AI encryption key no longer hardcoded | P0 | DONE | key read from `.env`; lazy derivation; tests pass |
+| H-8 | Remove dead signature-blind JWT decoder | P1 | DONE | `src/lib/authGuard.ts` deleted; no code references remain; `lint`/`test`/`build` green |
 | H-9 | Remove hardcoded dev bearer token default | P0 | DONE | server requires explicit `APP_AUTH_TOKEN` + `ALLOW_DEV_AUTH=true` |
 | H-10 | Align local scanner and CI allowlist | P0 | DONE | CI now runs `scripts/ci-security-audit.mjs`; single source of truth; `npm run audit` pass |
 | M-3 | `requireTenant` must not exempt `admin` | P1 | DONE | cross-tenant probe as admin → 403 |
@@ -58,9 +59,11 @@
 | M-8 | Demo data ships in the production bundle | P1 | DONE | demo student/user PII removed from `StudentManagementView` sample + `sampleImages`; tenant profile contacts and digest recipients emptied; bundle scan clean |
 | M-9 | "Strict TypeScript" was not strict | P2 | DONE | `strict: true` + `noImplicitOverride: true` enabled, 0 errors; `noUncheckedIndexedAccess` deferred (181 findings) |
 | M-15 | Performance and accessibility | P2 | DONE | Vite `manualChunks` vendor split (main chunk 1,086 kB → 250 kB); `role="dialog"`/`aria-modal`/`aria-label` added to 10 more modals |
+| M-10 | Server/attendance access rules extracted to tested modules | P1 | DONE | `routeAuth.ts` (4 tests) + `attendanceAccess.ts` (10) + `serverIntegration.test.ts` (7) all drive production code; `server.ts` and `AttendanceContext.tsx` import them |
 | T-1 | Tenant-secrets test writes to the real `tenant-ai-secrets.json` | P1 | DONE | temp path via `TENANT_AI_SECRETS_PATH`; real file hash unchanged |
 | DATA-1a | Persist students to Firestore (create, update, transfer, restore, delete, import) | P0 | DONE | UI add → Firestore student count 1 → 2 |
 | DATA-1b | Persist attendance sessions to Firestore | P0 | DONE | UI create → Firestore `attendance_sessions` doc (draft, class 10/أ) |
+| DATA-2 | No fabricated identity/contact/medical defaults | P1 | DONE | placeholder email/phone/guardian phone/relationship/blood type replaced with the real value or empty across `AttendanceContext` + 6 components; `AddStudentModal` picker gained an "unspecified" option; bundle scan clean |
 
 ---
 
@@ -133,6 +136,12 @@
 | 2026-10-18 | M-15 perf | **pass**: main chunk 1,086.91 kB → `index` 250.26 kB + vendor-charts 339.6 kB + vendor-firebase 444.9 kB + vendor-react 327.4 kB + vendor 244.5 kB; no size warnings |
 | 2026-10-18 | M-10 server integration | **pass**: `serverIntegration.test.ts` (7) imports the real `server.ts` and drives a live Express instance — public health/resolver/registry endpoints, 401 without bearer, 404 unknown domain, helmet headers; server auto-start guarded by a direct-run check (`node server.js` still binds: `/api/health` 200) |
 | 2026-10-18 | M-15 keyboard a11y | **pass**: `useModalAccessibility` (focus-on-open, Tab/Shift+Tab trap, Escape-to-close, focus restore) wired into all 19 dialog modals; `modalA11y.test.ts` (11) covers the key/cycle logic; `tsc` + `build` green |
+| 2026-10-18 | production-readiness pass: `lint` / `test` / `build` / `audit` | **pass**: 0 `tsc` errors; 27 files / 192 tests; client + `server.js` built; audit clean |
+| 2026-10-18 | `npm run test:rules` (re-run) | **pass**, all rules tests pass (the logged `PERMISSION_DENIED` lines are the expected negative cases) |
+| 2026-10-18 | `node scripts/security-probes.mjs` vs live dev server (`:5099`) | **pass**, 16/16 (anonymous 401s, `/API/...` variants, tenant projection fields, header escalation → 403, authenticated PDF → 200) |
+| 2026-10-18 | production boot `NODE_ENV=production node server.js` | **pass**: `/api/health` 200 with HSTS + `X-Content-Type-Options`; anonymous `/api/pdf/generate` → 401 |
+| 2026-10-18 | H-8 dead-file removal | **pass**: `src/lib/authGuard.ts` deleted; no code references; `lint`/`test`/`build` green |
+| 2026-10-18 | fabricated-default removal (DATA-2) | **pass**: 7 files stop inventing email/phone/guardian phone/blood type/relationship; bundle no longer contains `+966500000000` or `user@school.edu.sa` |
 
 ---
 
@@ -145,3 +154,4 @@
 5. **Type-strictness follow-up (M-9):** `noUncheckedIndexedAccess` is still off. Measured at **181 findings across 26 files** (top: `StudentAbsenceDrawer.tsx` 35, `StudentAbsenceInquiryView.tsx` 35, `calculationsAudit.test.ts` 25, `WeeklyAttendanceTrendCard.tsx` 12, `holidayUtils.ts` 10, `AttendanceContext.tsx` 10). Most are `ISO-date split destructuring` (`const [y,m,d] = s.split('-')`) and loop-index accesses. Enable only after a dedicated pass (enabling it is all-or-nothing: it breaks `tsc`, `lint` and the build until every site is guarded).
 6. **Accessibility follow-up (M-15):** DONE — modals carry `role="dialog"`/`aria-modal`/`aria-label`, and all 19 dialog modals now use `useModalAccessibility` (focus on open, Tab/Shift+Tab trap, Escape-to-close, focus restore). Only a screen-reader content audit (labels/announcements) remains.
 7. **Live provider verification (NS-1):** real sends are unverified without live gateway credentials; adapters fail closed by design.
+8. **Build-time env inlining (deployment):** `dist/` bakes in whatever `.env` exists when `npm run build` runs (platform-owner email(s), Firebase project id, `VITE_USE_FIREBASE_EMULATOR`, default tenant). Build the production bundle with production values and confirm `VITE_USE_FIREBASE_EMULATOR=false`; documented in `docs/DEPLOYMENT.md` and `handoff.md`.

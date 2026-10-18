@@ -80,7 +80,7 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
   // Initial Principal credentials
   const [principalName, setPrincipalName] = useState('');
   const [principalEmail, setPrincipalEmail] = useState('');
-  const [principalPhone, setPrincipalPhone] = useState('+966500000000');
+  const [principalPhone, setPrincipalPhone] = useState('');
 
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });

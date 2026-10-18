@@ -82,7 +82,7 @@ export const UserEditModal: React.FC<Props> = ({
     onSave({
       name: name.trim(),
       email: email.trim(),
-      phone: phone.trim() || '+966500000000',
+      phone: phone.trim(),
       role,
       jobTitle: jobTitle.trim() || undefined,
       status,

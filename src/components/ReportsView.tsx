@@ -103,7 +103,7 @@ export const ReportsView: React.FC = () => {
           <td>${s.totalAbsences >= 8 ? 'حرج (8+ أيام - إنذار نهائي)' : s.totalAbsences >= 5 ? 'مرتفع (5+ أيام - إنذار ثان)' : s.totalAbsences >= 3 ? 'تنبيه أولي' : 'منضبط'}</td>
           <td>${s.guardianName}</td>
           <td dir="ltr">${s.guardianPhone}</td>
-          <td>${s.bloodType || 'O+'}</td>
+          <td>${s.bloodType || ''}</td>
         </tr>
       `
       )
@@ -220,7 +220,7 @@ export const ReportsView: React.FC = () => {
       `"${s.totalAbsences >= 8 ? 'حرج (8+ أيام)' : s.totalAbsences >= 5 ? 'مرتفع (5+ أيام)' : 'طبيعي'}"`,
       `"${s.guardianName}"`,
       `"${s.guardianPhone}"`,
-      `"${s.bloodType || 'O+'}"`,
+      `"${s.bloodType || ''}"`,
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');

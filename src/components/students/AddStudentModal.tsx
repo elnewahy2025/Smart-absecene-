@@ -46,7 +46,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const [guardianName, setGuardianName] = useState('');
   const [guardianPhone, setGuardianPhone] = useState(dialCode);
   const [guardianRelationship, setGuardianRelationship] = useState('الأب');
-  const [bloodType, setBloodType] = useState('O+');
+  const [bloodType, setBloodType] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -271,6 +271,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                 onChange={(e) => setBloodType(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white"
               >
+                <option value="">{isAr ? 'غير محدد' : 'Unspecified'}</option>
                 {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bt) => (
                   <option key={bt} value={bt}>{bt}</option>
                 ))}

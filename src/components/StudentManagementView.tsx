@@ -350,8 +350,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       const grade = parts[colIndices.grade] || classesStats[0]?.grade || 'المرحلة الدراسية';
       const className = parts[colIndices.className] || classesStats[0]?.className || 'غير محدد';
       const guardianName = parts[colIndices.guardianName] || 'ولي أمر الطالب';
-      const guardianPhone = parts[colIndices.guardianPhone] || '+966500000000';
-      const bloodType = parts[colIndices.bloodType] || 'O+';
+      const guardianPhone = parts[colIndices.guardianPhone] || '';
+      const bloodType = parts[colIndices.bloodType] || '';
 
       const normalizedClass = className.replace(/\s+/g, '').toLowerCase();
       const matchedConfiguredClass = approvedClasses.find(
@@ -713,7 +713,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                       <td className="py-3 px-4 font-mono text-slate-600" dir="ltr">{s.guardianPhone}</td>
                       <td className="py-3 px-4">
                         <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700 font-bold">
-                          {s.bloodType || 'O+'}
+                          {s.bloodType || ''}
                         </span>
                       </td>
                       <td className="py-3 px-4">

@@ -335,7 +335,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                       tenantId: currentTenant.id,
                       name: cred.user.displayName || cred.user.email?.split('@')[0] || 'مستخدم معتمد',
                       role: selectedRole,
-                      phone: cred.user.phoneNumber || '+966500000000',
+                      phone: cred.user.phoneNumber || '',
                       email: cred.user.email || '',
                       status: 'active',
                     } as UserProfile);
