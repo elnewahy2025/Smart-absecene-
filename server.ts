@@ -194,12 +194,17 @@ app.post(
 
     const executablePath = getSystemChromePath();
 
-    // Chromium's sandbox stays enabled. Container hosts must permit it (non-root
-    // user with user namespaces); do not reintroduce --no-sandbox.
+    // Chromium's sandbox is enabled by default. Some container hosts (e.g. hardened
+    // runtimes without user-namespace support) cannot start the sandboxed renderer;
+    // operators can opt out explicitly with PUPPETEER_NO_SANDBOX=true. Only the PDF
+    // renderer is affected, and only requests to the print stylesheet / webfonts are
+    // reachable from it (everything else is aborted).
+    const disableSandbox = process.env.PUPPETEER_NO_SANDBOX === 'true';
     browser = await puppeteer.launch({
       executablePath,
       headless: true,
       args: [
+        ...(disableSandbox ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--font-render-hinting=medium',

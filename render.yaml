@@ -20,6 +20,11 @@ services:
       - key: VITE_USE_FIREBASE_EMULATOR
         value: "false"
 
+      # Chromium sandbox. Leave "false"; if PDF generation fails on this host with
+      # a sandbox/namespace error, set this to "true" for the PDF renderer only.
+      - key: PUPPETEER_NO_SANDBOX
+        value: "false"
+
       # --- secrets / per-deployment values: set these in the dashboard ---
       - key: FIREBASE_SERVICE_ACCOUNT_BASE64
         sync: false
