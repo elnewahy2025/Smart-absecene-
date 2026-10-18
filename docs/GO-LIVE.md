@@ -1,13 +1,33 @@
 # Go-Live Runbook (beginner-friendly)
 
-Hosting target: **Render — free Docker web service.** Everything that can be scripted
-already is; the steps that remain need **your** Google account, because they create secrets
-only you can make.
+Hosting targets: **Vercel (recommended — no card required)** or **Render (free Docker web
+service, which now prompts for a card)**. Everything that can be scripted already is; the
+steps that remain need **your** Google account, because they create secrets only you can make.
 
-> Free tier note: the service sleeps after inactivity, so the first visit of the day takes
-> ~30–60 seconds to wake. That is normal.
+> Cold-start note: Render's free tier sleeps after inactivity (~30–60 s to wake). Vercel
+> functions cold-start too (~1–3 s; the first PDF export is slower while Chromium unpacks).
 
 ---
+
+## Step 0 — Vercel (recommended)
+
+`vercel.json`, `api/[...path].ts` and serverless Chromium support are already committed, so
+Vercel needs no code changes.
+
+1. Sign up at <https://vercel.com/signup> with GitHub (Hobby needs no credit card).
+2. **Add New → Project** → import `elnewahy2025/Smart-absecene-`. Vercel reads `vercel.json`:
+   build `npm run build`, output `dist`, function `api/[...path].ts`.
+3. Add the environment variables from `.env.production`, plus these two:
+   - `PUPPETEER_SKIP_DOWNLOAD=1` — build-time only; stops Chromium downloading during install.
+   - `TRUST_PROXY=1` — Vercel proxies every request.
+   - Do **not** add `NODE_ENV` (it would skip devDependencies and break the build).
+4. **Deploy**, then add the `*.vercel.app` domain under Firebase → Authentication → Settings →
+   Authorized domains, and sign in.
+
+> Vercel Hobby terms allow non-commercial use only; a paid school SaaS may need the Pro plan.
+
+---
+
 
 ## What is already done for you
 
