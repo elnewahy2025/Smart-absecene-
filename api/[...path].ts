@@ -10,16 +10,29 @@ export default async function handler(req: any, res: any) {
   let app: any;
   let prepareRuntime: any;
   try {
-    const serverModule: any = await import('../server.ts');
+    // Vercel emits the entry as .js, and TS/ESM specifiers must point at the
+    // emitted file, so reference the compiled server module as server.js.
+    const serverModule: any = await import('../server.js');
     app = serverModule.app;
     prepareRuntime = serverModule.prepareRuntime;
     await prepareRuntime();
   } catch (error: any) {
     console.error('[VERCEL_BOOT_ERROR]', error);
+    let listing: string[] = [];
+    let serverFiles: string[] = [];
+    try {
+      const fs: any = await import('node:fs');
+      listing = fs.readdirSync('/var/task').slice(0, 40);
+      serverFiles = listing.filter((name: string) => name.startsWith('server'));
+    } catch (listError: any) {
+      listing = [`<listing failed: ${listError?.message}>`];
+    }
     res.status(500).json({
       code: 'FUNCTION_BOOT_ERROR',
       name: error?.name,
       message: String(error?.message || error).slice(0, 600),
+      serverFiles,
+      taskRoot: listing,
     });
     return;
   }
