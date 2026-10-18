@@ -4,12 +4,19 @@ import { School, Plus, Trash2, Edit2, Check, X, DoorOpen, Users, CheckCircle2 } 
 
 interface Props {
   classes: SchoolClassConfig[];
+  educationalGrades?: string[];
   onChange: (classes: SchoolClassConfig[]) => void;
   onAutoSave?: (classes: SchoolClassConfig[]) => Promise<void> | void;
   disabled?: boolean;
 }
 
-export const ClassesManagementCard: React.FC<Props> = ({ classes, onChange, onAutoSave, disabled }) => {
+export const ClassesManagementCard: React.FC<Props> = ({
+  classes,
+  educationalGrades = [],
+  onChange,
+  onAutoSave,
+  disabled,
+}) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [gradeInput, setGradeInput] = useState('');
@@ -21,7 +28,7 @@ export const ClassesManagementCard: React.FC<Props> = ({ classes, onChange, onAu
   // New class modal / inline row
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newGrade, setNewGrade] = useState('الصف العاشر');
+  const [newGrade, setNewGrade] = useState(educationalGrades[0] || 'الصف العاشر');
   const [newRoom, setNewRoom] = useState('');
   const [newCapacity, setNewCapacity] = useState<number>(35);
 
@@ -142,14 +149,28 @@ export const ClassesManagementCard: React.FC<Props> = ({ classes, onChange, onAu
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">الصف / المرحلة الدراسية</label>
-              <input
-                type="text"
-                value={newGrade}
-                onChange={(e) => setNewGrade(e.target.value)}
-                placeholder="الصف العاشر"
-                className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              />
+              <label className="text-slate-600 block mb-1">الصف / المرحلة الدراسية *</label>
+              {educationalGrades.length > 0 ? (
+                <select
+                  value={newGrade}
+                  onChange={(e) => setNewGrade(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 font-medium"
+                >
+                  {educationalGrades.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={newGrade}
+                  onChange={(e) => setNewGrade(e.target.value)}
+                  placeholder="الصف العاشر"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
+                />
+              )}
             </div>
             <div>
               <label className="text-slate-600 block mb-1">القاعة / الغرفة الصفية</label>
@@ -228,12 +249,29 @@ export const ClassesManagementCard: React.FC<Props> = ({ classes, onChange, onAu
                           />
                         </td>
                         <td className="p-2">
-                          <input
-                            type="text"
-                            value={gradeInput}
-                            onChange={(e) => setGradeInput(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-800"
-                          />
+                          {educationalGrades.length > 0 ? (
+                            <select
+                              value={gradeInput}
+                              onChange={(e) => setGradeInput(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-800 font-medium"
+                            >
+                              {!educationalGrades.includes(gradeInput) && gradeInput && (
+                                <option value={gradeInput}>{gradeInput} (مخصص)</option>
+                              )}
+                              {educationalGrades.map((g) => (
+                                <option key={g} value={g}>
+                                  {g}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={gradeInput}
+                              onChange={(e) => setGradeInput(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-800"
+                            />
+                          )}
                         </td>
                         <td className="p-2">
                           <input

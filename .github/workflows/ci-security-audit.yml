@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -25,13 +25,7 @@ jobs:
         run: npm run lint
 
       - name: Secret scan
-        run: |
-          grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" . --exclude-dir=.git --exclude-dir=node_modules || true
-          if grep -RInE "(AIza|ghp_|github_pat_|AKIA|sk_live|BEGIN PRIVATE KEY|GEMINI_API_KEY=\"[A-Za-z0-9_\-]+\")" . --exclude-dir=.git --exclude-dir=node_modules >/tmp/secret-scan.txt; then
-            echo "Secrets detected in repository text. Fix before merge."
-            cat /tmp/secret-scan.txt
-            exit 1
-          fi
+        run: node scripts/ci-security-audit.mjs
 
       - name: Env file protection check
         run: |
@@ -49,6 +43,3 @@ jobs:
 
       - name: Run automated unit tests
         run: npm run test
-
-      - name: Security audit script
-        run: node scripts/ci-security-audit.mjs

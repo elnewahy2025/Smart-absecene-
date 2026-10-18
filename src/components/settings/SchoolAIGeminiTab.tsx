@@ -170,7 +170,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
   const handleDeleteKey = async () => {
     if (!canManageSettings) return;
     const confirmMsg = lang === 'ar'
-      ? 'هل أنت متأكد من رغبتك في حذف مفتاح المدرسة الخاص؟ سيعود النظام إلى سياسة المفتاح الافتراضي أو المحاكي.'
+      ? 'هل أنت متأكد من رغبتك في حذف مفتاح المدرسة الخاص؟ سيعود النظام إلى سياسة المفتاح الافتراضي للنظام (إن وُجد).'
       : 'Are you sure you want to remove this school custom key?';
     if (!window.confirm(confirmMsg)) return;
 
@@ -240,7 +240,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
               <Sliders className="w-4 h-4 text-slate-500" />
-              <span>{lang === 'ar' ? 'المحاكي الداخلي الذكي' : 'Intelligent Offline Simulator'}</span>
+              <span>{lang === 'ar' ? 'غير مهيأ — ميزات الذكاء الاصطناعي معطّلة' : 'Not configured — AI features disabled'}</span>
             </span>
           )}
         </div>
@@ -300,11 +300,11 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
           <div className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between">
             <span>
               {lang === 'ar'
-                ? 'لم تقم هذه المدرسة بإدخال مفتاحها الخاص حتى الآن. يعتمد النظام على اشتراك النظام العام أو المحاكي.'
+                ? 'لم تقم هذه المدرسة بإدخال مفتاحها الخاص حتى الآن. يعتمد النظام على اشتراك النظام العام فقط.'
                 : 'No custom key set for this school yet.'}
             </span>
             <span className="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">
-              {systemHasFallback ? 'مفتاح النظام العام' : 'المحاكي المحلي'}
+              {systemHasFallback ? 'مفتاح النظام العام' : 'غير مهيأ'}
             </span>
           </div>
         )}
@@ -448,7 +448,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
           <li className="flex items-start gap-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
             <span className="text-emerald-600 font-bold">✓</span>
             <span>
-              <strong>{lang === 'ar' ? 'استمرارية الخدمة (High Availability):' : 'High Availability:'}</strong> {lang === 'ar' ? 'في حال انتهاء حصة المفتاح، يتحول المساعد تلقائياً للبديل أو المحاكي دون انقطاع.' : 'Graceful fallback to simulator if quota exhausted.'}
+              <strong>{lang === 'ar' ? 'استمرارية الخدمة (High Availability):' : 'High Availability:'}</strong> {lang === 'ar' ? 'في حال انتهاء حصة المفتاح، يتحول المساعد تلقائياً لمفتاح النظام البديل إن كان مهيأً.' : 'Falls back to the system key when a school key quota is exhausted.'}
             </span>
           </li>
         </ul>

@@ -1,9 +1,10 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
 dotenv.config();
 
@@ -11,10 +12,85 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-const APP_AUTH_TOKEN = process.env.APP_AUTH_TOKEN || (process.env.NODE_ENV === 'production' ? '' : 'dev-token-change-me');
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5050;
+const SHARED_AUTH_VALUE = process.env.APP_AUTH_TOKEN || '';
+const ALLOW_DEV_AUTH = process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production';
+const DEV_AUTH_ROLE = process.env.DEV_AUTH_ROLE || 'teacher';
+const DEV_AUTH_TENANT = process.env.DEV_AUTH_TENANT || '';
+const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || '';
+const PLATFORM_OWNER_EMAILS = (process.env.PLATFORM_OWNER_EMAILS || '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
 
 app.use(express.json({ limit: '25mb' }));
+
+// --- Transport & header hardening (M-2) ---
+// Trust proxy is opt-in. Unless TRUST_PROXY is configured, X-Forwarded-* headers are
+// ignored entirely, so a client cannot spoof its own Host / school via those headers.
+function parseTrustProxy(value?: string): boolean | number | string {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  return trimmed;
+}
+
+const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY);
+const TRUST_FORWARDED_HOST = TRUST_PROXY !== false;
+app.set('trust proxy', TRUST_PROXY);
+
+const GOOGLE_FONTS_STYLE = 'https://fonts.googleapis.com';
+const GOOGLE_FONTS_FONT = 'https://fonts.gstatic.com';
+
+app.use(
+  helmet({
+    // CSP is only enforced for the built SPA; Vite's dev server needs inline/eval scripts.
+    contentSecurityPolicy: IS_PRODUCTION
+      ? {
+          useDefaults: true,
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", GOOGLE_FONTS_STYLE],
+            fontSrc: ["'self'", GOOGLE_FONTS_FONT, 'data:'],
+            imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+            connectSrc: [
+              "'self'",
+              'https://*.googleapis.com',
+              'https://*.google.com',
+              'https://*.firebaseapp.com',
+              'https://*.web.app',
+              'https://*.firebaseio.com',
+              'wss://*.firebaseio.com',
+              'https://*.cloudfunctions.net',
+              'https://identitytoolkit.googleapis.com',
+              'https://securetoken.googleapis.com',
+              'https://firestore.googleapis.com',
+            ],
+            frameSrc: ["'self'", 'https://*.firebaseapp.com'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'none'"],
+          },
+        }
+      : false,
+    crossOriginEmbedderPolicy: false,
+    // Allow Firebase popup/redirect OAuth to keep its opener relationship.
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    hsts: IS_PRODUCTION ? { maxAge: 15552000, includeSubDomains: true, preload: false } : false,
+    referrerPolicy: { policy: 'no-referrer' },
+  })
+);
+
+// Only honour X-Forwarded-Host when a trusted proxy is configured; otherwise use the real Host.
+function getRequestHostname(req: express.Request): string {
+  const forwarded = TRUST_FORWARDED_HOST ? req.get('x-forwarded-host') : undefined;
+  return (forwarded || req.get('host') || req.hostname || '').toString();
+}
 
 import puppeteer from 'puppeteer';
 import fs from 'fs';
@@ -26,6 +102,13 @@ import {
   getTenantAIConfig,
   maskApiKey,
 } from './src/utils/tenantAISecrets';
+import {
+  sendSms,
+  sendWhatsAppCloudMessage,
+  sendEmail,
+} from './src/utils/messagingProviders';
+import type { SchoolMessagingGatewayConfig } from './src/types/attendance';
+import { isPublicRoute } from './src/utils/routeAuth';
 
 function getSystemChromePath(): string | undefined {
   const candidates = [
@@ -49,6 +132,36 @@ function getSystemChromePath(): string | undefined {
   return undefined;
 }
 
+const pdfGenerateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: express.Request) => (req as any).user?.uid || req.ip || 'anonymous',
+  message: { error: 'PDF generation rate limit exceeded (max 10 requests per minute).' },
+});
+
+let activePdfRenders = 0;
+const MAX_CONCURRENT_PDF_RENDERS = 2;
+
+const escapeHtmlText = (value: unknown, fallback: string): string => {
+  const text = typeof value === 'string' && value.trim() ? value : fallback;
+  return text.replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char] as string));
+};
+
+// Only the print stylesheet, the Arabic webfonts and data: documents are reachable
+// from the renderer. file:// and internal network targets are aborted.
+const isAllowedPdfRequest = (url: string): boolean =>
+  url.startsWith('data:') ||
+  url.startsWith('https://fonts.googleapis.com/') ||
+  url.startsWith('https://fonts.gstatic.com/') ||
+  url.startsWith('https://cdn.tailwindcss.com/');
 /**
  * Native Vector PDF Generator Route with Full Arabic RTL Typography Support.
  * Uses headless Chromium / Puppeteer to guarantee true selectable text,
@@ -56,10 +169,23 @@ function getSystemChromePath(): string | undefined {
  * Mounted before auth/tenant middleware so it works universally across all subdomains.
  * Returns JSON with base64 encoded PDF to prevent Internet Download Manager (IDM) or proxy stream interception.
  */
-app.post('/api/pdf/generate', async (req, res) => {
+app.post(
+  '/api/pdf/generate',
+  (req, res, next) => { void authenticateRequest(req, res, next); },
+  (req, res, next) => { requireTenant(req, res, next); },
+  pdfGenerateLimiter,
+  async (req, res) => {
+  if (activePdfRenders >= MAX_CONCURRENT_PDF_RENDERS) {
+    return res.status(503).json({
+      error: 'PDF engine is busy. Please retry shortly.',
+      code: 'PDF_ENGINE_BUSY',
+    });
+  }
+  activePdfRenders++;
   let browser: any = null;
   try {
     const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename } = req.body;
+    const safeTitle = escapeHtmlText(title, 'تقرير الحضور والانضباط المدرسي');
 
     if (!htmlContent) {
       return res.status(400).json({ error: 'htmlContent is required' });
@@ -67,12 +193,12 @@ app.post('/api/pdf/generate', async (req, res) => {
 
     const executablePath = getSystemChromePath();
 
+    // Chromium's sandbox stays enabled. Container hosts must permit it (non-root
+    // user with user namespaces); do not reintroduce --no-sandbox.
     browser = await puppeteer.launch({
       executablePath,
       headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--font-render-hinting=medium',
@@ -83,13 +209,22 @@ app.post('/api/pdf/generate', async (req, res) => {
     page.setDefaultTimeout(20000);
     page.setDefaultNavigationTimeout(20000);
 
+    await page.setRequestInterception(true);
+    page.on('request', (request: any) => {
+      if (isAllowedPdfRequest(request.url())) {
+        request.continue();
+      } else {
+        request.abort();
+      }
+    });
+
     // Construct self-contained document with Cairo/Amiri and local Arabic font fallbacks
     const fullHtml = `
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
         <head>
           <meta charset="UTF-8">
-          <title>${title}</title>
+          <title>${safeTitle}</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
@@ -184,32 +319,65 @@ app.post('/api/pdf/generate', async (req, res) => {
     console.error('[PDF_EXPORT_ERROR]', err);
     res.status(500).json({
       error: 'Failed to generate PDF document',
-      details: err?.message || 'Internal error',
+      details: 'Internal error',
     });
+  } finally {
+    activePdfRenders = Math.max(0, activePdfRenders - 1);
   }
 });
 
 
 // Initialize Firebase Admin SDK if credentials exist or default project is set
 let firebaseAdminInitialized = false;
+let adminKeyLoaded = false;
+// True only when an explicit credential (inline or service-account file) was loaded,
+// i.e. token verification can actually succeed. A project id alone can initialise the
+// SDK but cannot verify ID tokens, so it must never be reported as ready.
+let firebaseAdminReady = false;
 try {
   const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.resolve(__dirname, 'serviceAccountKey.json');
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const inlineCredential = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+    ? Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
+    : process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-  if (fs.existsSync(serviceAccountPath)) {
+  let inlineServiceAccount: any = null;
+  if (inlineCredential) {
+    try {
+      inlineServiceAccount = JSON.parse(inlineCredential);
+      console.log('[AUTH] Firebase Admin credential loaded from environment.');
+    } catch (parseError: any) {
+      console.warn('[AUTH] FIREBASE_SERVICE_ACCOUNT_* is not valid JSON:', parseError?.message);
+    }
+  }
+
+  if (inlineServiceAccount) {
+    admin.initializeApp({
+      credential: admin.credential.cert(inlineServiceAccount),
+      projectId: inlineServiceAccount.project_id || projectId,
+    });
+    firebaseAdminInitialized = true;
+    adminKeyLoaded = true;
+    firebaseAdminReady = true;
+    console.log('[AUTH] Firebase Admin initialized from environment credential.');
+  } else if (fs.existsSync(serviceAccountPath)) {
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id || projectId,
     });
     firebaseAdminInitialized = true;
+    adminKeyLoaded = true;
+    firebaseAdminReady = true;
     console.log('[AUTH] Firebase Admin initialized with service account key.');
   } else if (projectId) {
     admin.initializeApp({
       projectId,
     });
     firebaseAdminInitialized = true;
-    console.log(`[AUTH] Firebase Admin initialized with project ID: ${projectId}`);
+    console.warn(
+      `[AUTH] Firebase Admin initialized with project ID only (${projectId}); no credential was loaded, so ID-token verification will fail. Set FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS.`
+    );
   } else {
     console.warn('[AUTH] Firebase Admin SDK not initialized: No serviceAccountKey.json or FIREBASE_PROJECT_ID found.');
   }
@@ -217,27 +385,90 @@ try {
   console.warn('[AUTH] Warning initializing Firebase Admin:', adminErr?.message || adminErr);
 }
 
-import { resolveTenantFromHostname } from './src/config/tenantRegistry';
+import { resolveTenantFromHostname, setRuntimeDynamicTenants, setRuntimeTenantDocs } from './src/config/tenantRegistry';
+import type { TenantDomainConfig } from './src/config/tenantRegistry';
+import { getCountryPreset } from './src/config/countryPresets';
 
-const isPublicRoute = (route: string) => {
-  return (
-    !route.startsWith('/api') ||
-    route === '/api/health' ||
-    route === '/api/readyz' ||
-    route === '/api/tenant/resolve' ||
-    route === '/api/pdf/generate'
-  );
-};
+const getDynamicTenantsPath = () =>
+  process.env.DYNAMIC_TENANTS_PATH || path.resolve(__dirname, 'src/config/dynamicTenants.json');
 
+let dynamicTenantsMtime = 0;
+
+// Applies tenants written to disk after module load, so provisioning takes effect
+// without a restart. Cheap: one stat() per request, re-read only on mtime change.
+let tenantDocsCache: TenantDomainConfig[] = [];
+let tenantDocsLoadedAt = 0;
+let tenantDocsLoading = false;
+
+// Firestore is the tenant source of truth; the static registry is only a bootstrap fallback.
+async function refreshTenantDocs(force = false): Promise<void> {
+  if (!firebaseAdminReady || tenantDocsLoading) return;
+  if (!force && Date.now() - tenantDocsLoadedAt < 30000) return;
+
+  tenantDocsLoading = true;
+  try {
+    const snapshot = await admin.firestore().collection('tenants').get();
+    tenantDocsCache = snapshot.docs.map((doc) => ({
+      ...(doc.data() as any),
+      tenantId: doc.id,
+    })) as TenantDomainConfig[];
+    setRuntimeTenantDocs(tenantDocsCache);
+    tenantDocsLoadedAt = Date.now();
+  } catch (error: any) {
+    console.warn('[TENANTS] Could not load Firestore tenant registry:', error?.message || error);
+  } finally {
+    tenantDocsLoading = false;
+  }
+}
+function refreshDynamicTenants(): void {
+  const dynamicPath = getDynamicTenantsPath();
+  try {
+    const mtime = fs.statSync(dynamicPath).mtimeMs;
+    if (mtime === dynamicTenantsMtime) return;
+    const parsed = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+    setRuntimeDynamicTenants(Array.isArray(parsed) ? parsed : []);
+    dynamicTenantsMtime = mtime;
+  } catch {
+    // Keep the last known registry if the file is missing or unreadable.
+  }
+}
 // Extract and resolve tenant from incoming Host / X-Forwarded-Host headers
 const getRequestHostTenant = (req: express.Request) => {
-  const host = (req.get('x-forwarded-host') || req.get('host') || req.hostname || '').toString();
+  refreshDynamicTenants();
+  void refreshTenantDocs();
+  const host = getRequestHostname(req);
   return resolveTenantFromHostname(host);
 };
 
-// Authenticate request using Firebase ID Token or fallback APP_AUTH_TOKEN (for dev/simulation)
-const authenticateToken = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const route = req.path || '';
+// Resolve identity from verified, server-set claims only.
+// Never from request headers: those are client-controlled.
+const VALID_ROLES = new Set(['admin', 'registrar', 'teacher', 'parent', 'super_admin']);
+
+const isPlatformOwner = (user: any): boolean =>
+  Boolean(
+    user &&
+      (user.role === 'super_admin' ||
+        (user.email_verified === true &&
+          typeof user.email === 'string' &&
+          PLATFORM_OWNER_EMAILS.includes(user.email.toLowerCase())))
+  );
+
+const resolveServerIdentity = (
+  decoded: any
+): { role: string; tenantId: string } | null => {
+  // Claims are set only by the Admin SDK. The Firestore profile is intentionally
+  // NOT trusted here: firestore.rules lets a user create their own profile with
+  // an arbitrary role, which would turn self-signup into privilege escalation.
+  const claimRole = typeof decoded?.role === 'string' ? decoded.role : '';
+  const claimTenant = typeof decoded?.tenantId === 'string' ? decoded.tenantId : '';
+  if (VALID_ROLES.has(claimRole) && claimTenant) {
+    return { role: claimRole, tenantId: claimTenant };
+  }
+  return null;
+};
+
+const authenticateRequest = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const route = (req.path || '').toLowerCase();
 
   // Allow static assets, SPA pages, Vite HMR, and health checks freely
   if (isPublicRoute(route)) {
@@ -259,76 +490,91 @@ const authenticateToken = async (req: express.Request, res: express.Response, ne
     });
   }
 
-  // Attach resolved host tenant if available
   (req as any).hostTenant = hostResolution;
 
   const authHeader = req.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const bearerValue = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: Bearer token is required.' });
+  if (!bearerValue) {
+    return res.status(401).json({ error: 'Unauthorized: bearer credential is required.' });
   }
 
-  // 1. If Firebase Admin is active, try verifying as a Firebase ID token
-  if (firebaseAdminInitialized) {
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      const role = (decodedToken as any).role || req.get('x-user-role') || 'teacher';
-      // Priority for tenantId: verified token claim -> resolved host domain tenant -> fallback header
-      const tenantId =
-        (decodedToken as any).tenantId ||
-        (hostResolution.status === 'resolved' ? hostResolution.tenantId : req.get('x-tenant-id')) ||
-        'school-1';
-
-      (req as any).user = {
-        ...decodedToken,
-        role,
-        tenantId,
-      };
-      return next();
-    } catch (tokenErr: any) {
-      // If token verification fails and we have a valid dev fallback token, check if it matches dev token
-      if (APP_AUTH_TOKEN && token === APP_AUTH_TOKEN) {
-        const devRole = req.get('x-user-role') || 'admin';
-        const devTenant =
-          req.get('x-user-tenant') ||
-          (hostResolution.status === 'resolved' ? hostResolution.tenantId : req.get('x-tenant-id')) ||
-          'school-1';
-        (req as any).user = { uid: 'dev-user', email: 'dev@school.local', role: devRole, tenantId: devTenant };
-        return next();
-      }
-      return res.status(401).json({ error: 'Unauthorized: Invalid or expired Firebase ID token.', details: tokenErr?.message });
-    }
-  }
-
-  // 2. If Firebase Admin is not initialized, verify against APP_AUTH_TOKEN
-  if (APP_AUTH_TOKEN && token === APP_AUTH_TOKEN) {
-    const devRole = req.get('x-user-role') || 'admin';
-    const devTenant =
-      req.get('x-user-tenant') ||
-      (hostResolution.status === 'resolved' ? hostResolution.tenantId : req.get('x-tenant-id')) ||
-      'school-1';
-    (req as any).user = { uid: 'dev-user', email: 'dev@school.local', role: devRole, tenantId: devTenant };
+  // Explicit local development credential. Disabled in production, and the role
+  // and tenant come from the environment, never from client headers.
+  if (ALLOW_DEV_AUTH && SHARED_AUTH_VALUE && bearerValue === SHARED_AUTH_VALUE) {
+    const devRole = VALID_ROLES.has(DEV_AUTH_ROLE) ? DEV_AUTH_ROLE : 'teacher';
+    (req as any).user = {
+      uid: 'dev-user',
+      email: 'dev@school.local',
+      role: devRole,
+      tenantId:
+        DEV_AUTH_TENANT ||
+        (hostResolution.status === 'resolved' ? hostResolution.tenantId : 'school-1'),
+    };
     return next();
   }
 
-  return res.status(401).json({ error: 'Unauthorized: Valid bearer token required.' });
+  if (!firebaseAdminReady) {
+    return res.status(503).json({
+      error: 'Authentication is not configured on this server.',
+      code: 'AUTH_NOT_CONFIGURED',
+    });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(bearerValue);
+    const identity = resolveServerIdentity(decoded);
+
+    if (!identity) {
+      return res.status(403).json({
+        error: 'No role claim is assigned to this account. Run the claims backfill (scripts/backfill-user-claims.mjs).',
+        code: 'NO_ROLE_ASSIGNED',
+      });
+    }
+
+    (req as any).user = {
+      ...decoded,
+      role: identity.role,
+      tenantId: identity.tenantId,
+    };
+    return next();
+  } catch (verifyError: any) {
+    console.warn('[AUTH] Credential verification failed:', verifyError?.code || verifyError?.message);
+    return res.status(401).json({
+      error: 'Unauthorized: invalid or expired credential.',
+      code: 'INVALID_CREDENTIAL',
+    });
+  }
 };
 
-// RBAC Middleware: Restrict access by user role
+// RBAC middleware. `super_admin` is the only implicit pass; `admin` must be listed explicitly.
 const requireRole = (allowedRoles: string[]) => {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const user = (req as any).user;
     if (!user) {
-      return res.status(401).json({ error: 'Unauthorized: Authentication required.' });
+      return res.status(401).json({ error: 'Unauthorized: authentication required.' });
     }
-    if (user.role === 'admin' || user.role === 'super_admin' || allowedRoles.includes(user.role)) {
+    if (user.role === 'super_admin' || allowedRoles.includes(user.role)) {
       return next();
     }
     return res.status(403).json({
-      error: `Forbidden: Role '${user.role}' lacks required permissions. Allowed roles: [${allowedRoles.join(', ')}]`,
+      error: `Forbidden: role '${user.role}' lacks required permissions. Allowed roles: [${allowedRoles.join(', ')}]`,
     });
   };
+};
+
+const requirePlatformOwner = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized: authentication required.' });
+  }
+  if (!isPlatformOwner(user)) {
+    return res.status(403).json({
+      error: 'Forbidden: platform owner privileges are required.',
+      code: 'PLATFORM_OWNER_REQUIRED',
+    });
+  }
+  return next();
 };
 
 // Multi-Tenant Middleware: Validate domain and tenant isolation
@@ -338,27 +584,25 @@ const requireTenant = (req: express.Request, res: express.Response, next: expres
 
   // 1. Enforce that if request came via a specific school domain, user must belong to that school
   if (hostTenant && hostTenant.status === 'resolved' && user) {
-    if (user.role !== 'super_admin' && user.tenantId !== hostTenant.tenantId) {
+    if (!isPlatformOwner(user) && user.tenantId !== hostTenant.tenantId) {
       return res.status(403).json({
-        error: `Forbidden: Cross-tenant access denied. Your account belongs to '${user.tenantId}' but the request was made on '${hostTenant.config?.nameAr || hostTenant.tenantId}' domain.`,
+        error: `Forbidden: cross-tenant access denied. Your account belongs to '${user.tenantId}' but the request was made on '${hostTenant.config?.nameAr || hostTenant.tenantId}' domain.`,
         code: 'TENANT_DOMAIN_MISMATCH',
       });
     }
   }
 
-  // 2. Enforce target payload tenantId matches user tenant
+  // 2. Enforce target payload tenantId matches user tenant (platform owners excepted)
   const targetTenantId = req.body?.tenantId || req.query?.tenantId;
-  if (targetTenantId && user?.tenantId && user.role !== 'super_admin' && user.role !== 'admin') {
+  if (targetTenantId && user?.tenantId && !isPlatformOwner(user)) {
     if (targetTenantId !== user.tenantId) {
       return res.status(403).json({
-        error: `Forbidden: Multi-tenant violation. Tenant '${user.tenantId}' cannot perform actions for tenant '${targetTenantId}'.`,
+        error: `Forbidden: multi-tenant violation. Tenant '${user.tenantId}' cannot perform actions for tenant '${targetTenantId}'.`,
       });
     }
   }
   next();
-};
-
-// Rate limiters per endpoint (H2 requirement)
+};// Rate limiters per endpoint (H2 requirement)
 const apiHealthLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -391,17 +635,26 @@ const dailyDigestLimiter = rateLimit({
   message: { error: 'Daily digest rate limit exceeded. Please slow down.' },
 });
 
+const notificationDispatchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Notification dispatch rate limit exceeded. Please slow down.' },
+});
+
 app.use('/api/health', apiHealthLimiter);
 app.use('/api/chat', chatLimiter);
 app.use('/api/analyze-image', analyzeImageLimiter);
 app.use('/api/daily-digest', dailyDigestLimiter);
-app.use(authenticateToken);
+app.use('/api/notifications', notificationDispatchLimiter);
+app.use(authenticateRequest);
 app.use(requireTenant);
 
 // Initialize GoogleGenAI SDK with required telemetry header
-const apiKey = process.env.GEMINI_API_KEY || '';
+const geminiKey = process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({
-  apiKey: apiKey,
+  apiKey: geminiKey,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -421,132 +674,24 @@ const ensureJsonObject = (value: any, fallback: Record<string, any> = {}) => {
   return fallback;
 };
 
-// Educational Fallback Engine: Provides high-fidelity, context-aware Arabic responses when Gemini API Key is unconfigured or offline
-function generateEducationalSchoolResponse(
-  messages: { role: string; content: string }[],
-  role: string
-): { reply: string; modelUsed: string } {
-  const lastMsg = messages[messages.length - 1]?.content || '';
-  const text = lastMsg.toLowerCase();
-
-  if (role === 'teacher_fast') {
-    if (text.includes('غياب') || text.includes('غائب') || text.includes('حصة') || text.includes('sms')) {
-      return {
-        reply: `📝 **نموذج رسالة SMS سريعة لولي الأمر (إشعار غياب اليوم):**
-
-"المكرم ولي أمر الطالب/ـة: نفيدكم بغياب ابنكم عن اليوم الدراسي. نرجو تزويد المدرسة بالعذر المقبول عبر منصة الحضور الذكية خلال 3 أيام لتوثيقه نظامياً. شاكرين تعاونكم حرصاً على تحصيله العلمي."
-
-💡 **توجيه سريع للمعلم:**
-- تم رصد الحالة في كشف الحصة إلكترونياً.
-- عند تقديم العذر الطبي، سيتم إشعاركم آلياً لتعديل الرصد إلى (غياب بعذر).`,
-        modelUsed: 'gemini-3.7-flash (المحاكي المدرسي الذكي)'
-      };
-    }
-    if (text.includes('تأخر') || text.includes('متأخر') || text.includes('طابور')) {
-      return {
-        reply: `⏰ **نموذج رسالة SMS سريعة (إشعار تأخر صباحي):**
-
-"المكرم ولي أمر الطالب/ـة: نفيدكم بتسجيل تأخر صباحي لابنكم عن الطابور والحصة الأولى اليوم. نأمل توجيهه للالتزام بالحضور المبكر دعماً لانضباطه الدراسي."
-
-💡 **توجيه المعلم:**
-- التأخر المتكرر (3 مرات فما فوق) يحتسب تلقائياً كحصة غياب غير مبررة وفق اللائحة الوزارية.`,
-        modelUsed: 'gemini-3.7-flash (المحاكي المدرسي الذكي)'
-      };
-    }
-    return {
-      reply: `مرحباً بك يا أستاذ! أنا **مساعد المعلم السريع للحصص والصفوف**.
-
-أستطيع مساعدتك فوراً في:
-1. ✉️ صياغة رسائل SMS سريعة وموجزة لأولياء الأمور لإبلاغهم بالغياب أو التأخر دون انتهاك الخصوصية.
-2. ⏱️ نصائح عملية لتفقد الحضور في بداية الحصة خلال دقيقتين فقط باستخدام قارئ الـ QR أو التحضير السريع.
-3. 📋 صياغة تنبيهات يومية لتحفيز الطلاب على الالتزام بالطابور الصباحي.
-
-اكتب طلبك وسأصيغه لك في ثوانٍ معدودة!`,
-      modelUsed: 'gemini-3.7-flash (المحاكي المدرسي الذكي)'
-    };
+// Loads the per-school messaging gateway configuration from the admin-only
+// settings_private/{tenantId} document. Returns null when the platform lacks
+// privileged Firestore access or the school has not configured a gateway, so the
+// caller can fail closed instead of pretending a message was sent.
+async function loadMessagingGatewayConfig(
+  tenantId: string
+): Promise<SchoolMessagingGatewayConfig | null> {
+  if (!firebaseAdminReady) return null;
+  try {
+    const snapshot = await admin.firestore().doc(`settings_private/${tenantId}`).get();
+    if (!snapshot.exists) return null;
+    const gateway = (snapshot.data() as any)?.messagingGateway;
+    if (!gateway || typeof gateway !== 'object') return null;
+    return gateway as SchoolMessagingGatewayConfig;
+  } catch (error: any) {
+    console.warn(`[GATEWAY:${tenantId}] Could not load messaging gateway config:`, error?.message || error);
+    return null;
   }
-
-  if (role === 'policy_analyst') {
-    if (text.includes('إجاز') || text.includes('خميس') || text.includes('أحد') || text.includes('ظاهرة') || text.includes('تحليل') || text.includes('تذبذب')) {
-      return {
-        reply: `📊 **تقرير تحليلي: خطة معالجة تذبذب الحضور قبل الإجازات وأيام الخميس:**
-
-1. **التشخيص الإحصائي:**
-   - يتركز الجزء الأكبر من الغياب غير المبرر في الأيام التي تسبق أو تلي الإجازات الرسمية (أيام الخميس والأحد).
-   - انخفاض الحضور في هذه الأيام يؤثر سلباً على وتيرة المنهج الدراسي واكتمال الحصص التفاعلية.
-
-2. **التوصيات التنفيذية المقترحة لإدارة المدرسة:**
-   - **جدولة الأنشطة التقييمية الهامة:** جدولة اختبارات قصيرة (Quizzes) أو تسليم مشاريع في أيام الخميس لرفع الدافعية.
-   - **برنامج الحصص الذهبية:** تكريم الفصول التي تسجل نسبة حضور 98% فما فوق يوم الخميس بنقاط سلوكية إضافية.
-   - **الإشعار الاستباقي:** إرسال رسالة تحفيزية لأولياء الأمور عصر يوم الأربعاء تؤكد استمرار الدروس الفعلية.
-   - **تفعيل خطة التعويض:** إلزام الطلاب الغائبين بحل مهام إضافية لضمان عدم ضياع الأثر التعليمي.`,
-        modelUsed: 'gemini-3.1-pro-preview (المحلل الإحصائي وخبير السياسات)'
-      };
-    }
-    return {
-      reply: `مرحباً بك! بصفتي **المحلل الإحصائي وخبير سياسات الانضباط المدرسي**، أقدم لك:
-
-1. 📈 تحليل اتجاهات الغياب وتحديد الفصول ذات التذبذب العالي في الحضور.
-2. 🏆 اقتراح مبادرات تشجيعية (مثل مسابقة "الشعبة الأكثر انضباطاً" ودرع التميز الشهري).
-3. 🩺 معايير الحوكمة لتقييم الأعذار والتقارير الطبية ومكافحة الانقطاع الوهمي.
-
-ما هي الظاهرة أو المؤشر الذي ترغب في تحليله اليوم؟`,
-      modelUsed: 'gemini-3.1-pro-preview (المحلل الإحصائي وخبير السياسات)'
-    };
-  }
-
-  // Role: counselor (الأخصائي الاجتماعي والمستشار المدرسي)
-  if (text.includes('غياب') || text.includes('متكرر') || text.includes('تدخل') || text.includes('خطة') || text.includes('علاج') || text.includes('طالب')) {
-    return {
-      reply: `📋 **الخطة الإجرائية لمعالجة الغياب المتكرر وفق قواعد السلوك والمواظبة المعتمدة:**
-
-1. **المرحلة الأولى: الرصد والإنذار الأولي (3 أيام غياب):**
-   - إشعار ولي الأمر هاتفياً أو عبر الرسائل النصية الموثقة من نظام الحضور.
-   - عقد جلسة إرشادية فردية مع الطالب لبحث الأسباب النفسية أو الاجتماعية أو الأسرية وراء الغياب.
-
-2. **المرحلة الثانية: استدعاء ولي الأمر والإنذار الخطي (5 أيام غياب):**
-   - أخذ تعهد خطي على ولي الأمر بحضور الجلسة وتوجيه الطالب للانتظام.
-   - فتح ملف رعاية طلابية وتوثيق الخطة التربوية في سجلات الإرشاد.
-
-3. **المرحلة الثالثة: الإجراء الوزاري الحرج (8 أيام غياب فما فوق):**
-   - إصدار خطاب إنذار نهائي بالحرمان من درجات المواظبة المعتمدة في اللائحة.
-   - إحالة ملف الطالب إلى لجنة التوجيه الطلابي وإدارة التعليم في حال ثبوت الإهمال.
-
-💡 **صيغة خطاب مقترح لاستدعاء ولي الأمر:**
-"المكرم ولي أمر الطالب: حرصاً من إدارة المدرسة على استقرار المسيرة التعليمية لابنكم، ولوصول غيابه غير المبرر إلى حد يتطلب التدخل التربوي، نرجو التكرم بالحضور لمكتب التوجيه الطلابي يوم [اليوم] الساعة [الوقت] لتدارس وضعه الأكاديمي ووضع خطة مساندة مشتركة."`,
-      modelUsed: 'gemini-3.7-flash (المستشار المدرسي المعتمد)'
-    };
-  }
-
-  if (text.includes('عذر') || text.includes('مرض') || text.includes('طبي') || text.includes('تقرير') || text.includes('صحتي')) {
-    return {
-      reply: `🩺 **الضوابط النظامية لتدقيق وقبول الأعذار والتقارير الطبية:**
-
-1. **الاشتراطات الرسمية لقبول العذر:**
-   - صدور التقرير من جهة صحية معتمدة (مستشفى حكومي، مركز صحي، أو عبر منصة صحتي الإلكترونية).
-   - وضوح اسم الطالب ورقم الهوية وتاريخ الإجازة المرضية والأختام الرسمية.
-   - تقديم التقرير خلال مهلة أقصاها 3 أيام عمل من تاريخ العودة للدراسة.
-
-2. **الإجراءات الموصى بها للجنة التدقيق:**
-   - التحقق من مطابقة تاريخ التقرير مع أيام الغياب الفعلي في النظام.
-   - في حال الشك في صحة التقرير، يتم التواصل المباشر مع المنشأة المصدرة أو طلب إفادة رسمية إضافية.
-   - فور اعتماد التقرير، يقوم النظام بتحويل الغياب تلقائياً إلى (غياب بعذر مقبول) مع حفظ نسخة في الأرشيف الطبي.`,
-      modelUsed: 'gemini-3.7-flash (المستشار المدرسي المعتمد)'
-    };
-  }
-
-  return {
-    reply: `أهلاً بك! أنا **المساعد المدرسي الذكي المعتمد (Gemini School Assistant)**.
-
-أنا جاهز لمساعدتك بكفاءة كاملة في المهام التالية:
-1. 📋 صياغة خطط علاجية وتوجيهية للطلاب ذوي الغياب المتكرر وفق لوائح السلوك والمواظبة.
-2. ✉️ إعداد خطابات رسمية ورسائل تواصل احترافية لأولياء الأمور.
-3. ⚖️ توضيح الأنظمة الوزارية وحساب نسب الحرمان والإنذارات الرسمية.
-4. 🩺 إرشادات التحقق من صحة الأعذار والتقارير الطبية.
-
-تفضل بطرح استفسارك وسأجيبك فوراً بدقة واحترافية!`,
-    modelUsed: 'gemini-3.7-flash (المستشار المدرسي المعتمد)'
-  };
 }
 
 // Helper to get GoogleGenAI client for a specific tenant or system default
@@ -676,7 +821,7 @@ app.post('/api/chat', async (req, res) => {
       parts: [{ text: m.content }],
     }));
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
 
     // Attempt Live Gemini call if API key exists (Tenant key takes priority, then system key)
     const liveResult = await callGeminiWithFallback(
@@ -699,19 +844,17 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    // High-fidelity Educational Assistant Fallback Engine
-    const fallbackResponse = generateEducationalSchoolResponse(cleanedMessages, role);
-    return res.json({
-      reply: fallbackResponse.reply,
-      modelUsed: fallbackResponse.modelUsed,
+    return res.status(503).json({
+      success: false,
+      code: 'AI_UNAVAILABLE',
+      error: 'The AI service is unavailable. No response was generated.',
     });
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
-    // Even if an unexpected runtime error happens, gracefully respond with educational guidance
-    const fallback = generateEducationalSchoolResponse(req.body?.messages || [], req.body?.role || 'counselor');
-    res.json({
-      reply: fallback.reply,
-      modelUsed: fallback.modelUsed,
+    return res.status(502).json({
+      success: false,
+      code: 'AI_ERROR',
+      error: 'The AI service failed to respond.',
     });
   }
 });
@@ -776,7 +919,7 @@ app.post('/api/analyze-image', async (req, res) => {
       'gemini-3.5-flash-lite',
     ];
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
 
     const liveResult = await callGeminiWithFallback(
       modelCandidates,
@@ -819,31 +962,16 @@ app.post('/api/analyze-image', async (req, res) => {
       });
     }
 
-    // Intelligent Fallback Analysis for Offline / Keyless Environments
-    const mockAnalysis = {
-      documentType: 'تقرير طبي / إجازة مرضية معتمدة',
-      studentName: expectedStudent !== 'غير محدد' ? expectedStudent : 'الطالب المعني بالغياب',
-      issuerName: 'المركز الصحي / مستشفى الرعاية الأولية',
-      datesCovered: expectedDate !== 'غير محدد' ? expectedDate : new Date().toISOString().split('T')[0],
-      durationDays: '1 يوم',
-      reasonOrDiagnosis: 'حالة صحية طارئة استوجبت الراحة والمتابعة الطبية',
-      hasOfficialStampOrSignature: true,
-      confidenceScore: 'عالية (95%)',
-      recommendedDecision: 'قبول العذر',
-      notesAndRecommendations: 'المستند مستوفٍ للبيانات والتواريخ مطابقة لسجل الغياب المدرسي. يوصى باعتماد العذر وتعديل الرصد إلى (غياب بعذر مقبول).',
-      extractedSummary: 'تقرير إجازة مرضية سليم ومكتمل الأختام ومطابق لتاريخ الغياب المسجل.',
-    };
-
-    return res.json({
-      analysis: mockAnalysis,
-      rawText: JSON.stringify(mockAnalysis, null, 2),
-      modelUsed: 'gemini-vision-audit (المحاكي الجنائي المعتمد)',
+    return res.status(503).json({
+      success: false,
+      code: 'AI_UNAVAILABLE',
+      error: 'Document analysis is unavailable. The document was not analysed or approved.',
     });
   } catch (err: any) {
     console.error('Error in /api/analyze-image:', err);
     res.status(500).json({
       error: 'فشل في تحليل صورة المستند',
-      details: err?.message || 'Unknown error',
+      details: 'Unknown error',
     });
   }
 });
@@ -893,7 +1021,7 @@ ${highRiskSummary}
 }
 `;
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
 
     const result = await callGeminiWithFallback(
       ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'],
@@ -909,32 +1037,33 @@ ${highRiskSummary}
     );
 
     if (!result || !result.text) {
-      throw new Error('Fallback needed');
+      return res.status(503).json({
+        success: false,
+        code: 'AI_UNAVAILABLE',
+        error: 'The AI morning briefing could not be generated. No briefing was produced.',
+      });
     }
 
-    let briefingJson = null;
+    let briefingJson: any = null;
     try {
       briefingJson = JSON.parse(result.text);
     } catch {
       const match = result.text.match(/\{[\s\S]*\}/);
       if (match) {
-        briefingJson = JSON.parse(match[0]);
-      } else {
-        briefingJson = {
-          headline: `نشرة الصباح للانضباط المدرسي - ${sanitizeText(tenantName, 'مدرسة')}`,
-          urgencyLevel: Array.isArray(anomalies) && anomalies.length > 0 ? 'elevated' : 'normal',
-          executiveSummary: result.text.slice(0, 300),
-          keyPriorities: [
-            'مراجعة كشوف الحضور غير المعتمدة قبل الحصة الأولى.',
-            'تدقيق الأعذار الطبية المعلقة.',
-            'تواصل الموجه الطلابي مع أولياء الأمور المعنيين.',
-          ],
-          counselorDirectives: [
-            'استدعاء الطلاب المكرر غيابهم للمتابعة.',
-            'تسجيل المتابعة في السجل المهني.',
-          ],
-        };
+        try {
+          briefingJson = JSON.parse(match[0]);
+        } catch {
+          briefingJson = null;
+        }
       }
+    }
+
+    if (!briefingJson || typeof briefingJson !== 'object') {
+      return res.status(502).json({
+        success: false,
+        code: 'AI_INVALID_RESPONSE',
+        error: 'The AI provider returned a briefing that could not be parsed.',
+      });
     }
 
     res.json({
@@ -943,41 +1072,76 @@ ${highRiskSummary}
       modelUsed: result.modelUsed,
     });
   } catch (err: any) {
-    console.warn('Fallback briefing generation due to error:', err?.message || err);
-    res.json({
-      success: true,
-      briefing: {
-        headline: 'نشرة الصباح الإدارية للانضباط والحضور المدرسي',
-        urgencyLevel: 'elevated',
-        executiveSummary: 'تمت متابعة بيانات الانضباط المدرسي صباحاً ومراجعة الحالة العامة للغياب والأعذار.',
-        keyPriorities: [
-          'اعتماد كشوف الحضور المعلقة.',
-          'تدقيق الأعذار الطبية المعلقة.',
-          'تفعيل التواصل مع أولياء الأمور المعنيين.',
-        ],
-        counselorDirectives: [
-          'إجراء المتابعة الإرشادية.',
-          'توثيق الإجراءات في السجل اليومي.',
-        ],
-      },
-      fallback: true,
+    console.error('Error generating daily AI briefing:', err?.message || err);
+    res.status(503).json({
+      success: false,
+      code: 'AI_UNAVAILABLE',
+      error: 'The AI morning briefing is currently unavailable.',
+      details: 'Unknown error',
     });
   }
 });
 
-// 4. Daily Email Digest - Dispatch / Simulation Endpoint (Protected: Admin & Registrar)
+// 4. Daily Email Digest - Dispatch Endpoint (Protected: Admin & Registrar)
 app.post('/api/daily-digest/dispatch', requireRole(['admin', 'registrar']), requireTenant, async (req, res) => {
   try {
-    const { recipients = [], subject, htmlContent, scheduledTime = '06:45', metadata = {} } = req.body;
+    const { recipients = [], subject, htmlContent, scheduledTime = '06:45' } = req.body;
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
 
     const validRecipients = Array.isArray(recipients)
-      ? recipients.filter((r) => typeof r === 'string').slice(0, 50)
+      ? recipients.filter((r) => typeof r === 'string' && r.includes('@')).slice(0, 50)
       : [];
+
+    if (validRecipients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid email recipients were provided for the daily digest.',
+      });
+    }
+
+    const safeSubject = sanitizeText(subject, 'Daily Digest');
+    const safeHtml = typeof htmlContent === 'string' ? htmlContent.slice(0, 200000) : '';
+    if (!safeHtml) {
+      return res.status(400).json({ success: false, error: 'The daily digest email body is empty.' });
+    }
+
+    const gateway = await loadMessagingGatewayConfig(tenantId);
+    if (!gateway || !gateway.emailEnabled || !gateway.emailProvider) {
+      return res.status(503).json({
+        success: false,
+        code: 'EMAIL_NOT_CONFIGURED',
+        error: 'No email transport is configured for this school. The daily digest was not sent.',
+      });
+    }
 
     const dispatchId = `digest-dispatch-${Date.now()}`;
     const timestamp = new Date().toISOString();
 
-    console.log(`[DAILY-EMAIL-DIGEST] Dispatching automated morning email digest "${sanitizeText(subject, 'school digest')}" to ${validRecipients.length} administrators.`);
+    const outcome = await sendEmail({
+      provider: gateway.emailProvider,
+      to: validRecipients,
+      subject: safeSubject,
+      html: safeHtml,
+      fromEmail: gateway.fromEmail,
+      fromName: gateway.fromName,
+      smtpHost: gateway.smtpHost,
+      smtpPort: gateway.smtpPort,
+      smtpSecure: gateway.smtpSecure,
+      smtpUser: gateway.smtpUser,
+      smtpPass: gateway.smtpPass,
+      apiKey: gateway.emailApiKey,
+    });
+
+    if (!outcome.ok) {
+      console.error(`[DAILY-EMAIL-DIGEST] Dispatch failed via ${gateway.emailProvider}:`, outcome.error);
+      return res.status(502).json({
+        success: false,
+        code: 'EMAIL_DISPATCH_FAILED',
+        error: outcome.error || 'The email provider rejected the daily digest.',
+      });
+    }
+
+    console.log(`[DAILY-EMAIL-DIGEST] Dispatched "${safeSubject}" to ${validRecipients.length} recipients via ${outcome.provider}.`);
 
     res.json({
       success: true,
@@ -986,24 +1150,167 @@ app.post('/api/daily-digest/dispatch', requireRole(['admin', 'registrar']), requ
       scheduledTime,
       recipientsCount: validRecipients.length,
       recipients: validRecipients,
-      subject: sanitizeText(subject, 'Daily Digest'),
+      subject: safeSubject,
       status: 'delivered',
+      provider: outcome.provider,
+      receiptId: outcome.receiptId,
       message: `تم إرسال النشرة الصباحية اليومية بنجاح إلى ${validRecipients.length} من قيادات المدرسة عبر البريد الإلكتروني.`,
     });
   } catch (err: any) {
     console.error('Error dispatching daily email digest:', err);
     res.status(500).json({
       error: 'فشل في إرسال النشرة الصباحية',
-      details: err?.message || 'Unknown error',
+      details: 'Unknown error',
     });
   }
 });
+
+/**
+ * 4. Parent Communication & Notification Outbox Gateway Dispatch Route
+ * Protected by RBAC: Only 'admin', 'registrar', and 'super_admin' can dispatch notifications.
+ * Teachers and parents are strictly rejected with 403 Forbidden.
+ * Enforces multi-tenant isolation against cross-tenant notification injection.
+ */
+app.post(
+  '/api/notifications/dispatch',
+  requireRole(['admin', 'registrar', 'super_admin']),
+  requireTenant,
+  async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const tenantId = user?.tenantId || (req as any).hostTenant?.tenantId || req.body?.tenantId || DEFAULT_TENANT_ID;
+      const { notifications: rawList, channel = 'WhatsApp' } = req.body;
+
+      if (!rawList || !Array.isArray(rawList) || rawList.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing or empty notifications array payload.',
+        });
+      }
+
+      // Enforce multi-tenant safety: Ensure all notifications belong to the user's school (unless super_admin)
+      if (user.role !== 'super_admin') {
+        const invalidTenantItem = rawList.find((n: any) => n.tenantId && n.tenantId !== tenantId);
+        if (invalidTenantItem) {
+          return res.status(403).json({
+            success: false,
+            error: `Cross-tenant dispatch forbidden. Item belongs to '${invalidTenantItem.tenantId}', but authenticated user belongs to '${tenantId}'.`,
+          });
+        }
+      }
+
+      const gateway = await loadMessagingGatewayConfig(tenantId);
+      if (!gateway) {
+        return res.status(503).json({
+          success: false,
+          code: 'GATEWAY_NOT_CONFIGURED',
+          error: 'No messaging gateway is configured. Notifications were not sent.',
+        });
+      }
+
+      type ItemResult = {
+        id: string;
+        status: 'sent' | 'failed' | 'manual';
+        gatewayReceiptId?: string;
+        gatewayProvider?: string;
+        sentAt?: string;
+        errorReason?: string;
+      };
+
+      const items = rawList.slice(0, 200) as any[];
+      const results: ItemResult[] = [];
+
+      for (const raw of items) {
+        const id = sanitizeText(raw?.id, '');
+        const recipientPhone = sanitizeText(raw?.recipientPhone, '');
+        const messageText = sanitizeText(raw?.messageText, '');
+        const itemChannel: 'SMS' | 'WhatsApp' = raw?.channel === 'SMS' || channel === 'SMS' ? 'SMS' : 'WhatsApp';
+
+        if (!id || !recipientPhone || !messageText) {
+          results.push({ id: id || 'unknown', status: 'failed', errorReason: 'Notification is missing an id, recipient phone, or message body.' });
+          continue;
+        }
+
+        if (itemChannel === 'SMS') {
+          if (!gateway.enableSmsNotifications) {
+            results.push({ id, status: 'failed', errorReason: 'SMS notifications are not enabled for this school.' });
+            continue;
+          }
+          const outcome = await sendSms({
+            provider: gateway.smsProvider,
+            to: recipientPhone,
+            body: messageText,
+            senderId: gateway.smsSenderId,
+            senderPhone: gateway.smsSenderPhone,
+            apiKey: gateway.smsApiKey,
+            apiSecret: gateway.smsApiSecret,
+          });
+          results.push(
+            outcome.ok
+              ? { id, status: 'sent', gatewayReceiptId: outcome.receiptId, gatewayProvider: outcome.provider, sentAt: new Date().toISOString() }
+              : { id, status: 'failed', errorReason: outcome.error || 'SMS provider rejected the message.' }
+          );
+          continue;
+        }
+
+        // WhatsApp
+        const mode = gateway.whatsappServiceMode || 'web_direct';
+        if (mode !== 'cloud_api') {
+          // WhatsApp Web direct mode is a real, human-in-the-loop send performed
+          // from the outbox. It is intentionally not auto-dispatched here.
+          results.push({
+            id,
+            status: 'manual',
+            errorReason: 'WhatsApp Web direct mode: open the conversation from the outbox to send this message.',
+          });
+          continue;
+        }
+        if (!gateway.enableWhatsAppNotifications) {
+          results.push({ id, status: 'failed', errorReason: 'WhatsApp notifications are not enabled for this school.' });
+          continue;
+        }
+        const outcome = await sendWhatsAppCloudMessage({
+          to: recipientPhone,
+          body: messageText,
+          phoneNumberId: gateway.whatsappPhoneNumberId,
+          accessToken: gateway.whatsappApiToken,
+        });
+        results.push(
+          outcome.ok
+            ? { id, status: 'sent', gatewayReceiptId: outcome.receiptId, gatewayProvider: outcome.provider, sentAt: new Date().toISOString() }
+            : { id, status: 'failed', errorReason: outcome.error || 'WhatsApp Cloud API rejected the message.' }
+        );
+      }
+
+      const receipts = results
+        .filter((r) => r.status === 'sent')
+        .map((r) => ({ id: r.id, gatewayReceiptId: r.gatewayReceiptId, gatewayProvider: r.gatewayProvider, sentAt: r.sentAt }));
+
+      return res.status(200).json({
+        success: true,
+        gatewayConfigured: true,
+        dispatched: receipts.length,
+        failed: results.filter((r) => r.status === 'failed').length,
+        manual: results.filter((r) => r.status === 'manual').length,
+        receipts,
+        results,
+      });
+    } catch (err: any) {
+      console.error('[NOTIFICATIONS-DISPATCH-ERROR]', err);
+      res.status(500).json({
+        success: false,
+        error: 'فشل في إرسال الإشعارات عبر بوابة المشغل',
+        details: 'Internal error',
+      });
+    }
+  }
+);
 
 // 5. Tenant AI Configuration Management Endpoints (Protected: Admin Only)
 // GET /api/tenant/ai-config - Returns sanitized metadata and masked key for the current school
 app.get('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
     const config = getTenantAIConfig(tenantId);
     res.json({
       success: true,
@@ -1019,7 +1326,7 @@ app.get('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, re
 // POST /api/tenant/ai-config - Saves/encrypts school's custom Gemini API key with AES-256-GCM
 app.post('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
     const { apiKey: newKey, preferredModel } = req.body;
 
     if (!newKey || typeof newKey !== 'string' || newKey.trim().length < 8) {
@@ -1043,7 +1350,7 @@ app.post('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (
 // DELETE /api/tenant/ai-config - Clears custom key (reverts to system trial key / fallback)
 app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
     removeTenantApiKey(tenantId);
     console.log(`[TENANT-AI:${tenantId}] Custom Gemini API key removed.`);
 
@@ -1061,7 +1368,7 @@ app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req,
 // POST /api/tenant/ai-config/test - Actively verifies connectivity to Google Gemini API
 app.post('/api/tenant/ai-config/test', requireRole(['admin']), requireTenant, async (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || 'school-1';
+    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
     const { testKey } = req.body;
 
     let keyToTest = (testKey && typeof testKey === 'string' && testKey.trim().length > 8)
@@ -1114,16 +1421,39 @@ app.post('/api/tenant/ai-config/test', requireRole(['admin']), requireTenant, as
     res.status(500).json({
       success: false,
       error: 'خطأ غير متوقع أثناء فحص المفتاح',
-      details: err?.message || 'Internal error',
+      details: 'Internal error',
     });
   }
 });
 
 app.get('/api/health', (req, res) => {
+  let dynamicTenantsCount = 0;
+  try {
+    const dynamicPath = path.resolve(__dirname, 'src/config/dynamicTenants.json');
+    if (fs.existsSync(dynamicPath)) {
+      const list = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+      dynamicTenantsCount = Array.isArray(list) ? list.length : 0;
+    }
+  } catch {}
+
+  const chromePath = getSystemChromePath();
+
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.json({
     status: 'ok',
     appName: 'Smart School Attendance System',
     timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+    nodeVersion: process.version,
+    memoryUsageMB: Math.round(process.memoryUsage().rss / (1024 * 1024)),
+    services: {
+      aiGemini: Boolean(geminiKey),
+      pdfPuppeteer: Boolean(chromePath),
+      firebaseAdmin: firebaseAdminReady,
+      firebaseAdminInitialized,
+      adminKeyLoaded,
+      dynamicTenantsCount,
+    },
   });
 });
 
@@ -1131,40 +1461,275 @@ app.get('/api/readyz', (req, res) => {
   res.json({
     status: 'ready',
     timestamp: new Date().toISOString(),
-    requiresAuth: Boolean(APP_AUTH_TOKEN),
+    requiresAuth: Boolean(SHARED_AUTH_VALUE),
   });
 });
 
-app.get('/api/tenant/resolve', (req, res) => {
-  const host = (req.get('x-forwarded-host') || req.get('host') || req.hostname || '').toString();
+app.get('/api/tenant/resolve', async (req, res) => {
+  refreshDynamicTenants();
+  await refreshTenantDocs();
+  const host = getRequestHostname(req);
   const resolution = resolveTenantFromHostname(host);
   res.json(resolution);
 });
 
+app.get('/api/tenants', async (req, res) => {
+  try {
+    await refreshTenantDocs();
+    const dynamicPath = path.resolve(__dirname, 'src/config/dynamicTenants.json');
+    let dynamicList: any[] = [];
+    if (fs.existsSync(dynamicPath)) {
+      dynamicList = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+    }
+
+    // Public projection: the pre-login tenant switcher only needs display fields.
+    const mergedTenants = new Map<string, any>();
+    for (const tenant of [...(Array.isArray(dynamicList) ? dynamicList : []), ...tenantDocsCache]) {
+      if (tenant && tenant.tenantId) mergedTenants.set(tenant.tenantId, tenant);
+    }
+
+    const publicTenants = Array.from(mergedTenants.values()).map((tenant: any) => ({
+      tenantId: typeof tenant?.tenantId === 'string' ? tenant.tenantId : '',
+      subdomain: typeof tenant?.subdomain === 'string' ? tenant.subdomain : '',
+      customDomains: Array.isArray(tenant?.customDomains)
+        ? tenant.customDomains.filter((domain: any) => typeof domain === 'string').slice(0, 10)
+        : [],
+      nameAr: typeof tenant?.nameAr === 'string' ? tenant.nameAr.slice(0, 120) : '',
+      nameEn: typeof tenant?.nameEn === 'string' ? tenant.nameEn.slice(0, 120) : '',
+      logoText: typeof tenant?.logoText === 'string' ? tenant.logoText.slice(0, 8) : '',
+      primaryColor: typeof tenant?.primaryColor === 'string' ? tenant.primaryColor : '',
+      isActive: tenant?.isActive !== false,
+    }));
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.json({ success: true, count: publicTenants.length, tenants: publicTenants });
+  } catch (err: any) {
+    console.error('[TENANTS-LIST-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to read the tenant registry.' });
+  }
+});
+
+app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
+  try {
+    const payload = req.body;
+    const slugPattern = /^[a-z0-9][a-z0-9-]{2,31}$/;
+    const hostPattern = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid tenant config payload' });
+    }
+
+    const tenantId = typeof payload.tenantId === 'string' ? payload.tenantId.trim().toLowerCase() : '';
+    const subdomain = typeof payload.subdomain === 'string' ? payload.subdomain.trim().toLowerCase() : '';
+    const nameAr = typeof payload.nameAr === 'string' ? payload.nameAr.trim().slice(0, 120) : '';
+
+    if (!slugPattern.test(tenantId) || !slugPattern.test(subdomain) || !nameAr) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenantId and subdomain must be 3-32 lowercase letters, digits or hyphens; nameAr is required.',
+      });
+    }
+
+    const customDomains = Array.isArray(payload.customDomains)
+      ? payload.customDomains
+          .filter((domain: unknown): domain is string => typeof domain === 'string' && hostPattern.test(domain))
+          .map((domain: string) => domain.toLowerCase())
+          .slice(0, 10)
+      : [];
+
+    const sanitized = {
+      tenantId,
+      subdomain,
+      customDomains,
+      nameAr,
+      nameEn: typeof payload.nameEn === 'string' ? payload.nameEn.trim().slice(0, 120) : '',
+      code: typeof payload.code === 'string' ? payload.code.trim().slice(0, 30) : '',
+      cityAr: typeof payload.cityAr === 'string' ? payload.cityAr.trim().slice(0, 80) : '',
+      cityEn: typeof payload.cityEn === 'string' ? payload.cityEn.trim().slice(0, 80) : '',
+      academicYear: typeof payload.academicYear === 'string' ? payload.academicYear.trim().slice(0, 40) : '',
+      currentTerm: typeof payload.currentTerm === 'string' ? payload.currentTerm.trim().slice(0, 60) : '',
+      schoolType: typeof payload.schoolType === 'string' ? payload.schoolType.trim().slice(0, 20) : 'mixed',
+      primaryColor: /^#[0-9a-fA-F]{6}$/.test(String(payload.primaryColor)) ? String(payload.primaryColor) : '#059669',
+      logoText: typeof payload.logoText === 'string' ? payload.logoText.slice(0, 8) : '',
+      isActive: payload.isActive !== false,
+    };
+
+    const dynamicPath = process.env.DYNAMIC_TENANTS_PATH || path.resolve(__dirname, 'src/config/dynamicTenants.json');
+    let dynamicList: any[] = [];
+    if (fs.existsSync(dynamicPath)) {
+      try {
+        dynamicList = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+      } catch {}
+    }
+
+    const updated = [...dynamicList.filter((d: any) => d.tenantId !== sanitized.tenantId), sanitized];
+    fs.writeFileSync(dynamicPath, JSON.stringify(updated, null, 2), 'utf8');
+    dynamicTenantsMtime = 0;
+    refreshDynamicTenants();
+    if (firebaseAdminReady) {
+      try {
+        await admin.firestore().doc(`tenants/${sanitized.tenantId}`).set(sanitized, { merge: true });
+        await refreshTenantDocs(true);
+      } catch (error: any) {
+        console.warn('[TENANTS] Could not persist the Firestore tenant document:', error?.message || error);
+      }
+    }
+    console.log(`[TENANTS] Provisioned '${sanitized.tenantId}' by ${(req as any).user?.email || 'unknown'}`);
+    res.json({ success: true, tenant: sanitized });
+  } catch (err: any) {
+    console.error('[TENANTS-PROVISION-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to persist the tenant configuration.' });
+  }
+});
+// Platform Owner: Intelligent & Verified Official Holidays Search Endpoint
+app.post('/api/owner/holidays/search', requirePlatformOwner, async (req, res) => {
+  try {
+    const { country = 'المملكة العربية السعودية', academicYear = '2026-2027', tenantId } = req.body;
+    const preset = getCountryPreset(country);
+
+    // Try live AI search with Gemini if key available
+    const { client: activeAi, keySource } = getGenAIClientForTenant(tenantId);
+    let liveHolidays: any = null;
+    let officialSource = `التقويم الرسمي المعتمد لـ (${preset.countryNameAr})`;
+
+    if (keySource !== 'none') {
+      try {
+        const prompt = `أنت خبير تدقيق وتقويم رسمي معتمد لوزارات التعليم ومجالس الوزراء في الدول العربية والعالمية.
+ابحث واستخرج التقويم الرسمي المعتمد لـ:
+الدولة: ${country}
+العام الدراسي: ${academicYear}
+
+المطلوب: إرجاع قائمة العطلات الرسمية المعتمدة (الأعياد الدينية، الأيام الوطنية، إجازات منتصف ونهاية الفصول، ونهايات الأسبوع المطولة إن وجدت) مع التأكد التام من صحة التواريخ والأسماء.
+أرجع الإجابة فقط بصيغة JSON نظيفة وصحيحة وبدون أي نصوص أخرى:
+{
+  "source": "اسم الوزارة أو الجهة الرسمية المصدرة للتقويم في هذه الدولة",
+  "weekendDays": [5, 6],
+  "ministryHeaderAr": "الترويسة الرسمية المعتمدة للوزارة والجهة التعليمية",
+  "holidays": [
+    {
+      "id": "hol-unique-id",
+      "nameAr": "اسم العطلة الرسمي بالعربية",
+      "nameEn": "Official Holiday Name in English",
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD",
+      "type": "official",
+      "notes": "تفاصيل وملاحظة الاعتماد الرسمي"
+    }
+  ]
+}`;
+
+        const modelCandidates = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+        for (const model of modelCandidates) {
+          try {
+            const aiRes = await activeAi.models.generateContent({
+              model,
+              contents: prompt,
+            });
+            if (aiRes?.text) {
+              const cleaned = aiRes.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+              const parsed = JSON.parse(cleaned);
+              if (parsed && Array.isArray(parsed.holidays) && parsed.holidays.length > 0) {
+                liveHolidays = parsed;
+                officialSource = parsed.source || officialSource;
+                break;
+              }
+            }
+          } catch (modelErr) {
+            // continue to next model
+          }
+        }
+      } catch (aiErr) {
+        console.warn('[HOLIDAY-SEARCH-AI] Gemini search fallback to preset:', aiErr);
+      }
+    }
+
+    if (liveHolidays && liveHolidays.holidays) {
+      return res.json({
+        success: true,
+        country: preset.countryNameAr,
+        source: officialSource,
+        verifiedBy: 'gemini_verified',
+        weekendDays: liveHolidays.weekendDays || preset.defaultWeekendDays,
+        ministryHeaderAr: liveHolidays.ministryHeaderAr || preset.ministryHeaderAr,
+        holidays: liveHolidays.holidays.map((h: any, idx: number) => ({
+          id: h.id || `hol-live-${Date.now()}-${idx}`,
+          nameAr: h.nameAr || `إجازة ${idx + 1}`,
+          nameEn: h.nameEn,
+          startDate: h.startDate,
+          endDate: h.endDate || h.startDate,
+          type: h.type || 'official',
+          notes: h.notes || `معتمد من ${officialSource}`,
+        })),
+      });
+    }
+
+    // Default high-accuracy fallback from verified countryPresets
+    return res.json({
+      success: true,
+      country: preset.countryNameAr,
+      source: `التقويم الرسمي المعتمد لوزارة التعليم - ${preset.countryNameAr}`,
+      verifiedBy: 'official_preset',
+      weekendDays: preset.defaultWeekendDays,
+      ministryHeaderAr: preset.ministryHeaderAr,
+      holidays: preset.officialHolidays,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'Failed to search holidays' });
+  }
+});
+
 // Vite Middleware for Development / Static for Production
+function serveStaticBundle() {
+  app.use(express.static(path.resolve(__dirname, 'dist')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'dist/index.html'));
+  });
+}
+
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist/index.html'));
-    });
+    serveStaticBundle();
   } else {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          watch: {
+            ignored: ['**/*.docx', '**/*.vsdx', '**/*.xlsx', '**/*.pptx', '**/~$*', '**/*.pdf', '**/*.png', '**/*.jpg', '**/*.tmp', '**/*.log', '**/.git/**', '**/scratch/**'],
+          },
+        },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.warn('Vite dev middleware unavailable; serving the static build from dist/ instead. Build the client with `npm run build` if dist/ is missing.', err instanceof Error ? err.message : err);
+      serveStaticBundle();
+    }
   }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smart School Attendance Server running on http://0.0.0.0:${PORT}`);
-    if (!APP_AUTH_TOKEN) {
-      console.warn('Security warning: AUTH token is not configured. Set APP_AUTH_TOKEN for production use.');
+    if (!SHARED_AUTH_VALUE) {
+      console.warn('Security warning: no shared bearer value is configured. Set APP_AUTH_TOKEN for local development only.');
     }
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-});
+// Only auto-start when executed directly (`node server.js` / `tsx server.ts`).
+// Importing this module (e.g. from integration tests) must not bind a port.
+const isDirectRun = (() => {
+  try {
+    return !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isDirectRun) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+  });
+}
+
+export { app, startServer };

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Student } from '../../types/attendance';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface DeleteStudentConfirmationModalProps {
   isOpen: boolean;
@@ -18,10 +19,12 @@ export const DeleteStudentConfirmationModal: React.FC<DeleteStudentConfirmationM
   lang,
 }) => {
   const isAr = lang === 'ar';
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   if (!isOpen || !student) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Confirm student deletion" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">

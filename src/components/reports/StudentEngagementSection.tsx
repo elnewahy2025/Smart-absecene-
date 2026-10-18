@@ -100,15 +100,18 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
   const grades = Array.from(new Set(students.map((s) => s.grade).filter(Boolean))).sort();
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+    <div
+      className="app-card rounded-xl border p-5 shadow-xs space-y-4"
+      style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
+    >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div>
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+          <h3 className="font-bold text-sm flex items-center gap-1.5" style={{ color: 'var(--app-text-main)' }}>
             <Trophy className="w-4 h-4 text-amber-500" />
             <span>{lang === 'ar' ? 'لوحة تحفيز وتفاعل الطلاب (Gamification Streak Hub)' : 'Student Engagement & Streaks'}</span>
           </h3>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
             {lang === 'ar'
               ? 'متابعة أطول سلاسل الحضور المتصل، أوسمة التميز، وشارات المواظبة لتعزيز الانضباط الإيجابي'
               : 'Continuous attendance streaks, motivation badges, and milestone progress'}
@@ -120,7 +123,8 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 font-medium cursor-pointer"
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 font-medium cursor-pointer"
+            style={{ color: 'var(--app-text-main)' }}
           >
             <option value="all">{lang === 'ar' ? 'جميع المراحل' : 'All Grades'}</option>
             {grades.map((g) => (
@@ -152,13 +156,13 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+        <div className="p-3 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center font-bold">
             <Star className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-emerald-800 font-semibold block">نقاط التحفيز المكتسبة</span>
-            <span className="text-xl font-bold text-emerald-950 font-mono">
+            <span className="text-[11px] text-primary font-semibold block">نقاط التحفيز المكتسبة</span>
+            <span className="text-xl font-bold text-primary font-mono">
               {engagementList.reduce((acc, i) => acc + i.points, 0).toLocaleString()}
             </span>
           </div>
@@ -196,17 +200,17 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
                       <Zap className="w-3 h-3 text-amber-500" />
                       <span>سلسلة الحضور: <strong className="text-slate-900 font-mono">{item.streakDays}</strong> يوم</span>
                     </span>
-                    <span className="font-mono text-emerald-700 font-bold">{item.points} نقطة</span>
+                    <span className="font-mono text-primary font-bold">{item.points} نقطة</span>
                   </div>
 
                   <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
                         item.streakDays >= 20
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                          ? 'bg-primary'
                           : item.streakDays >= 10
-                          ? 'bg-gradient-to-r from-amber-400 to-yellow-400'
-                          : 'bg-gradient-to-r from-slate-400 to-slate-500'
+                          ? 'bg-amber-500'
+                          : 'bg-slate-400'
                       }`}
                       style={{ width: `${Math.min(100, Math.max(8, (item.streakDays / 25) * 100))}%` }}
                     />

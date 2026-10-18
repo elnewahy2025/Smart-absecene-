@@ -28,5 +28,9 @@ All previously reported security, multi-tenancy, and authorization findings have
   - CSV student roster uploads strictly validate classrooms and grades against `schoolProfile.classes`. Non-compliant records are rejected with explicit reasons and a red regulatory warning banner.
   - Excuse submissions and attendance session roll-calls validate against academic terms and off-days.
   - Thresholds for unexcused warnings and chronic absence dynamically bind to Settings values.
-  - Tested and verified via `src/utils/settingsComplianceAudit.test.ts` (61/61 passing vitest tests).
+  - Tested and verified via `src/utils/settingsComplianceAudit.test.ts` and automated test suites (192/192 passing vitest tests across 27 suites).
+
+---
+
+> **Note (2026-10-18):** A later independent audit (`docs/PROJECT_AUDIT_2026-10-18.md`) found additional Critical/High findings (header-derived identities, public provisioning, unauthenticated PDF, client-side auth fallback, and several Firestore rule holes). Their live remediation status is tracked in `PROGRESS.md`; those items — not this historical summary — are the current source of truth for security readiness.
 

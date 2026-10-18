@@ -1,6 +1,7 @@
 import React from 'react';
 import { DailyEmailDigestItem } from '../../types/attendance';
 import { Check } from 'lucide-react';
+import { SandboxedEmailHtml } from './SandboxedEmailHtml';
 
 interface DigestHistoryTabProps {
   digestHistory: DailyEmailDigestItem[];
@@ -73,16 +74,28 @@ export const DigestHistoryTab: React.FC<DigestHistoryTabProps> = ({
                     <td className="py-3 px-3 font-bold text-sky-600">{item.pendingJustificationsCount}</td>
                     <td className="py-3 px-3 font-bold text-amber-600">{item.highRiskStudentsCount}</td>
                     <td className="py-3 px-3">
-                      <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <Check className="w-3 h-3 text-emerald-600" />
+                      <span
+                        className={`font-bold text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                          item.status === 'delivered'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : item.status === 'failed'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        <Check className="w-3 h-3" />
                         <span>
                           {item.status === 'delivered'
                             ? lang === 'ar'
                               ? 'تم التسليم'
                               : 'Delivered'
+                            : item.status === 'failed'
+                            ? lang === 'ar'
+                              ? 'فشل الإرسال'
+                              : 'Failed'
                             : lang === 'ar'
-                            ? 'محاكاة ناجحة'
-                            : 'Simulated'}
+                            ? 'مجدولة'
+                            : 'Scheduled'}
                         </span>
                       </span>
                     </td>
@@ -134,9 +147,11 @@ export const DigestHistoryTab: React.FC<DigestHistoryTabProps> = ({
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               {selectedHistoryItem.htmlContent ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: selectedHistoryItem.htmlContent }}
+                <SandboxedEmailHtml
+                  html={selectedHistoryItem.htmlContent}
+                  title={lang === 'ar' ? 'أرشيف النشرة' : 'Digest archive'}
                   className="email-render-container"
+                  minHeight={520}
                 />
               ) : (
                 <div className="text-xs text-slate-500">

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types/attendance';
 import {
@@ -26,6 +26,7 @@ import {
   ArrowRightLeft,
   Trash2,
   RotateCcw,
+  Calendar,
 } from 'lucide-react';
 import { StudentQRCodeModal } from './StudentQRCodeModal';
 import { QRScannerModal } from './QRScannerModal';
@@ -34,6 +35,7 @@ import { StudentBehaviourModal } from './attendance/StudentBehaviourModal';
 import { AddStudentModal } from './students/AddStudentModal';
 import { TransferStudentModal } from './students/TransferStudentModal';
 import { DeleteStudentConfirmationModal } from './students/DeleteStudentConfirmationModal';
+import { StudentAbsenceDrawer } from './students/StudentAbsenceDrawer';
 
 interface ParsedImportRow {
   rowNumber: number;
@@ -49,7 +51,13 @@ interface ParsedImportRow {
   errorReason?: string;
 }
 
-export const StudentManagementView: React.FC = () => {
+interface StudentManagementViewProps {
+  initialStudentId?: string;
+}
+
+export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
+  initialStudentId,
+}) => {
   const {
     students,
     importStudents,
@@ -81,10 +89,29 @@ export const StudentManagementView: React.FC = () => {
     (s) => s.attendanceRate < 90 || s.totalAbsences >= warningThreshold
   ).length;
 
+  // Configured grades derived directly from Settings Profile as single source of truth
+  const configuredGradesList = useMemo(() => {
+    if (schoolProfile?.educationalGrades && schoolProfile.educationalGrades.length > 0) {
+      return schoolProfile.educationalGrades;
+    }
+    const fromStats = Array.from(new Set(classesStats.map((c) => c.grade).filter(Boolean)));
+    return fromStats.length > 0 ? fromStats : ['الصف العاشر', 'الصف الحادي عشر', 'الصف الثاني عشر'];
+  }, [schoolProfile?.educationalGrades, classesStats]);
+
   // Single Student Modals
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [studentToTransfer, setStudentToTransfer] = useState<Student | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [selectedStudentForAbsence, setSelectedStudentForAbsence] = useState<Student | null>(null);
+
+  useEffect(() => {
+    if (initialStudentId) {
+      const match = students.find((s) => s.id === initialStudentId);
+      if (match) {
+        setSelectedStudentForAbsence(match);
+      }
+    }
+  }, [initialStudentId, students]);
   
   // 2-Stage Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -108,12 +135,12 @@ export const StudentManagementView: React.FC = () => {
 
   // Sample CSV text with deliberate mix of valid and duplicate rows for testing
   const sampleImportText = `الرقم المدرسي,السجل المدني,اسم الطالب,المرحلة,الفصل,ولي الأمر,الهاتف,فصيلة الدم
-20260191,1098765491,فيصل بن منصور الحربي,الصف العاشر,10 / أ,منصور الحربي,+966501234567,O+
-20260192,1098765492,بدر بن عبد الله الرشيد,الصف العاشر,10 / أ,عبد الله الرشيد,+966502345678,A+
-20260101,1098765431,يوسف بن خالد المطيري,الصف العاشر,10 / أ,د. خالد المطيري,+966509990011,O+
-20260193,,سعود بن نايف الشمري,الصف العاشر,10 / ب,نايف الشمري,+966503456789,B+
-20260194,1098765494,تركي بن فهد السبيعي,الصف العاشر,10 / ب,فهد السبيعي,+966504567890,AB+
-20260195,1098765495,مشعل بن إبراهيم التميمي,الصف العاشر,10 / ب,إبراهيم التميمي,+966505678901,A-`;
+20260001,3000000001,فيصل بن منصور الحربي,الصف العاشر,10 / أ,منصور الحربي,+966500000001,O+
+20260002,3000000002,بدر بن عبد الله الرشيد,الصف العاشر,10 / أ,عبد الله الرشيد,+966500000002,A+
+20260003,3000000003,يوسف بن خالد المطيري,الصف العاشر,10 / أ,خالد المطيري,+966500000003,O+
+20260004,,سعود بن نايف الشمري,الصف العاشر,10 / ب,نايف الشمري,+966500000004,B+
+20260005,3000000005,تركي بن فهد السبيعي,الصف العاشر,10 / ب,فهد السبيعي,+966500000005,AB+
+20260006,3000000002,مشعل بن إبراهيم التميمي,الصف العاشر,10 / ب,إبراهيم التميمي,+966500000006,A-`;
 
   // Filter existing students in view
   const filteredStudents = students.filter((s) => {
@@ -434,7 +461,9 @@ export const StudentManagementView: React.FC = () => {
             {lang === 'ar' ? 'سجل الطلاب المقيدين في المدرسة' : 'Enrolled Students Registry'}
           </h3>
           <p className="text-xs opacity-85 mt-0.5">
-            {currentTenant.name} · {schoolEnrollmentStats.activeStudentsCount} طالب نشط ({schoolEnrollmentStats.totalStudentsCount} إجمالي السجلات)
+            {lang === 'ar'
+              ? `${schoolEnrollmentStats.activeStudentsCount} طالب نشط (${schoolEnrollmentStats.totalStudentsCount} إجمالي السجلات)`
+              : `${schoolEnrollmentStats.activeStudentsCount} Active Students (${schoolEnrollmentStats.totalStudentsCount} Total Records)`}
           </p>
         </div>
 
@@ -499,6 +528,35 @@ export const StudentManagementView: React.FC = () => {
       {/* Filter and Search Bar with Quick Intervention Drilldown */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5 text-xs w-full md:w-auto">
+          {/* Grade Select Filter */}
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="student-grade-filter" className="font-semibold text-slate-700">
+              {lang === 'ar' ? 'المرحلة:' : 'Grade:'}
+            </label>
+            <select
+              id="student-grade-filter"
+              value={selectedGradeFilter}
+              onChange={(e) => {
+                const newG = e.target.value;
+                setSelectedGradeFilter(newG);
+                if (newG !== 'all' && selectedClass !== 'all') {
+                  const currentCls = classesStats.find((c) => c.className === selectedClass);
+                  if (currentCls && currentCls.grade !== newG) {
+                    setSelectedClass('all');
+                  }
+                }
+              }}
+              className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer text-xs"
+            >
+              <option value="all">{lang === 'ar' ? 'جميع المراحل' : 'All Grades'}</option>
+              {configuredGradesList.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Class Select */}
           <div className="flex items-center gap-1.5">
             <label htmlFor="student-class-filter" className="font-semibold text-slate-700">
@@ -511,11 +569,13 @@ export const StudentManagementView: React.FC = () => {
               className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-900 cursor-pointer text-xs"
             >
               <option value="all">{lang === 'ar' ? 'جميع الفصول' : 'All Classes'}</option>
-              {classesStats.map((c) => (
-                <option key={c.className} value={c.className}>
-                  {c.className} ({c.activeStudents} {lang === 'ar' ? 'طالب' : 'students'})
-                </option>
-              ))}
+              {classesStats
+                .filter((c) => selectedGradeFilter === 'all' || c.grade === selectedGradeFilter)
+                .map((c) => (
+                  <option key={c.className} value={c.className}>
+                    {c.className} ({c.activeStudents} {lang === 'ar' ? 'طالب' : 'students'})
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -624,7 +684,14 @@ export const StudentManagementView: React.FC = () => {
                       <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{idx + 1}</td>
                       <td className="py-3 px-4 font-bold text-slate-900">
                         <div className="flex items-center gap-1.5">
-                          <span>{s.fullName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStudentForAbsence(s)}
+                            className="text-start hover:text-primary hover:underline cursor-pointer transition-colors"
+                            title={lang === 'ar' ? 'انقر لعرض ملف وسجل غياب الطالب' : 'Click to view absence record'}
+                          >
+                            {s.fullName}
+                          </button>
                           {isTransferred && (
                             <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300">
                               {lang === 'ar' ? 'منقول' : 'Transferred'}
@@ -650,10 +717,14 @@ export const StudentManagementView: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex flex-col">
+                        <div
+                          className="flex flex-col cursor-pointer group"
+                          onClick={() => setSelectedStudentForAbsence(s)}
+                          title={lang === 'ar' ? 'انقر لعرض تفاصيل وسجل الغياب' : 'Click to view absence details'}
+                        >
                           <div className="flex items-center gap-1.5">
                             <span
-                              className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs inline-block ${
+                              className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs inline-block transition-transform group-hover:scale-105 ${
                                 s.attendanceRate >= 95
                                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                   : s.attendanceRate >= 85
@@ -732,6 +803,14 @@ export const StudentManagementView: React.FC = () => {
                               >
                                 <ArrowRightLeft className="w-3 h-3 text-amber-700" />
                                 <span>{lang === 'ar' ? 'نقل لمدرسة' : 'Transfer'}</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedStudentForAbsence(s)}
+                                className="inline-flex items-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                title={lang === 'ar' ? 'استعلام ومتابعة سجل الغياب والتقارير' : 'Absence Inquiry'}
+                              >
+                                <Calendar className="w-3 h-3 text-primary" />
+                                <span>{lang === 'ar' ? 'استعلام' : 'Inquiry'}</span>
                               </button>
                               <button
                                 onClick={() => setStudentToDelete(s)}
@@ -1145,6 +1224,7 @@ export const StudentManagementView: React.FC = () => {
         onClose={() => setIsAddStudentModalOpen(false)}
         onAddStudent={addStudent}
         classesStats={classesStats}
+        educationalGrades={schoolProfile?.educationalGrades}
         lang={lang}
       />
 
@@ -1164,6 +1244,13 @@ export const StudentManagementView: React.FC = () => {
         onClose={() => setStudentToDelete(null)}
         onConfirmDelete={deleteStudent}
         lang={lang}
+      />
+
+      {/* Student Absence & Conduct Slide-over Drawer */}
+      <StudentAbsenceDrawer
+        student={selectedStudentForAbsence}
+        isOpen={Boolean(selectedStudentForAbsence)}
+        onClose={() => setSelectedStudentForAbsence(null)}
       />
     </div>
   );

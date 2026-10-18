@@ -239,23 +239,26 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
+    <div
+      className="app-card rounded-2xl border p-6 shadow-xs space-y-6"
+      style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
+    >
       {/* Header & Sub-header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
+            <span className="bg-primary/10 text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
               <BarChart3 className="w-3 h-3" />
               <span>{lang === 'ar' ? 'تحليل مقارن للمراحل' : 'Comparative Grade Analysis'}</span>
             </span>
             <span className="text-slate-400 text-xs">· رصد التفاوت السلوكي والغياب التراكمي</span>
           </div>
-          <h3 className="text-lg font-bold text-slate-900">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--app-text-main)' }}>
             {lang === 'ar'
               ? 'أنماط ومؤشرات الغياب عبر المراحل الدراسية'
               : 'Absence Patterns Across Grade Levels'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
             {lang === 'ar'
               ? 'مقارنة بيانية وتحليل إحصائي لمعدلات الغياب، التبرير الطبي، وحالات الخطر المزمن بين مختلف الصفوف الدراسية لتوجيه برامج الإرشاد الطلابي والتدخل المبكر.'
               : 'Visual comparative analysis of absence days, medical justification patterns, and chronic absenteeism across grades to guide early interventions.'}
@@ -263,18 +266,18 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
         </div>
 
         {/* View Segmented Toggle Controls */}
-        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/80 shrink-0 self-start md:self-center">
+        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0 self-start md:self-center">
           <button
             type="button"
             onClick={() => setMetricView('excuses_breakdown')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               metricView === 'excuses_breakdown'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:text-primary'
             }`}
             title="مقارنة الأعذار المعتمدة رسمياً مقابل الغياب بدون عذر"
           >
-            <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
+            <FileCheck2 className={`w-3.5 h-3.5 ${metricView === 'excuses_breakdown' ? 'text-white' : 'text-primary'}`} />
             <span>{lang === 'ar' ? 'أنواع الغياب (مبرر / غير مبرر)' : 'Absence Types'}</span>
           </button>
 
@@ -283,12 +286,12 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
             onClick={() => setMetricView('risk_distribution')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               metricView === 'risk_distribution'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:text-primary'
             }`}
             title="توزيع الطلاب حسب مستويات الخطورة والإنذارات"
           >
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+            <AlertTriangle className={`w-3.5 h-3.5 ${metricView === 'risk_distribution' ? 'text-white' : 'text-rose-500'}`} />
             <span>{lang === 'ar' ? 'الغياب المزمن والإنذارات' : 'Chronic Risk'}</span>
           </button>
 
@@ -297,12 +300,12 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
             onClick={() => setMetricView('averages_and_rates')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               metricView === 'averages_and_rates'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:text-primary'
             }`}
             title="مقارنة متوسط أيام الغياب ونسبة الحضور العامة"
           >
-            <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+            <TrendingUp className={`w-3.5 h-3.5 ${metricView === 'averages_and_rates' ? 'text-white' : 'text-primary'}`} />
             <span>{lang === 'ar' ? 'المعدلات ونسب الحضور' : 'Rates & Averages'}</span>
           </button>
         </div>
@@ -311,18 +314,18 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
       {/* Analytical Callout Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Most Disciplined Grade */}
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
-          <div className="w-9 h-9 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
+          <div className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
             <Award className="w-5 h-5" />
           </div>
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-[11px] font-bold text-primary">
               {lang === 'ar' ? 'المرحلة الأكثر انضباطاً' : 'Most Disciplined Grade'}
             </span>
             <div className="text-sm font-extrabold text-slate-900 dark:text-white">
               {bestGrade ? bestGrade.gradeName : '—'}
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+            <div className="text-[11px] text-primary font-semibold">
               {bestGrade ? `${bestGrade.averageAttendanceRate}% حضور عام` : ''}
             </div>
           </div>
@@ -414,7 +417,7 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
           </div>
 
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span>{lang === 'ar' ? 'تحديث فوري من سجلات الحضور المعتمدة' : 'Live attendance data'}</span>
           </div>
         </div>
@@ -447,7 +450,7 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
                     fontSize: 10,
                   }}
                 />
-                <Tooltip content={<CustomChartTooltip />} />
+                <Tooltip cursor={{ fill: 'transparent' }} content={<CustomChartTooltip />} />
                 <Legend
                   verticalAlign="top"
                   align="right"
@@ -507,7 +510,7 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
                     fontSize: 10,
                   }}
                 />
-                <Tooltip content={<CustomChartTooltip />} />
+                <Tooltip cursor={{ fill: 'transparent' }} content={<CustomChartTooltip />} />
                 <Legend
                   verticalAlign="top"
                   align="right"
@@ -567,7 +570,7 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
                     fontSize: 10,
                   }}
                 />
-                <Tooltip content={<CustomChartTooltip />} />
+                <Tooltip cursor={{ fill: 'transparent' }} content={<CustomChartTooltip />} />
                 <Legend
                   verticalAlign="top"
                   align="right"

@@ -10,32 +10,34 @@ export const DEFAULT_SCHOOL_1_PROFILE: TenantSchoolProfile = {
   officeAr: 'مكتب تعليم الروضة',
   stageAr: 'المرحلة الثانوية',
   genderType: 'boys',
-  logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=160&auto=format&fit=crop&q=80',
+  logoUrl: '',
   stampUrl: '',
   address: {
     country: 'المملكة العربية السعودية',
+    countryCallingCode: '+966',
     region: 'منطقة الرياض',
     city: 'الرياض',
-    district: 'حي الأندلس',
-    streetAddress: 'شارع خالد بن الوليد، مبنى رقم 42',
-    postalCode: '13214',
-    buildingNumber: '42',
+    district: '',
+    streetAddress: '',
+    postalCode: '',
+    buildingNumber: '',
   },
-  generalPhone: '+966 11 456 7890',
-  emergencyHotline: '+966 50 123 4567',
-  officialEmail: 'info@andalus-school.edu.sa',
-  websiteUrl: 'https://andalus.edu.sa',
+  countryCallingCode: '+966',
+  generalPhone: '',
+  emergencyHotline: '',
+  officialEmail: '',
+  websiteUrl: '',
   leadership: {
-    principalName: 'أ. عبد الرحمن السعدي',
-    principalPhone: '+966 50 111 2233',
-    principalEmail: 'principal@andalus-school.edu.sa',
-    vicePrincipalStudentAffairsName: 'أ. فهد بن إبراهيم المنصور',
-    vicePrincipalStudentAffairsPhone: '+966 50 222 3344',
-    vicePrincipalAcademicAffairsName: 'أ. سلطان بن خالد القحطاني',
-    vicePrincipalAcademicAffairsPhone: '+966 50 333 4455',
-    socialWorkerName: 'أ. ماجد بن عبد العزيز التميمي',
-    socialWorkerPhone: '+966 50 444 5566',
-    socialWorkerEmail: 'counselor@andalus-school.edu.sa',
+    principalName: '',
+    principalPhone: '',
+    principalEmail: '',
+    vicePrincipalStudentAffairsName: '',
+    vicePrincipalStudentAffairsPhone: '',
+    vicePrincipalAcademicAffairsName: '',
+    vicePrincipalAcademicAffairsPhone: '',
+    socialWorkerName: '',
+    socialWorkerPhone: '',
+    socialWorkerEmail: '',
   },
   academicYear: {
     code: '1447-1448',
@@ -58,6 +60,11 @@ export const DEFAULT_SCHOOL_1_PROFILE: TenantSchoolProfile = {
     { id: 'p-7', periodNumber: 7, nameAr: 'صلاة الظهر والفسحة الثانية', startTime: '11:15', endTime: '11:45', type: 'prayer' },
     { id: 'p-8', periodNumber: 8, nameAr: 'الحصة السادسة', startTime: '11:45', endTime: '12:30', type: 'lesson' },
     { id: 'p-9', periodNumber: 9, nameAr: 'الحصة السابعة', startTime: '12:30', endTime: '13:15', type: 'lesson' },
+  ],
+  educationalGrades: [
+    'الصف العاشر',
+    'الصف الحادي عشر',
+    'الصف الثاني عشر',
   ],
   classes: [
     { id: 'class-10a', name: '10 / أ', grade: 'الصف العاشر', room: 'قاعة 101', capacity: 35 },
@@ -85,6 +92,17 @@ export const DEFAULT_SCHOOL_1_PROFILE: TenantSchoolProfile = {
   officialReportFooterNote: 'وثيقة رسمية صادرة آلياً وموثقة برمز الاستجابة السريعة (QR) طبقاً للائحة المواظبة والسلوك بوزارة التعليم.',
   weekendDays: [...DEFAULT_WEEKEND_DAYS],
   officialHolidays: [...DEFAULT_OFFICIAL_HOLIDAYS],
+  messagingGateway: {
+    whatsappPhoneNumber: '',
+    whatsappServiceMode: 'web_direct',
+    smsProvider: 'taqnyat',
+    smsSenderId: '',
+    enableWhatsAppNotifications: true,
+    enableSmsNotifications: true,
+    lastConfiguredByRole: 'super_admin',
+    lastConfiguredByEmail: '',
+    lastConfiguredAt: '',
+  },
 };
 
 export const DEFAULT_SCHOOL_2_PROFILE: TenantSchoolProfile = {
@@ -96,32 +114,34 @@ export const DEFAULT_SCHOOL_2_PROFILE: TenantSchoolProfile = {
   officeAr: 'مكتب تعليم شمال جدة',
   stageAr: 'المرحلة المتوسطة والثانوية',
   genderType: 'girls',
-  logoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=160&auto=format&fit=crop&q=80',
+  logoUrl: '',
   stampUrl: '',
   address: {
     country: 'المملكة العربية السعودية',
+    countryCallingCode: '+966',
     region: 'منطقة مكة المكرمة',
     city: 'جدة',
-    district: 'حي الروضة',
-    streetAddress: 'طريق الأمير محمد بن عبد العزيز، مبنى 18',
-    postalCode: '23432',
-    buildingNumber: '18',
+    district: '',
+    streetAddress: '',
+    postalCode: '',
+    buildingNumber: '',
   },
-  generalPhone: '+966 12 654 3210',
-  emergencyHotline: '+966 55 987 6543',
-  officialEmail: 'info@falah-school.edu.sa',
-  websiteUrl: 'https://falah.edu.sa',
+  countryCallingCode: '+966',
+  generalPhone: '',
+  emergencyHotline: '',
+  officialEmail: '',
+  websiteUrl: '',
   leadership: {
-    principalName: 'أ. نورة بنت عبد الله الغامدي',
-    principalPhone: '+966 55 111 4455',
-    principalEmail: 'principal@falah-school.edu.sa',
-    vicePrincipalStudentAffairsName: 'أ. هدى بنت صالح الزهراني',
-    vicePrincipalStudentAffairsPhone: '+966 55 222 5566',
-    vicePrincipalAcademicAffairsName: 'أ. ريم بنت أحمد الشهري',
-    vicePrincipalAcademicAffairsPhone: '+966 55 333 6677',
-    socialWorkerName: 'أ. منيرة بنت محمد العتيبي',
-    socialWorkerPhone: '+966 55 444 7788',
-    socialWorkerEmail: 'counselor@falah-school.edu.sa',
+    principalName: '',
+    principalPhone: '',
+    principalEmail: '',
+    vicePrincipalStudentAffairsName: '',
+    vicePrincipalStudentAffairsPhone: '',
+    vicePrincipalAcademicAffairsName: '',
+    vicePrincipalAcademicAffairsPhone: '',
+    socialWorkerName: '',
+    socialWorkerPhone: '',
+    socialWorkerEmail: '',
   },
   academicYear: {
     code: '1447-1448',
@@ -145,6 +165,13 @@ export const DEFAULT_SCHOOL_2_PROFILE: TenantSchoolProfile = {
     { id: 'p-8', periodNumber: 8, nameAr: 'الحصة السادسة', startTime: '11:45', endTime: '12:30', type: 'lesson' },
     { id: 'p-9', periodNumber: 9, nameAr: 'الحصة السابعة', startTime: '12:30', endTime: '13:15', type: 'lesson' },
   ],
+  educationalGrades: [
+    'الصف السادس',
+    'الصف السابع',
+    'الصف الثامن',
+    'الصف التاسع',
+    'الصف العاشر',
+  ],
   classes: [
     { id: 'class-falah-1a', name: '10 / أ', grade: 'الصف العاشر', room: 'قاعة 101', capacity: 30 },
     { id: 'class-falah-1b', name: '10 / ب', grade: 'الصف العاشر', room: 'قاعة 102', capacity: 30 },
@@ -164,6 +191,17 @@ export const DEFAULT_SCHOOL_2_PROFILE: TenantSchoolProfile = {
   officialReportFooterNote: 'وثيقة رسمية صادرة آلياً وموثقة برمز الاستجابة السريعة (QR) طبقاً للائحة المواظبة والسلوك بوزارة التعليم.',
   weekendDays: [...DEFAULT_WEEKEND_DAYS],
   officialHolidays: [...DEFAULT_OFFICIAL_HOLIDAYS],
+  messagingGateway: {
+    whatsappPhoneNumber: '',
+    whatsappServiceMode: 'web_direct',
+    smsProvider: 'unifonic',
+    smsSenderId: '',
+    enableWhatsAppNotifications: true,
+    enableSmsNotifications: true,
+    lastConfiguredByRole: 'super_admin',
+    lastConfiguredByEmail: '',
+    lastConfiguredAt: '',
+  },
 };
 
 export const DEFAULT_TENANT_PROFILES: Record<string, TenantSchoolProfile> = {
@@ -171,14 +209,46 @@ export const DEFAULT_TENANT_PROFILES: Record<string, TenantSchoolProfile> = {
   'school-2': DEFAULT_SCHOOL_2_PROFILE,
 };
 
-export function getDefaultSchoolProfile(tenantId: string): TenantSchoolProfile {
-  if (DEFAULT_TENANT_PROFILES[tenantId]) {
-    return JSON.parse(JSON.stringify(DEFAULT_TENANT_PROFILES[tenantId]));
-  }
+function withNeutralContacts(profile: TenantSchoolProfile): TenantSchoolProfile {
   return {
-    ...JSON.parse(JSON.stringify(DEFAULT_SCHOOL_1_PROFILE)),
-    tenantId,
-    schoolName: `المدرسة النموذجية (${tenantId})`,
-    schoolCode: `SCH-${tenantId.toUpperCase()}`,
+    ...profile,
+    logoUrl: '',
+    stampUrl: '',
+    generalPhone: '',
+    emergencyHotline: '',
+    officialEmail: '',
+    websiteUrl: '',
+    address: {
+      ...profile.address,
+      district: '',
+      streetAddress: '',
+      postalCode: '',
+      buildingNumber: '',
+    },
+    leadership: {
+      principalName: '',
+      principalPhone: '',
+      principalEmail: '',
+      vicePrincipalStudentAffairsName: '',
+      vicePrincipalStudentAffairsPhone: '',
+      vicePrincipalAcademicAffairsName: '',
+      vicePrincipalAcademicAffairsPhone: '',
+      socialWorkerName: '',
+      socialWorkerPhone: '',
+      socialWorkerEmail: '',
+    },
   };
+}
+export function getDefaultSchoolProfile(tenantId: string): TenantSchoolProfile {
+  const base = DEFAULT_TENANT_PROFILES[tenantId]
+    ? JSON.parse(JSON.stringify(DEFAULT_TENANT_PROFILES[tenantId]))
+    : {
+        ...JSON.parse(JSON.stringify(DEFAULT_SCHOOL_1_PROFILE)),
+        tenantId,
+        schoolName: `المدرسة النموذجية (${tenantId})`,
+        schoolCode: `SCH-${tenantId.toUpperCase()}`,
+      };
+
+  // Contact and leadership fields are user-entered; never seed them from demo data.
+  return withNeutralContacts(base);
 }

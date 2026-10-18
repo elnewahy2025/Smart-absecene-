@@ -5,6 +5,7 @@ import { Student } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
 import { Printer, Download, X, QrCode, Building, Layers, Loader2 } from 'lucide-react';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
+import { useModalAccessibility } from '../hooks/useModalAccessibility';
 
 interface BatchQRModalProps {
   onClose: () => void;
@@ -95,10 +96,15 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
     }
   };
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen: true, onClose, containerRef: dialogRef });
+
   const modalContent = (
     <div
       className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto w-screen h-screen print:p-0 print:bg-white print:static print:block"
       style={{ margin: 0, padding: '0.75rem', left: 0, top: 0, right: 0, bottom: 0 }}
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >

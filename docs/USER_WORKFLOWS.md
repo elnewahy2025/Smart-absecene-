@@ -43,3 +43,38 @@
 2. The system calculates anomalies, at-risk students (using Settings threshold), and pending justifications.
 3. A Gemini-based summary may be appended.
 4. The digest can be dispatched to recipients.
+
+## Touchless QR 3-Condition Check-In Workflow
+
+1. **Step 1: Initiation & Explicit Warning Confirmation**:
+   - In manual mode, all students are present by default.
+   - When the teacher clicks "بدء جلسة مسح الـ QR", the roster is NOT immediately reset.
+   - A dedicated confirmation modal appears with a clear warning explaining that entering QR mode will transition unscanned students into a pending state (`⏳ بانتظار مسح الـ QR`).
+   - The teacher must explicitly confirm before the scanning session starts.
+
+2. **Step 2: Live Scanning, Duplicate Prevention & Timestamping**:
+   - The teacher directs student badges to the camera or hardware barcode scanner.
+   - **First Scan**: The student is immediately marked `present` with an exact time-stamp note (`حضور عبر مسح الـ QR في تمام HH:MM:SS`), a pleasant audio chime plays, and the live counter updates.
+   - **Duplicate Scan**: If the same badge is scanned again, re-registration is blocked, a low-frequency warning tone plays, and an amber alert banner displays:
+     `⚠️ تنبيه تكرار: الطالب (...) مسجل حضور بالفعل في تمام الساعة [الوقت]. تم منع التكرار للحفاظ على دقة السجل.`
+
+3. **Step 3: Deferred Finalization & Late Arrival Review**:
+   - Throughout the scan, all unscanned students remain safely in pending state (`pending`).
+   - Final absence is **never committed automatically**.
+   - When the teacher clicks "إنهاء جلسة المسح واعتماد الغياب", a review modal appears.
+   - The modal displays: total class size, verified present students, and unscanned students.
+   - For every unscanned student, the teacher can toggle them between `غائب (Absent)` and `متأخر (Late)` with a quick minutes selector (5, 10, 15, 20, 30, 45 min) to prevent late arrivals from being unfairly penalized.
+   - Once confirmed, final records are saved to the attendance session and audit log.
+
+## Platform Owner Provisioning & Smart Holiday Search Workflow
+
+1. Platform Owner logs in (`owner@smartschool.platform`).
+2. **Instant School Provisioning**:
+   - Opens Platform Owner Hub (`PlatformOwnerModal.tsx`).
+   - Enters school name, subdomain, country, and admin details.
+   - The school is registered in `dynamicTenants.json` and immediately resolvable across all subdomains.
+3. **Smart Holiday Search & Ministerial Presets**:
+   - In Settings > Holidays & Weekends, the exclusive gold button `[بحث واستيراد ذكي (The Owner)]` is accessible.
+   - Queries verified official holidays for any country and academic year via Gemini API or accredited country presets.
+   - One-click import applies holidays, adapts weekend structures (Fri-Sat vs Sat-Sun), and dynamically adjusts ministerial letterheads across settings tabs.
+

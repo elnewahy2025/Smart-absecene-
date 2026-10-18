@@ -57,7 +57,7 @@ export function generateSampleMedicalNoteBase64(studentName = 'يوسف خالد
   ctx.fillStyle = '#334155';
   ctx.fillText(`اسم المريض / الطالب: ${studentName}`, rightX, y);
   y += 35;
-  ctx.fillText('السجل المدني: 1098765431', rightX, y);
+  ctx.fillText('السجل المدني: 3000000001', rightX, y);
   y += 35;
   ctx.fillText('المرحلة الدراسية: الصف العاشر (الأول الثانوي)', rightX, y);
   y += 45;

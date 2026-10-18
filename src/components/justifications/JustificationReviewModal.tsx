@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Justification } from '../../types/attendance';
 import {
   ShieldCheck,
@@ -13,6 +13,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 export interface JustificationReviewModalProps {
   justification: Justification;
@@ -45,8 +46,10 @@ export const JustificationReviewModal: React.FC<JustificationReviewModalProps> =
   onApprove,
   onReject,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen: true, onClose, containerRef: dialogRef });
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 z-50 overflow-y-auto">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Justification review" className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 z-50 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-5 sm:p-6 space-y-4 max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0">

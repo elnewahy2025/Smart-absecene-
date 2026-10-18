@@ -10,6 +10,7 @@ interface Props {
 
 export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const leadership = profile.leadership || ({} as Partial<TenantSchoolProfile['leadership']>);
+  const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+966';
 
   const handleLeadershipChange = (key: string, value: string) => {
     onChange({
@@ -21,7 +22,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
   };
 
   return (
-    <div className="space-y-4 text-xs">
+    <div className="space-y-4 text-xs font-['Cairo',sans-serif]">
       <div className="settings-group-header flex items-center justify-between p-3 rounded-xl border font-bold shadow-2xs">
         <div className="flex items-center gap-2.5">
           <Users className="w-4 h-4 shrink-0" />
@@ -52,14 +53,17 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1">رقم الجوال:</label>
+              <label className="text-slate-600 block mb-1 flex items-center justify-between">
+                <span>رقم الجوال:</span>
+                <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
+              </label>
               <input
                 type="text"
                 disabled={disabled}
                 value={leadership.principalPhone || ''}
                 onChange={(e) => handleLeadershipChange('principalPhone', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder="+966 50 111 2233"
+                placeholder={`${dialCode} 50 111 2233`}
               />
             </div>
             <div>
@@ -94,14 +98,17 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             />
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">رقم الجوال / التحويلة:</label>
+            <label className="text-slate-600 block mb-1 flex items-center justify-between">
+              <span>رقم الجوال / التحويلة:</span>
+              <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
+            </label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalStudentAffairsPhone || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalStudentAffairsPhone', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-              placeholder="+966 50 222 3344"
+              placeholder={`${dialCode} 50 222 3344`}
             />
           </div>
         </div>
@@ -124,14 +131,17 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             />
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">رقم الجوال / التحويلة:</label>
+            <label className="text-slate-600 block mb-1 flex items-center justify-between">
+              <span>رقم الجوال / التحويلة:</span>
+              <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
+            </label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalAcademicAffairsPhone || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalAcademicAffairsPhone', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-              placeholder="+966 50 333 4455"
+              placeholder={`${dialCode} 50 333 4455`}
             />
           </div>
         </div>
@@ -155,14 +165,17 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1">رقم الجوال:</label>
+              <label className="text-slate-600 block mb-1 flex items-center justify-between">
+                <span>رقم الجوال:</span>
+                <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
+              </label>
               <input
                 type="text"
                 disabled={disabled}
                 value={leadership.socialWorkerPhone || ''}
                 onChange={(e) => handleLeadershipChange('socialWorkerPhone', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder="+966 50 444 5566"
+                placeholder={`${dialCode} 50 444 5566`}
               />
             </div>
             <div>

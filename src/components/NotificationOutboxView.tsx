@@ -27,6 +27,7 @@ import {
   Calendar,
   Layers,
 } from 'lucide-react';
+import { openWhatsAppDirect } from '../utils/whatsappUtils';
 
 export const NotificationOutboxView: React.FC = () => {
   const {
@@ -38,6 +39,7 @@ export const NotificationOutboxView: React.FC = () => {
     lang,
     currentTenant,
     classesStats,
+    schoolProfile,
   } = useAttendance();
 
   // Filters & Search
@@ -208,8 +210,8 @@ export const NotificationOutboxView: React.FC = () => {
       setIsBatchModalOpen(false);
       setSentSuccessAlert(
         lang === 'ar'
-          ? `تم بنجاح إدراج وإرسال دُفعة تذكير الغياب لـ (${count}) ولي أمر عبر (${batchChannel}) في طابور Outbox المعتمد!`
-          : `Successfully enqueued ${count} batch absence reminder messages via (${batchChannel})!`
+          ? `تم إدراج ${count} تذكير في الطابور وسيُرسَل عبر بوابة المدرسة المُهيأة.`
+          : `Queued ${count} reminder(s); dispatching through the school's configured gateway.`
       );
       setTimeout(() => setSentSuccessAlert(null), 6000);
     } catch (err) {
@@ -243,8 +245,8 @@ export const NotificationOutboxView: React.FC = () => {
     setComposeMessage('');
     setSentSuccessAlert(
       lang === 'ar'
-        ? `تم بنجاح إدراج وإرسال ${count} رسالة لولي الأمر عبر (${composeChannel}).`
-        : `Enqueued ${count} message(s) via (${composeChannel}).`
+        ? `تم إدراج ${count} رسالة في الطابور وسيُرسَل عبر بوابة المدرسة المُهيأة.`
+        : `Queued ${count} message(s); dispatching through the school's configured gateway.`
     );
     setTimeout(() => setSentSuccessAlert(null), 5000);
   };
@@ -332,20 +334,21 @@ export const NotificationOutboxView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Simulation Mode Indicator (L4) */}
-      <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-900 flex items-center justify-between shadow-xs">
+      {/* Carrier Gateway & RBAC Security Indicator */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-2.5">
-          <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-            {lang === 'ar' ? 'وضع المحاكاة' : 'Simulation Mode'}
+          <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-emerald-200" />
+            {lang === 'ar' ? 'بوابة المشغل البرمجية' : 'Gateway Dispatch API'}
           </span>
-          <span className="font-medium">
+          <span className="font-medium text-slate-300">
             {lang === 'ar'
-              ? 'تنبيه بيئة العرض: بوابة الرسائل النصية والواتساب تعمل حالياً بنمط المحاكاة المباشرة (Sandbox) لمحاكاة الإرسال دون استهلاك رصيد المشغل.'
-              : 'SMS/WhatsApp gateways are currently in Simulation / Sandbox mode for testing and auditing without consuming SMS quota.'}
+              ? 'بوابة إرسال الرسائل محمية بنظام الصلاحيات (RBAC) وتعتمد إيصالات تسليم رقمية لـ WhatsApp Business وSMS.'
+              : 'Notification gateway is RBAC-secured and generates verified carrier delivery receipts.'}
           </span>
         </div>
-        <span className="text-purple-700/80 text-[11px] hidden sm:inline">
-          {lang === 'ar' ? 'محاكاة Twilio / Unifonic' : 'Mock Gateway'}
+        <span className="text-emerald-400 font-mono text-[11px] hidden sm:inline">
+          Meta Cloud API / Unifonic & SMS Hub
         </span>
       </div>
 
@@ -539,6 +542,14 @@ export const NotificationOutboxView: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        {notif.gatewayReceiptId && (
+                          <div
+                            className="text-[9px] font-mono text-slate-500 mt-1 truncate max-w-[130px]"
+                            title={`إيصال البوابة المعتمد: ${notif.gatewayReceiptId} (${notif.gatewayProvider || ''})`}
+                          >
+                            🧾 {notif.gatewayReceiptId}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4 max-w-sm">
                         <p className="text-slate-700 text-[11px] line-clamp-2 leading-relaxed font-sans">
@@ -574,22 +585,42 @@ export const NotificationOutboxView: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        {isFailed ? (
-                          <button
-                            onClick={() => handleRetrySingle(notif.id)}
-                            disabled={isThisRetrying}
-                            className="flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors"
-                          >
-                            <RotateCcw className={`w-3.5 h-3.5 ${isThisRetrying ? 'animate-spin' : ''}`} />
-                            <span>{isThisRetrying ? 'جارٍ الإرسال...' : 'إعادة المحاولة'}</span>
-                          </button>
-                        ) : isSent ? (
-                          <div className="text-[11px] text-slate-400 font-mono">
-                            {new Date(notif.sentAt || notif.createdAt).toLocaleTimeString('ar-SA')}
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-amber-700 font-medium">في الطابور</span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {notif.recipientPhone && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openWhatsAppDirect(
+                                  notif.recipientPhone,
+                                  notif.messageText,
+                                  schoolProfile?.countryCallingCode || '+966'
+                                );
+                              }}
+                              className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                              title="فتح محادثة واتساب ويب مباشرة مع ولي الأمر"
+                            >
+                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <span>واتساب ويب</span>
+                            </button>
+                          )}
+
+                          {isFailed ? (
+                            <button
+                              onClick={() => handleRetrySingle(notif.id)}
+                              disabled={isThisRetrying}
+                              className="flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-colors"
+                            >
+                              <RotateCcw className={`w-3.5 h-3.5 ${isThisRetrying ? 'animate-spin' : ''}`} />
+                              <span>{isThisRetrying ? 'جارٍ الإرسال...' : 'إعادة'}</span>
+                            </button>
+                          ) : isSent ? (
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              {new Date(notif.sentAt || notif.createdAt).toLocaleTimeString('ar-SA')}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-amber-700 font-medium">في الطابور</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

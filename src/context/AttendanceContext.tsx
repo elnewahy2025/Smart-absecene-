@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Tenant,
   UserProfile,
@@ -6,6 +6,7 @@ import {
   StudentEnrollmentStatus,
   AttendanceSession,
   AttendanceRecord,
+  StudentAttendanceRecord,
   AttendanceStatus,
   Justification,
   NotificationOutboxItem,
@@ -23,6 +24,8 @@ import {
   SchoolEnrollmentStats,
   OfficialHoliday,
   HolidayType,
+  SchoolProvisionInput,
+  SchoolMessagingGatewayConfig,
 } from '../types/attendance';
 import {
   isSchoolOffDay,
@@ -30,23 +33,41 @@ import {
   DEFAULT_WEEKEND_DAYS,
   DEFAULT_OFFICIAL_HOLIDAYS,
 } from '../utils/holidayUtils';
-import { getDefaultSchoolProfile, DEFAULT_TENANT_PROFILES } from '../config/tenantSettings';
+import { getDefaultSchoolProfile } from '../config/tenantSettings';
+import { getDefaultSchoolSettings } from '../config/defaultSettings';
 import { computeDailyDigestData, generateHtmlEmailTemplate } from '../utils/digestEngine';
 import {
-  INITIAL_TENANTS,
   INITIAL_USERS,
   INITIAL_STUDENTS,
   INITIAL_SESSIONS,
   INITIAL_JUSTIFICATIONS,
   INITIAL_NOTIFICATIONS,
   INITIAL_AUDIT_LOGS,
-  INITIAL_SETTINGS,
   INITIAL_BEHAVIOUR_INCIDENTS,
-} from '../data/mockData';
+} from '../data/initialState';
+import { localCache } from '../utils/localCache';
+import {
+  canManageSettings as canManageSettingsRule,
+  canWriteSubmittedSessions,
+  isElevatedOrSuperAdmin,
+  canEditSession as canEditSessionRule,
+  isChildOfGuardian as isChildOfGuardianRule,
+} from '../utils/attendanceAccess';
+const REGISTRY_TENANTS: Tenant[] = Object.values(TENANT_REGISTRY).map((config) => ({
+  id: config.tenantId,
+  name: config.nameAr,
+  code: config.code,
+  city: config.cityAr,
+  academicYear: config.academicYear,
+  currentTerm: config.currentTerm,
+  schoolType: config.schoolType,
+}));
+
 import {
   TENANT_REGISTRY,
   TenantDomainConfig,
   resolveTenantFromHostname,
+  getActiveTenantRegistry,
 } from '../config/tenantRegistry';
 
 import {
@@ -57,11 +78,20 @@ import {
   OperationType,
 } from '../lib/firebase';
 import { authenticatedFetch } from '../lib/api';
+
+const PLATFORM_OWNER_EMAILS = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAILS || '')
+  .split(',')
+  .map((value: string) => value.trim().toLowerCase())
+  .filter(Boolean);
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
+  UserCredential,
 } from 'firebase/auth';
 import {
   doc,
@@ -76,11 +106,70 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 
+const toFirestoreData = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const buildParentSessions = (records: StudentAttendanceRecord[]): AttendanceSession[] => {
+  const bySession = new Map<string, AttendanceSession>();
+
+  for (const record of records) {
+    let session = bySession.get(record.sessionId);
+    if (!session) {
+      session = {
+        id: record.sessionId,
+        tenantId: record.tenantId,
+        date: record.date,
+        sessionType: record.sessionType,
+        periodNumber: record.periodNumber,
+        subject: record.subject,
+        classId: record.classId,
+        className: record.className,
+        grade: '',
+        teacherId: '',
+        teacherName: record.teacherName || '',
+        status: 'submitted',
+        totalStudents: 0,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        excusedCount: 0,
+        records: [],
+      };
+      bySession.set(record.sessionId, session);
+    }
+
+    session.records.push({
+      id: record.id,
+      sessionId: record.sessionId,
+      studentId: record.studentId,
+      status: record.status,
+      minutesLate: record.minutesLate,
+      note: record.note,
+      updatedAt: record.updatedAt,
+      updatedBy: '',
+    });
+  }
+
+  return Array.from(bySession.values()).map((session) => ({
+    ...session,
+    totalStudents: session.records.length,
+    presentCount: session.records.filter((item) => item.status === 'present').length,
+    absentCount: session.records.filter((item) => item.status === 'absent').length,
+    lateCount: session.records.filter((item) => item.status === 'late').length,
+    excusedCount: session.records.filter((item) =>
+      ['excused_absence', 'excused_leave', 'under_review'].includes(item.status)
+    ).length,
+  }));
+};
+
 interface AttendanceContextType {
   // Firebase Auth
   firebaseUser: FirebaseUser | null;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (useRedirect?: boolean) => Promise<UserCredential | undefined>;
   signOutGoogle: () => Promise<void>;
+  signInWithCredentials: (
+    email: string,
+    pass: string
+  ) => Promise<{ success: boolean; user?: UserProfile; error?: string; isFirebase?: boolean }>;
 
   // Tenant & Role
   currentTenant: Tenant;
@@ -93,6 +182,7 @@ interface AttendanceContextType {
   setLang: (lang: 'ar' | 'en') => void;
 
   // RBAC Permission Checks
+  isSuperAdmin: boolean;
   canManageSettings: boolean;
   canReviewJustifications: boolean;
   canReopenSessions: boolean;
@@ -100,6 +190,10 @@ interface AttendanceContextType {
   canDispatchDigest: boolean;
   canManageOutbox: boolean;
   canEditSession: (session: AttendanceSession) => boolean;
+
+  // Platform Owner / Multi-Tenant School Provisioning
+  provisionNewSchool: (input: SchoolProvisionInput) => Promise<{ success: boolean; message: string; tenantId: string }>;
+  refreshDynamicTenants: () => Promise<void>;
 
   // Data scoped to currentTenant
   users: UserProfile[];
@@ -183,10 +277,12 @@ interface AttendanceContextType {
   classesStats: SchoolClassSummary[];
   schoolEnrollmentStats: SchoolEnrollmentStats;
 
-  // Settings
+  // Settings & Messaging Gateways (Owner Guarded)
   updateSettings: (newSettings: Partial<SchoolSettings>) => void;
   schoolProfile: TenantSchoolProfile;
   updateSchoolProfile: (newProfile: Partial<TenantSchoolProfile>) => Promise<void>;
+  messagingGateway: SchoolMessagingGatewayConfig;
+  updateMessagingGateway: (config: Partial<SchoolMessagingGatewayConfig>) => { success: boolean; message: string };
   isOffDay: (dateStr: string) => OffDayCheckResult;
   weekendDays: number[];
   officialHolidays: OfficialHoliday[];
@@ -212,35 +308,98 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const [tenantId, setTenantIdState] = useState<string>(() => {
     if (initialTenantId) return initialTenantId;
     if (typeof window !== 'undefined') {
-      const res = resolveTenantFromHostname(window.location.hostname);
+      const res = resolveTenantFromHostname(window.location.hostname, window.location.search);
       if (res.status === 'resolved' && res.tenantId) {
         return res.tenantId;
       }
     }
-    return (typeof localStorage !== 'undefined' && localStorage.getItem('school_current_tenant_id')) || 'school-1';
+    return (typeof localCache !== 'undefined' && localCache.getItem('school_current_tenant_id')) || 'school-1';
   });
+  const [authenticatedPhone, setAuthenticatedPhone] = useState('');
+
   const [currentUserRole, setCurrentUserRoleState] = useState<UserRole>(() => {
-    return ((typeof localStorage !== 'undefined' && localStorage.getItem('school_current_user_role')) as UserRole) || 'admin';
+    return ((typeof localCache !== 'undefined' && localCache.getItem('school_current_user_role')) as UserRole) || 'parent';
   });
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
   const setTenantId = (id: string) => {
     setTenantIdState(id);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('school_current_tenant_id', id);
+    if (typeof localCache !== 'undefined') {
+      localCache.setItem('school_current_tenant_id', id);
     }
   };
 
   const setUserRole = (role: UserRole) => {
     setCurrentUserRoleState(role);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('school_current_user_role', role);
+    if (typeof localCache !== 'undefined') {
+      localCache.setItem('school_current_user_role', role);
     }
   };
 
+  const [dynamicTenants, setDynamicTenants] = useState<TenantDomainConfig[]>(() => {
+    if (typeof localCache !== 'undefined') {
+      try {
+        const saved = localCache.getItem('school_dynamic_tenants');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Error reading dynamic tenants:', e);
+      }
+    }
+    return [];
+  });
+
+  const syncTenantsWithServer = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tenants');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.tenants)) {
+          setDynamicTenants((prev) => {
+            const map = new Map<string, TenantDomainConfig>();
+            for (const t of data.tenants) {
+              if (t && t.tenantId) map.set(t.tenantId, t);
+            }
+            for (const t of prev) {
+              if (t && t.tenantId && !map.has(t.tenantId)) map.set(t.tenantId, t);
+            }
+            const merged = Array.from(map.values());
+            if (typeof localCache !== 'undefined') {
+              localCache.setItem('school_dynamic_tenants', JSON.stringify(merged));
+            }
+            return merged;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not sync dynamic tenants from server:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncTenantsWithServer();
+  }, [syncTenantsWithServer]);
+
+  const tenants: Tenant[] = useMemo(() => {
+    const list: Tenant[] = [...REGISTRY_TENANTS];
+    for (const dt of dynamicTenants) {
+      if (!list.some((t) => t.id === dt.tenantId)) {
+        list.push({
+          id: dt.tenantId,
+          name: dt.nameAr,
+          code: dt.code,
+          city: dt.cityAr,
+          academicYear: dt.academicYear,
+          currentTerm: dt.currentTerm,
+          schoolType: dt.schoolType,
+        });
+      }
+    }
+    return list;
+  }, [dynamicTenants]);
+
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('school_users');
+    const saved = localCache.getItem('school_users');
     if (!saved) return INITIAL_USERS;
     try {
       const parsed: UserProfile[] = JSON.parse(saved);
@@ -253,7 +412,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
 
   const [allStudents, setAllStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('school_students');
+    const saved = localCache.getItem('school_students');
     if (!saved) return INITIAL_STUDENTS;
     try {
       const parsed: Student[] = JSON.parse(saved);
@@ -265,8 +424,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     }
   });
 
+  const sessionHashesRef = useRef<Record<string, string>>({});
+  const sessionsHydratedRef = useRef(false);
+  const sessionsSeededRef = useRef(false);
+  const sessionsRef = useRef<AttendanceSession[]>([]);
+
   const [allSessions, setAllSessions] = useState<AttendanceSession[]>(() => {
-    const saved = localStorage.getItem('school_sessions');
+    const saved = localCache.getItem('school_sessions');
     if (!saved) return INITIAL_SESSIONS;
     try {
       const parsed: AttendanceSession[] = JSON.parse(saved);
@@ -280,8 +444,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const existingIds = new Set(normalized.map((s) => s.id));
       const missing = INITIAL_SESSIONS.filter((s) => !existingIds.has(s.id));
       const merged = [...normalized, ...missing];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_sessions', JSON.stringify(merged));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_sessions', JSON.stringify(merged));
       }
       return merged;
     } catch {
@@ -289,8 +453,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     }
   });
 
+  sessionsRef.current = allSessions;
+  const [parentAttendanceRecords, setParentAttendanceRecords] = useState<StudentAttendanceRecord[]>([]);
+
   const [allJustifications, setAllJustifications] = useState<Justification[]>(() => {
-    const saved = localStorage.getItem('school_justifications');
+    const saved = localCache.getItem('school_justifications');
     if (!saved) return INITIAL_JUSTIFICATIONS;
     try {
       const parsed: Justification[] = JSON.parse(saved);
@@ -301,8 +468,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const existingIds = new Set(normalized.map((j) => j.id));
       const missing = INITIAL_JUSTIFICATIONS.filter((j) => !existingIds.has(j.id));
       const merged = [...normalized, ...missing];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_justifications', JSON.stringify(merged));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_justifications', JSON.stringify(merged));
       }
       return merged;
     } catch {
@@ -311,7 +478,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
 
   const [allNotifications, setAllNotifications] = useState<NotificationOutboxItem[]>(() => {
-    const saved = localStorage.getItem('school_notifications');
+    const saved = localCache.getItem('school_notifications');
     if (!saved) return INITIAL_NOTIFICATIONS;
     try {
       const parsed: NotificationOutboxItem[] = JSON.parse(saved);
@@ -322,8 +489,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const existingIds = new Set(normalized.map((n) => n.id));
       const missing = INITIAL_NOTIFICATIONS.filter((n) => !existingIds.has(n.id));
       const merged = [...normalized, ...missing];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_notifications', JSON.stringify(merged));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_notifications', JSON.stringify(merged));
       }
       return merged;
     } catch {
@@ -332,12 +499,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
 
   const [allAuditLogs, setAllAuditLogs] = useState<AuditLog[]>(() => {
-    const saved = localStorage.getItem('school_audit_logs');
+    const saved = localCache.getItem('school_audit_logs');
     return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
   });
 
   const [allBehaviourIncidents, setAllBehaviourIncidents] = useState<StudentBehaviourIncident[]>(() => {
-    const saved = localStorage.getItem('school_behaviour_incidents');
+    const saved = localCache.getItem('school_behaviour_incidents');
     if (!saved) return INITIAL_BEHAVIOUR_INCIDENTS;
     try {
       const parsed: StudentBehaviourIncident[] = JSON.parse(saved);
@@ -350,32 +517,27 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
 
   const [settingsMap, setSettingsMap] = useState<Record<string, SchoolSettings>>(() => {
-    const saved = localStorage.getItem('school_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+    const saved = localCache.getItem('school_settings');
+    return saved ? JSON.parse(saved) : {};
   });
 
   const [schoolProfilesMap, setSchoolProfilesMap] = useState<Record<string, TenantSchoolProfile>>(() => {
     try {
-      const saved = localStorage.getItem('tenant_school_profiles');
+      const saved = localCache.getItem('tenant_school_profiles');
       if (saved) {
         return JSON.parse(saved);
       }
     } catch (e) {
       console.error('Failed to parse cached tenant_school_profiles', e);
     }
-    return DEFAULT_TENANT_PROFILES;
+    return {};
   });
 
   const DEFAULT_DIGEST_CONFIG: DailyEmailDigestConfig = {
     enabled: true,
     scheduledTime: '06:45',
     daysOfWeek: [0, 1, 2, 3, 4],
-    recipients: [
-      'principal@andalus-school.edu.sa',
-      'counselor@andalus-school.edu.sa',
-      'vice.principal@andalus-school.edu.sa',
-      'attendance.registrar@andalus-school.edu.sa',
-    ],
+    recipients: [],
     includeAnomalies: true,
     includePendingJustifications: true,
     includeHighRiskStudents: true,
@@ -384,16 +546,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     consecutiveAbsenceDaysThreshold: 2,
     anomalySpikePercentage: 25,
     notifyViaWhatsAppToo: true,
-    principalPhone: '+966501112233',
+    principalPhone: '',
   };
 
   const [digestConfig, setDigestConfig] = useState<DailyEmailDigestConfig>(() => {
-    const saved = localStorage.getItem('school_digest_config');
+    const saved = localCache.getItem('school_digest_config');
     return saved ? JSON.parse(saved) : DEFAULT_DIGEST_CONFIG;
   });
 
   const [digestHistory, setDigestHistory] = useState<DailyEmailDigestItem[]>(() => {
-    const saved = localStorage.getItem('school_digest_history');
+    const saved = localCache.getItem('school_digest_history');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -405,18 +567,52 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
 
   useEffect(() => {
-    localStorage.setItem('school_digest_config', JSON.stringify(digestConfig));
+    localCache.setItem('school_digest_config', JSON.stringify(digestConfig));
   }, [digestConfig]);
 
   useEffect(() => {
-    localStorage.setItem('school_digest_history', JSON.stringify(digestHistory));
+    localCache.setItem('school_digest_history', JSON.stringify(digestHistory));
   }, [digestHistory]);
+
+  // Listen to Firebase Auth redirect results (for production deployments like Vercel & mobile browsers)
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setFirebaseUser(result.user);
+        }
+      })
+      .catch((err) => {
+        console.warn('[AUTH] getRedirectResult check:', err);
+      });
+  }, []);
 
   // Listen to Firebase Auth state and synchronize user role & tenant from Firestore
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
+        const userEmail = (user.email || '').toLowerCase();
+
+        // 1. If user is the Platform Owner
+        if (PLATFORM_OWNER_EMAILS.includes(userEmail)) {
+          setUserRole('super_admin');
+          return;
+        }
+
+        // 2. Check local user registry for known seeded users / roles
+        const matchedLocalUser = allUsers.find((u) => u.email.toLowerCase() === userEmail);
+
+        if (matchedLocalUser) {
+          if (matchedLocalUser.role) {
+            setUserRole(matchedLocalUser.role);
+          }
+          if (matchedLocalUser.tenantId && matchedLocalUser.tenantId !== 'platform') {
+            setTenantId(matchedLocalUser.tenantId);
+          }
+          return;
+        }
+
         const userProfileRef = doc(db, 'users', user.uid);
         try {
           const userSnap = await getDoc(userProfileRef);
@@ -428,6 +624,23 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             if (data.role) {
               setUserRole(data.role as UserRole);
             }
+            setAuthenticatedPhone(data.phone || '');
+            setAllUsers((prev) => {
+              const profile = {
+                ...data,
+                id: user.uid,
+                userId: user.uid,
+                tenantId: data.tenantId || tenantId,
+                name: data.name || user.displayName || 'مستخدم معتمد',
+                email: data.email || user.email || '',
+                role: (data.role as UserRole) || 'parent',
+                phone: data.phone || '',
+                status: data.status || 'active',
+              } as UserProfile;
+              const map = new Map(prev.map((item) => [item.id, item]));
+              map.set(profile.id, profile);
+              return Array.from(map.values());
+            });
           } else {
             // New user registration profile initialization
             await setDoc(userProfileRef, {
@@ -454,8 +667,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   useEffect(() => {
     if (!firebaseUser) return;
 
+    const isParentUser = currentUserRole === 'parent';
+    const parentProfile = isParentUser
+      ? allUsers.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
+      : undefined;
+    const parentPhone = authenticatedPhone || parentProfile?.phone;
+
     // 1. Students sync
-    const qStudents = query(collection(db, 'students'), where('tenantId', '==', tenantId));
+    const qStudents = parentPhone
+      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
+      : query(collection(db, 'students'), where('tenantId', '==', tenantId));
     const unsubStudents = onSnapshot(
       qStudents,
       (snapshot) => {
@@ -498,7 +719,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     // 2. Attendance Sessions sync
     const qSessions = query(collection(db, 'attendance_sessions'), where('tenantId', '==', tenantId));
-    const unsubSessions = onSnapshot(
+    const unsubSessions =
+      currentUserRole === 'parent'
+        ? () => {}
+        : onSnapshot(
       qSessions,
       (snapshot) => {
         if (!snapshot.empty) {
@@ -506,6 +730,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as AttendanceSession;
             remoteSessions.push({ ...data, id: docSnap.id });
+            sessionHashesRef.current[docSnap.id] = JSON.stringify({ ...data, id: docSnap.id });
           });
           if (remoteSessions.length > 0) {
             setAllSessions((prev) => {
@@ -516,14 +741,30 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             });
           }
         }
+        sessionsHydratedRef.current = true;
+        if (!sessionsSeededRef.current) {
+          for (const session of sessionsRef.current) {
+            sessionHashesRef.current[session.id] = JSON.stringify(session);
+          }
+          sessionsSeededRef.current = true;
+        }
       },
       (error) => {
+        sessionsHydratedRef.current = true;
+        if (!sessionsSeededRef.current) {
+          for (const session of sessionsRef.current) {
+            sessionHashesRef.current[session.id] = JSON.stringify(session);
+          }
+          sessionsSeededRef.current = true;
+        }
         handleFirestoreError(error, OperationType.GET, 'attendance_sessions');
       }
     );
 
     // 3. Justifications sync
-    const qJustifications = query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
+    const qJustifications = parentPhone
+      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
+      : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
     const unsubJustifications = onSnapshot(
       qJustifications,
       (snapshot) => {
@@ -549,7 +790,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     );
 
     // 4. Notification outbox sync
-    const qNotifications = query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId));
+    const qNotifications = parentPhone
+      ? query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId), where('recipientPhone', '==', parentPhone))
+      : query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId));
     const unsubNotifications = onSnapshot(
       qNotifications,
       (snapshot) => {
@@ -576,7 +819,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     // 5. Audit logs sync
     const qAudit = query(collection(db, 'audit_logs'), where('tenantId', '==', tenantId));
-    const unsubAudit = onSnapshot(
+    const unsubAudit = isParentUser
+      ? () => {}
+      : onSnapshot(
       qAudit,
       (snapshot) => {
         if (!snapshot.empty) {
@@ -609,13 +854,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       unsubNotifications();
       unsubAudit();
     };
-  }, [firebaseUser, tenantId]);
+  }, [firebaseUser, tenantId, currentUserRole, allUsers, authenticatedPhone]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (useRedirect = false): Promise<UserCredential | undefined> => {
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+      if (useRedirect) {
+        await signInWithRedirect(auth, googleProvider);
+        return undefined;
+      }
+      return await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
       console.error('Google Sign-In Error:', error);
+      if (error?.code === 'auth/popup-blocked') {
+        console.warn('Popup blocked by browser, falling back to signInWithRedirect...');
+        await signInWithRedirect(auth, googleProvider);
+        return undefined;
+      }
       throw error;
     }
   };
@@ -629,40 +883,93 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     }
   };
 
-  // Save changes to localStorage
+  const signInWithCredentials = async (
+    targetEmail: string,
+    pass: string
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string; isFirebase?: boolean }> => {
+    const trimmed = targetEmail.trim().toLowerCase();
+
+    // 1. Attempt Firebase Authentication (Email/Password)
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, trimmed, pass);
+      const fUser = userCred.user;
+
+      const localMatch = allUsers.find((u) => u.email.toLowerCase() === trimmed);
+      const userProfile: UserProfile = localMatch || {
+        id: fUser.uid,
+        tenantId,
+        name: fUser.displayName || fUser.email?.split('@')[0] || 'مستخدم معتمد',
+        role: currentUserRole,
+        phone: fUser.phoneNumber || '+966500000000',
+        email: fUser.email || trimmed,
+        status: 'active',
+      };
+
+      if (userProfile.role !== 'super_admin' && userProfile.tenantId && userProfile.tenantId !== tenantId) {
+        return {
+          success: false,
+          error: `تم رفض الدخول: هذا الحساب مسجل لمدرسة أخرى (${userProfile.tenantId}). لا تملك صلاحية الوصول إلى بوابة المدرسة الحالية.`,
+        };
+      }
+
+      if (userProfile.status === 'inactive') {
+        return {
+          success: false,
+          error: 'تم تعطيل هذا الحساب مؤقتاً من قبل إدارة المدرسة.',
+        };
+      }
+
+      if (userProfile.role) {
+        setUserRole(userProfile.role);
+      }
+
+      return { success: true, user: userProfile, isFirebase: true };
+    } catch (firebaseErr: any) {
+      console.warn('[AUTH] Firebase sign-in failed:', firebaseErr.code);
+      const isWrongPass = firebaseErr.code === 'auth/wrong-password' || firebaseErr.code === 'auth/invalid-credential';
+      return {
+        success: false,
+        error: isWrongPass
+          ? 'كلمة المرور غير صحيحة.'
+          : 'تعذر تسجيل الدخول. تحقق من بيانات الحساب أو تواصل مع إدارة المدرسة.',
+      };
+    }
+  };
+
+  // Save changes to localCache
   useEffect(() => {
-    localStorage.setItem('school_students', JSON.stringify(allStudents));
+    localCache.setItem('school_students', JSON.stringify(allStudents));
   }, [allStudents]);
 
   useEffect(() => {
-    localStorage.setItem('school_sessions', JSON.stringify(allSessions));
+    localCache.setItem('school_sessions', JSON.stringify(allSessions));
   }, [allSessions]);
 
   useEffect(() => {
-    localStorage.setItem('school_justifications', JSON.stringify(allJustifications));
+    localCache.setItem('school_justifications', JSON.stringify(allJustifications));
   }, [allJustifications]);
 
   useEffect(() => {
-    localStorage.setItem('school_notifications', JSON.stringify(allNotifications));
+    localCache.setItem('school_notifications', JSON.stringify(allNotifications));
   }, [allNotifications]);
 
   useEffect(() => {
-    localStorage.setItem('school_audit_logs', JSON.stringify(allAuditLogs));
+    localCache.setItem('school_audit_logs', JSON.stringify(allAuditLogs));
   }, [allAuditLogs]);
 
   useEffect(() => {
-    localStorage.setItem('school_settings', JSON.stringify(settingsMap));
+    localCache.setItem('school_settings', JSON.stringify(settingsMap));
   }, [settingsMap]);
 
   useEffect(() => {
-    localStorage.setItem('tenant_school_profiles', JSON.stringify(schoolProfilesMap));
+    localCache.setItem('tenant_school_profiles', JSON.stringify(schoolProfilesMap));
   }, [schoolProfilesMap]);
 
   // Current tenant and school profile
   const schoolProfile: TenantSchoolProfile =
     schoolProfilesMap[tenantId] || getDefaultSchoolProfile(tenantId);
 
-  const baseTenant = INITIAL_TENANTS.find((t) => t.id === tenantId) || INITIAL_TENANTS[0];
+  const baseTenant = tenants.find((t) => t.id === tenantId) || tenants[0] || REGISTRY_TENANTS[0];
   const currentTenant: Tenant = {
     ...baseTenant,
     name: schoolProfile.schoolName || baseTenant.name,
@@ -672,66 +979,294 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     schoolType: schoolProfile.genderType || baseTenant.schoolType,
     schoolProfile,
   };
-  const tenantDomainConfig = TENANT_REGISTRY[tenantId];
+  const activeRegistry = getActiveTenantRegistry();
+  const tenantDomainConfig = activeRegistry[tenantId] || TENANT_REGISTRY[tenantId];
+
+  // Platform Owner Stealth & God-Mode RBAC Check
+  const isSuperAdmin = currentUserRole === 'super_admin';
+
   const currentUser: UserProfile =
-    INITIAL_USERS.find((u) => u.tenantId === tenantId && u.role === currentUserRole) || {
-      id: `user-${currentUserRole}-${tenantId}`,
+    (isSuperAdmin
+      ? allUsers.find((u) => u.role === 'super_admin') || {
+          id: 'user-owner',
+          tenantId: 'platform',
+          name: firebaseUser?.displayName || '',
+          role: 'super_admin',
+          phone: authenticatedPhone || '',
+          email: PLATFORM_OWNER_EMAILS[0] || '',
+          status: 'active',
+        }
+      : allUsers.find((u) => u.id === firebaseUser?.uid) ||
+        allUsers.find((u) => u.email.toLowerCase() === (firebaseUser?.email || '').toLowerCase()) ||
+        allUsers.find((u) => u.tenantId === tenantId && u.role === currentUserRole)) || {
+      id: firebaseUser?.uid || `user-${currentUserRole}-${tenantId}`,
       tenantId: tenantId,
-      name:
-        currentUserRole === 'admin'
-          ? (tenantId === 'school-1' ? 'أ. عبد الله بن سلمان الغامدي' : 'أ. سامي بن أحمد الزهراني')
-          : currentUserRole === 'registrar'
-          ? (tenantId === 'school-1' ? 'أ. ماجد بن عبد العزيز الخالدي' : 'أ. طارق بن سعيد الغامدي')
-          : currentUserRole === 'teacher'
-          ? (tenantId === 'school-1' ? 'أ. فهد بن ناصر القحطاني' : 'أ. حامد بن يوسف الشهري')
-          : (tenantId === 'school-1' ? 'د. خالد بن سعود المطيري' : 'أ. إبراهيم بن محمد الصاعدي'),
+      name: firebaseUser?.displayName || '',
       role: currentUserRole,
-      phone: currentUserRole === 'parent' ? (tenantId === 'school-1' ? '+966509990011' : '+966506667788') : '+966501112233',
-      email: `${currentUserRole}@${tenantId === 'school-1' ? 'andalus' : 'falah'}-school.edu.sa`,
-      assignedClasses: currentUserRole === 'teacher' ? (tenantId === 'school-1' ? ['class-1a', 'class-1b'] : ['class-2a', 'class-2b']) : undefined,
+      phone: authenticatedPhone || '',
+      email: firebaseUser?.email || '',
+      assignedClasses: currentUserRole === 'teacher' ? [] : undefined,
     };
 
-  const settings = settingsMap[tenantId] || INITIAL_SETTINGS['school-1'];
+  const settings = settingsMap[tenantId] || getDefaultSchoolSettings(tenantId);
   const weekendDays = settings.weekendDays || schoolProfile.weekendDays || DEFAULT_WEEKEND_DAYS;
   const officialHolidays = settings.officialHolidays || schoolProfile.officialHolidays || DEFAULT_OFFICIAL_HOLIDAYS;
+
+  const messagingGateway: SchoolMessagingGatewayConfig = useMemo(() => {
+    return (
+      schoolProfile.messagingGateway ||
+      settings.messagingGateway || {
+        whatsappPhoneNumber: '',
+        whatsappServiceMode: 'web_direct',
+        smsProvider: 'taqnyat',
+        smsSenderId: '',
+        enableWhatsAppNotifications: false,
+        enableSmsNotifications: false,
+        lastConfiguredByRole: 'super_admin',
+        lastConfiguredByEmail: currentUser?.email || '',
+        lastConfiguredAt: '',
+      }
+    );
+  }, [schoolProfile.messagingGateway, settings.messagingGateway]);
 
   const isOffDay = (dateStr: string): OffDayCheckResult => {
     return isSchoolOffDay(dateStr, weekendDays, officialHolidays);
   };
 
-  // RBAC Permission Booleans
-  const canManageSettings = currentUserRole === 'admin';
-  const canReviewJustifications = currentUserRole === 'admin' || currentUserRole === 'registrar';
-  const canReopenSessions = currentUserRole === 'admin' || currentUserRole === 'registrar';
-  const canImportStudents = currentUserRole === 'admin' || currentUserRole === 'registrar';
-  const canDispatchDigest = currentUserRole === 'admin' || currentUserRole === 'registrar';
-  const canManageOutbox = currentUserRole === 'admin' || currentUserRole === 'registrar';
-
-  const canEditSession = (sess: AttendanceSession): boolean => {
-    if (currentUserRole === 'parent') return false;
-    if (currentUserRole === 'admin' || currentUserRole === 'registrar') return true;
-    if (currentUserRole === 'teacher') {
-      if (sess.status === 'submitted') return false;
-      const assigned = currentUser.assignedClasses || ['class-1a', 'class-1b'];
-      return assigned.includes(sess.classId) || sess.teacherId === currentUser.id;
+  // RBAC Permission Booleans (Super Admin has FULL permissions everywhere)
+  const canManageSettings = canManageSettingsRule(currentUserRole, isSuperAdmin);
+  // Parents read per-student mirrors, never the raw session documents.
+  useEffect(() => {
+    if (!firebaseUser || currentUserRole !== 'parent') {
+      setParentAttendanceRecords([]);
+      return;
     }
-    return false;
-  };
+    const phone = authenticatedPhone || currentUser?.phone;
+    if (!phone) return;
+
+    const recordsQuery = query(
+      collection(db, 'attendance_records'),
+      where('tenantId', '==', tenantId),
+      where('guardianPhone', '==', phone)
+    );
+    const unsubscribe = onSnapshot(
+      recordsQuery,
+      (snapshot) => {
+        const rows: StudentAttendanceRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          rows.push({ ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id });
+        });
+        setParentAttendanceRecords(rows.filter((row) => row.tenantId === tenantId));
+      },
+      (error) => console.error('[PARENT] Could not load attendance records:', error?.code)
+    );
+
+    return () => unsubscribe();
+  }, [firebaseUser, currentUserRole, currentUser?.phone, tenantId, authenticatedPhone]);
+
+  // Seed hashes at hydration so existing local/demo sessions are not bulk-uploaded;
+  // only sessions changed after hydration are written.
+  useEffect(() => {
+    if (!sessionsHydratedRef.current || sessionsSeededRef.current) return;
+    for (const session of allSessions) {
+      sessionHashesRef.current[session.id] = JSON.stringify(session);
+    }
+    sessionsSeededRef.current = true;
+  }, [allSessions]);
+
+  useEffect(() => {
+    if (!firebaseUser || !sessionsHydratedRef.current) return;
+    if (!['admin', 'registrar', 'teacher', 'super_admin'].includes(currentUserRole)) return;
+
+    const timer = setTimeout(() => {
+      const canWriteSubmitted = canWriteSubmittedSessions(currentUserRole);
+      for (const session of allSessions.filter((item) => item.tenantId === tenantId)) {
+        const hash = JSON.stringify(session);
+        if (sessionHashesRef.current[session.id] === hash) continue;
+
+        if (session.status === 'submitted' && !canWriteSubmitted) {
+          sessionHashesRef.current[session.id] = hash;
+          continue;
+        }
+
+        sessionHashesRef.current[session.id] = hash;
+        void setDoc(doc(db, 'attendance_sessions', session.id), toFirestoreData(session), { merge: true }).catch((error) =>
+          console.error('[SESSIONS] Could not persist session:', error)
+        );
+        for (const record of session.records) {
+          const student = allStudents.find((item) => item.id === record.studentId);
+          if (!student?.guardianPhone) continue;
+
+          const recordId = `${session.id}_${record.studentId}`;
+          void setDoc(
+            doc(db, 'attendance_records', recordId),
+            toFirestoreData({
+              id: recordId,
+              tenantId: session.tenantId,
+              sessionId: session.id,
+              studentId: record.studentId,
+              guardianPhone: student.guardianPhone,
+              date: session.date,
+              sessionType: session.sessionType,
+              periodNumber: session.periodNumber,
+              subject: session.subject,
+              classId: session.classId,
+              className: session.className,
+              teacherName: session.teacherName,
+              status: record.status,
+              minutesLate: record.minutesLate,
+              note: record.note,
+              updatedAt: record.updatedAt || new Date().toISOString(),
+            }),
+            { merge: true }
+          ).catch((error) => console.error('[SESSIONS] Could not persist attendance record:', error));
+        }
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [allSessions, allStudents, firebaseUser, tenantId, currentUserRole]);
+  // --- Settings persistence (Firestore is the source of truth; localCache is only a cache) ---
+  const settingsHydratedRef = useRef(false);
+  const lastSettingsHashRef = useRef('');
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      settingsHydratedRef.current = false;
+      return;
+    }
+
+    const settingsRef = doc(db, 'settings', tenantId);
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as any;
+          if (data?.settings) {
+            setSettingsMap((prev) => {
+              const current = prev[tenantId] || getDefaultSchoolSettings(tenantId);
+              return {
+                ...prev,
+                [tenantId]: {
+                  ...current,
+                  ...data.settings,
+                  messagingGateway: current.messagingGateway,
+                },
+              };
+            });
+          }
+          if (data?.schoolProfile) {
+            setSchoolProfilesMap((prev) => {
+              const current = prev[tenantId] || getDefaultSchoolProfile(tenantId);
+              return {
+                ...prev,
+                [tenantId]: {
+                  ...current,
+                  ...data.schoolProfile,
+                  messagingGateway: current.messagingGateway,
+                },
+              };
+            });
+          }
+        }
+        settingsHydratedRef.current = true;
+      },
+      (error) => {
+        console.error('[SETTINGS] Could not load shared settings:', error);
+        settingsHydratedRef.current = true;
+      }
+    );
+
+    return () => unsubscribe();
+  }, [firebaseUser, tenantId]);
+
+  // Gateway credentials live in an admin-only document, never in the tenant-readable settings.
+  useEffect(() => {
+    if (!firebaseUser || !canManageSettings) return;
+
+    const privateRef = doc(db, 'settings_private', tenantId);
+    const unsubscribe = onSnapshot(
+      privateRef,
+      (snapshot) => {
+        if (!snapshot.exists()) return;
+        const gateway = (snapshot.data() as any)?.messagingGateway;
+        if (!gateway) return;
+
+        setSettingsMap((prev) => ({
+          ...prev,
+          [tenantId]: {
+            ...(prev[tenantId] || getDefaultSchoolSettings(tenantId)),
+            messagingGateway: gateway,
+          },
+        }));
+        setSchoolProfilesMap((prev) => ({
+          ...prev,
+          [tenantId]: {
+            ...(prev[tenantId] || getDefaultSchoolProfile(tenantId)),
+            messagingGateway: gateway,
+          },
+        }));
+      },
+      (error) => console.error('[SETTINGS] Could not load messaging gateway:', error)
+    );
+
+    return () => unsubscribe();
+  }, [firebaseUser, tenantId, canManageSettings]);
+
+  useEffect(() => {
+    if (!firebaseUser || !canManageSettings || !settingsHydratedRef.current) return;
+
+    const timer = setTimeout(() => {
+      const currentSettings =
+        settingsMap[tenantId] || getDefaultSchoolSettings(tenantId);
+      const currentProfile = schoolProfilesMap[tenantId] || getDefaultSchoolProfile(tenantId);
+      const { messagingGateway: gatewayFromSettings, ...settingsForStore } = currentSettings;
+      const { messagingGateway: gatewayFromProfile, ...profileForStore } = currentProfile;
+      const gateway = gatewayFromSettings || gatewayFromProfile;
+      const timestamp = new Date().toISOString();
+      const payload = {
+        settings: settingsForStore,
+        schoolProfile: profileForStore,
+        updatedAt: timestamp,
+        updatedBy: firebaseUser.uid,
+      };
+      const hash = JSON.stringify(payload);
+      if (hash === lastSettingsHashRef.current) return;
+      lastSettingsHashRef.current = hash;
+
+      void setDoc(doc(db, 'settings', tenantId), payload, { merge: true }).catch((error) =>
+        console.error('[SETTINGS] Could not persist shared settings:', error)
+      );
+
+      if (gateway) {
+        void setDoc(
+          doc(db, 'settings_private', tenantId),
+          { messagingGateway: gateway, updatedAt: timestamp, updatedBy: firebaseUser.uid },
+          { merge: true }
+        ).catch((error) => console.error('[SETTINGS] Could not persist messaging gateway:', error));
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [settingsMap, schoolProfilesMap, tenantId, firebaseUser, canManageSettings]);
+  const canReviewJustifications = isElevatedOrSuperAdmin(currentUserRole, isSuperAdmin);
+  const canReopenSessions = isElevatedOrSuperAdmin(currentUserRole, isSuperAdmin);
+  const canImportStudents = isElevatedOrSuperAdmin(currentUserRole, isSuperAdmin);
+  const canDispatchDigest = isElevatedOrSuperAdmin(currentUserRole, isSuperAdmin);
+  const canManageOutbox = isElevatedOrSuperAdmin(currentUserRole, isSuperAdmin);
+
+  const canEditSession = (sess: AttendanceSession): boolean =>
+    canEditSessionRule({
+      role: currentUserRole,
+      isSuperAdmin,
+      userId: currentUser.id,
+      assignedClasses: currentUser.assignedClasses || ['class-1a', 'class-1b'],
+      session: sess,
+    });
 
   // Helper to determine if a student record belongs to the authenticated parent
-  const isChildOfGuardian = (student: Student, user: UserProfile): boolean => {
-    if (user.role !== 'parent') return true;
-    const cleanUserPhone = (user.phone || '').replace(/[^\d]/g, '');
-    const cleanGuardianPhone = (student.guardianPhone || '').replace(/[^\d]/g, '');
-    if (cleanUserPhone && cleanGuardianPhone && cleanUserPhone === cleanGuardianPhone) return true;
-    if (user.email && student.guardianEmail && user.email.toLowerCase() === student.guardianEmail.toLowerCase()) return true;
-    if (user.name && student.guardianName && (
-      student.guardianName.trim() === user.name.trim() ||
-      (user.name.includes('المطيري') && student.guardianName.includes('المطيري')) ||
-      (user.name.includes('الصاعدي') && student.guardianName.includes('الصاعدي'))
-    )) return true;
-    return false;
-  };
+  const isChildOfGuardian = (student: Student, user: UserProfile): boolean =>
+    isChildOfGuardianRule(user, student);
 
   // Student IDs belonging strictly to current parent
   const parentChildIds = currentUserRole === 'parent'
@@ -747,22 +1282,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     : allStudents.filter((s) => s.tenantId === tenantId);
 
   const sessions = currentUserRole === 'parent'
-    ? allSessions
-        .filter((s) => s.tenantId === tenantId)
-        .map((sess) => {
-          const matchingRecords = sess.records.filter((rec) => parentChildIds.includes(rec.studentId));
-          return {
-            ...sess,
-            records: matchingRecords,
-            totalStudents: matchingRecords.length,
-            presentCount: matchingRecords.filter((r) => r.status === 'present').length,
-            absentCount: matchingRecords.filter((r) => r.status === 'absent').length,
-            excusedCount: matchingRecords.filter(
-              (r) => r.status === 'excused_absence' || r.status === 'excused_leave' || r.status === 'under_review'
-            ).length,
-          };
-        })
-        .filter((sess) => sess.records.length > 0)
+    ? buildParentSessions(parentAttendanceRecords)
     : allSessions.filter((s) => s.tenantId === tenantId);
 
   const justifications = currentUserRole === 'parent'
@@ -779,8 +1299,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
   const auditLogs = currentUserRole === 'parent' ? [] : allAuditLogs.filter((a) => a.tenantId === tenantId);
 
-  // Scoped users for current school
-  const users = allUsers.filter((u) => u.tenantId === tenantId);
+  // Scoped users for current school (Stealth: super_admin NEVER appears in school staff lists)
+  const users = allUsers.filter((u) => u.tenantId === tenantId && u.role !== 'super_admin');
 
   // Dynamic School & Class Analytics
   const classesStats: SchoolClassSummary[] = useMemo(() => {
@@ -864,11 +1384,31 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     setAllUsers((prev) => {
       const updated = [...prev, newUser];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_users', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_users', JSON.stringify(updated));
       }
       return updated;
     });
+
+    if (firebaseUser) {
+      setDoc(
+        doc(db, 'users', id),
+        {
+          userId: id,
+          tenantId,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          phone: newUser.phone,
+          jobTitle: newUser.jobTitle || '',
+          assignedClasses: newUser.assignedClasses || [],
+          assignedSubjects: newUser.assignedSubjects || [],
+          status: newUser.status,
+          createdAt: newUser.createdAt,
+        },
+        { merge: true }
+      ).catch((err) => console.warn('[FIRESTORE] User doc sync failed:', err));
+    }
 
     addAuditLog({
       action: 'create',
@@ -886,8 +1426,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const updateUser = (userId: string, updates: Partial<UserProfile>) => {
     setAllUsers((prev) => {
       const updated = prev.map((u) => (u.id === userId && u.tenantId === tenantId ? { ...u, ...updates } : u));
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_users', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_users', JSON.stringify(updated));
       }
       return updated;
     });
@@ -908,14 +1448,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     if (!target) {
       return { success: false, message: 'المستخدم غير موجود' };
     }
+    if (target.role === 'super_admin' || target.id === 'user-owner') {
+      return { success: false, message: 'حساب مالك المنصة محمي تماماً ولا يمكن حذفه.' };
+    }
     if (target.id === currentUser.id) {
       return { success: false, message: 'لا يمكنك حذف حسابك الشخصي النشط حالياً' };
     }
 
     setAllUsers((prev) => {
       const updated = prev.filter((u) => u.id !== userId);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_users', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_users', JSON.stringify(updated));
       }
       return updated;
     });
@@ -947,8 +1490,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     setAllBehaviourIncidents((prev) => {
       const updated = [newIncident, ...prev];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_behaviour_incidents', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_behaviour_incidents', JSON.stringify(updated));
       }
       return updated;
     });
@@ -1181,10 +1724,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             category: isAbsent ? 'absence' : 'late',
             messageText: msg,
             channel: ch,
-            status: 'sent',
+            status: 'pending',
             retryCount: 0,
             createdAt: now,
-            sentAt: now,
           });
         }
       }
@@ -1300,7 +1842,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       classId,
       className,
       grade,
-      teacherId: currentUser.id,
+      teacherId: firebaseUser?.uid || currentUser.id,
       teacherName: currentUser.name,
       status: 'draft',
       totalStudents: records.length,
@@ -1360,6 +1902,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       tenantId: tenantId,
       studentId,
       studentName: student?.fullName || 'طالب',
+      guardianPhone: student?.guardianPhone || currentUser?.phone || '',
       className: student?.className || 'الفصل',
       absenceDate,
       reasonType,
@@ -1380,6 +1923,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         tenantId: newJust.tenantId,
         studentId: newJust.studentId,
         studentName: newJust.studentName,
+        guardianPhone: newJust.guardianPhone || null,
         className: newJust.className,
         absenceDate: newJust.absenceDate,
         reasonType: newJust.reasonType,
@@ -1509,10 +2053,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           category: 'excuse_approved',
           messageText: `المكرم ولي أمر الطالب (${student.fullName}): تم قبول واعتماد العذر الطبي المقدم لغياب نجلكم بتاريخ ${just.absenceDate} رسمياً من قبل إدارة المدرسة.`,
           channel: settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS',
-          status: 'sent',
+          status: 'pending',
           retryCount: 0,
           createdAt: now,
-          sentAt: now,
         };
         setAllNotifications((prev) => [approvalNotif, ...prev]);
         if (firebaseUser) {
@@ -1541,40 +2084,212 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   };
 
   const retryNotification = async (id: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        setAllNotifications((prev) =>
-          prev.map((n) =>
+    const target = allNotifications.find((n) => n.id === id);
+    if (!target) return false;
+
+    if (!canManageOutbox) {
+      console.warn('Unauthorized: Notification dispatch requires administrator or registrar privileges.');
+      return false;
+    }
+
+    try {
+      const res = await authenticatedFetch('/api/notifications/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          channel: target.channel,
+          notifications: [target],
+        }),
+      });
+
+      const resJson = res.ok ? await res.json() : null;
+      if (!res.ok || !resJson) {
+        const reason = resJson?.error || 'No messaging gateway is configured for this school.';
+        setAllNotifications((prev) => {
+          const updated = prev.map((n) =>
+            n.id === id
+              ? { ...n, status: 'failed' as const, retryCount: n.retryCount + 1, errorReason: reason }
+              : n
+          );
+          if (typeof localCache !== 'undefined') {
+            localCache.setItem('school_notifications', JSON.stringify(updated));
+          }
+          return updated;
+        });
+        return false;
+      }
+
+      const outcome = (resJson?.results?.find((r: any) => r.id === id) || resJson?.receipts?.[0] || null) as any;
+
+      if (!outcome || outcome.status === 'manual') {
+        // Nothing was transmitted (e.g. WhatsApp Web direct mode); the item stays queued.
+        setAllNotifications((prev) => {
+          const updated = prev.map((n) =>
+            n.id === id
+              ? { ...n, status: 'pending' as const, retryCount: n.retryCount + 1, errorReason: outcome?.errorReason }
+              : n
+          );
+          if (typeof localCache !== 'undefined') {
+            localCache.setItem('school_notifications', JSON.stringify(updated));
+          }
+          return updated;
+        });
+        return false;
+      }
+
+      if (outcome.status === 'failed') {
+        setAllNotifications((prev) => {
+          const updated = prev.map((n) =>
             n.id === id
               ? {
                   ...n,
-                  status: 'sent',
+                  status: 'failed' as const,
                   retryCount: n.retryCount + 1,
-                  sentAt: new Date().toISOString(),
-                  errorReason: undefined,
+                  errorReason: outcome.errorReason || 'Gateway rejected the message.',
                 }
               : n
-          )
+          );
+          if (typeof localCache !== 'undefined') {
+            localCache.setItem('school_notifications', JSON.stringify(updated));
+          }
+          return updated;
+        });
+        return false;
+      }
+
+      const receipt = resJson?.receipts?.find((r: any) => r.id === id) || outcome;
+
+      setAllNotifications((prev) => {
+        const updated = prev.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                status: 'sent' as const,
+                retryCount: n.retryCount + 1,
+                sentAt: receipt?.sentAt || new Date().toISOString(),
+                gatewayReceiptId: receipt?.gatewayReceiptId,
+                gatewayProvider: receipt?.gatewayProvider,
+                errorReason: undefined,
+              }
+            : n
         );
-        resolve(true);
-      }, 700);
-    });
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_notifications', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      addAuditLog({
+        entityType: 'settings',
+        entityId: target.id,
+        action: 'update',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `إعادة إرسال إشعار ولي الأمر عبر (${target.channel}) للطالب (${target.studentName}) - رقم الإيصال: ${receipt?.gatewayReceiptId || 'بدون إيصال'}.`,
+      });
+
+      return true;
+    } catch (err: any) {
+      const reason = err?.message || 'Network error while dispatching the notification.';
+      console.error('Notification retry failed:', err);
+      setAllNotifications((prev) => {
+        const updated = prev.map((n) =>
+          n.id === id
+            ? { ...n, status: 'failed' as const, retryCount: n.retryCount + 1, errorReason: reason }
+            : n
+        );
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_notifications', JSON.stringify(updated));
+        }
+        return updated;
+      });
+      return false;
+    }
   };
 
-  const retryAllFailedNotifications = () => {
-    setAllNotifications((prev) =>
-      prev.map((n) =>
-        n.tenantId === tenantId && n.status === 'failed'
-          ? {
+  const retryAllFailedNotifications = async () => {
+    if (!canManageOutbox) {
+      console.warn('Unauthorized: Notification dispatch requires administrator or registrar privileges.');
+      return;
+    }
+
+    const failedItems = allNotifications.filter((n) => n.tenantId === tenantId && n.status === 'failed');
+    if (failedItems.length === 0) return;
+
+    try {
+      const res = await authenticatedFetch('/api/notifications/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          notifications: failedItems,
+        }),
+      });
+
+      const resJson = res.ok ? await res.json() : null;
+
+      if (!res.ok || !resJson) {
+        console.warn('Bulk notification retry aborted:', resJson?.error || `HTTP ${res.status}`);
+        return;
+      }
+
+      const receiptMap = new Map<string, any>();
+      if (Array.isArray(resJson?.receipts)) {
+        for (const r of resJson.receipts) receiptMap.set(r.id, r);
+      }
+      const resultMap = new Map<string, any>();
+      if (Array.isArray(resJson?.results)) {
+        for (const r of resJson.results) resultMap.set(r.id, r);
+      }
+
+      const sentCount = failedItems.filter((n) => resultMap.get(n.id)?.status === 'sent').length;
+
+      setAllNotifications((prev) => {
+        const updated = prev.map((n) => {
+          if (n.tenantId !== tenantId || n.status !== 'failed') return n;
+          const outcome = resultMap.get(n.id) as any;
+          if (!outcome || outcome.status === 'manual') {
+            return { ...n, status: 'pending' as const, retryCount: n.retryCount + 1, errorReason: outcome?.errorReason };
+          }
+          if (outcome.status === 'failed') {
+            return {
               ...n,
-              status: 'sent',
+              status: 'failed' as const,
               retryCount: n.retryCount + 1,
-              sentAt: new Date().toISOString(),
-              errorReason: undefined,
-            }
-          : n
-      )
-    );
+              errorReason: outcome.errorReason || 'Gateway rejected the message.',
+            };
+          }
+          const receipt = receiptMap.get(n.id) || outcome;
+          return {
+            ...n,
+            status: 'sent' as const,
+            retryCount: n.retryCount + 1,
+            sentAt: receipt?.sentAt || new Date().toISOString(),
+            gatewayReceiptId: receipt?.gatewayReceiptId,
+            gatewayProvider: receipt?.gatewayProvider,
+            errorReason: undefined,
+          };
+        });
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_notifications', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      addAuditLog({
+        entityType: 'settings',
+        entityId: `bulk-retry-${tenantId}`,
+        action: 'update',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `إعادة محاولة إرسال الإشعارات المتعثرة (${failedItems.length} إشعار): تم إرسال ${sentCount} بنجاح عبر بوابة المشغل.`,
+      });
+    } catch (err) {
+      console.error('Bulk notification retry failed:', err);
+    }
   };
 
   const sendCustomParentNotification = (params: {
@@ -1584,6 +2299,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     category?: 'absence' | 'late' | 'warning' | 'broadcast' | 'excuse_approved';
     absenceDate?: string;
   }): number => {
+    if (!canManageOutbox) {
+      console.warn('Unauthorized: Notification dispatch requires administrator or registrar privileges.');
+      return 0;
+    }
+
     const now = new Date().toISOString();
     const newItems: NotificationOutboxItem[] = [];
 
@@ -1623,10 +2343,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           category: params.category || 'broadcast',
           messageText: formattedMsg,
           channel: params.channel,
-          status: 'sent',
+          status: 'pending',
           retryCount: 0,
           createdAt: now,
-          sentAt: now,
         };
         newItems.push(item);
       }
@@ -1634,6 +2353,77 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     if (newItems.length > 0) {
       setAllNotifications((prev) => [...newItems, ...prev]);
+
+      // Fire asynchronous backend gateway dispatch
+      authenticatedFetch('/api/notifications/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          channel: params.channel,
+          notifications: newItems,
+        }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          const newIds = new Set(newItems.map((item) => item.id));
+          if (!data) {
+            setAllNotifications((prev) =>
+              prev.map((item) =>
+                newIds.has(item.id)
+                  ? { ...item, status: 'failed' as const, errorReason: 'No messaging gateway is configured for this school.' }
+                  : item
+              )
+            );
+            return;
+          }
+
+          const receiptMap = new Map<string, any>();
+          if (Array.isArray(data?.receipts)) {
+            data.receipts.forEach((r: any) => receiptMap.set(r.id, r));
+          }
+          const resultMap = new Map<string, any>();
+          if (Array.isArray(data?.results)) {
+            data.results.forEach((r: any) => resultMap.set(r.id, r));
+          }
+
+          setAllNotifications((prev) =>
+            prev.map((item) => {
+              if (!newIds.has(item.id)) return item;
+              const outcome = resultMap.get(item.id) as any;
+              if (!outcome || outcome.status === 'manual') {
+                return { ...item, status: 'pending' as const, errorReason: outcome?.errorReason };
+              }
+              if (outcome.status === 'failed') {
+                return {
+                  ...item,
+                  status: 'failed' as const,
+                  errorReason: outcome.errorReason || 'Gateway rejected the message.',
+                };
+              }
+              const receipt = receiptMap.get(item.id) || outcome;
+              return {
+                ...item,
+                status: 'sent' as const,
+                gatewayReceiptId: receipt?.gatewayReceiptId,
+                gatewayProvider: receipt?.gatewayProvider,
+                sentAt: receipt?.sentAt || new Date().toISOString(),
+                errorReason: undefined,
+              };
+            })
+          );
+        })
+        .catch((err) => {
+          console.error('Backend notification dispatch failed:', err);
+          const newIds = new Set(newItems.map((item) => item.id));
+          setAllNotifications((prev) =>
+            prev.map((item) =>
+              newIds.has(item.id)
+                ? { ...item, status: 'failed' as const, errorReason: 'Network error while contacting the messaging gateway.' }
+                : item
+            )
+          );
+        });
 
       if (firebaseUser) {
         newItems.forEach((n) => {
@@ -1647,6 +2437,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             channel: n.channel,
             status: n.status,
             retryCount: n.retryCount,
+            gatewayReceiptId: n.gatewayReceiptId,
+            gatewayProvider: n.gatewayProvider,
           }).catch((err) => {
             handleFirestoreError(err, OperationType.WRITE, `notification_outbox/${n.id}`);
           });
@@ -1660,7 +2452,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerId: currentUser.id,
         performerName: currentUser.name,
         performerRole: currentUser.role,
-        details: `إرسال وبث رسائل مخصصة لأولياء الأمور: تم إرسال ${newItems.length} رسالة عبر (${params.channel}).`,
+        details: `إرسال وبث رسائل مخصصة لأولياء الأمور: تم إدراج ${newItems.length} رسالة في الطابور عبر (${params.channel}).`,
       });
     }
 
@@ -1699,10 +2491,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       category: 'warning',
       messageText: message,
       channel: settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS',
-      status: 'sent',
+      status: 'pending',
       retryCount: 0,
       createdAt: now,
-      sentAt: now,
     };
 
     setAllNotifications((prev) => [warningItem, ...prev]);
@@ -1748,6 +2539,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     return sent;
   };
 
+  const persistStudent = (student: Student) => {
+    if (!firebaseUser) return;
+    void setDoc(doc(db, 'students', student.id), toFirestoreData(student), { merge: true }).catch((error) =>
+      console.error('[STUDENTS] Could not persist student:', error)
+    );
+  };
+
+  const persistStudentPatch = (studentId: string, updates: Partial<Student>) => {
+    if (!firebaseUser) return;
+    void setDoc(doc(db, 'students', studentId), toFirestoreData(updates), { merge: true }).catch((error) =>
+      console.error('[STUDENTS] Could not update student:', error)
+    );
+  };
   const importStudents = (newStudentsList: Partial<Student>[]) => {
     if (!canImportStudents) {
       console.warn('Unauthorized: Student import requires administrator or registrar privileges.');
@@ -1814,6 +2618,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     if (additions.length > 0) {
       setAllStudents((prev) => [...prev, ...additions]);
+      additions.forEach(persistStudent);
       addAuditLog({
         entityType: 'student',
         entityId: `bulk-import-${Date.now()}`,
@@ -1844,11 +2649,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
     setAllStudents((prev) => {
       const updated = [newStudent, ...prev];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_students', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
       }
       return updated;
     });
+
+    persistStudent(newStudent);
 
     addAuditLog({
       action: 'create',
@@ -1864,12 +2671,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   };
 
   const updateStudent = (studentId: string, updates: Partial<Student>) => {
+    persistStudentPatch(studentId, updates);
     setAllStudents((prev) => {
       const updated = prev.map((s) =>
         s.id === studentId && s.tenantId === tenantId ? { ...s, ...updates } : s
       );
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_students', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
       }
       return updated;
     });
@@ -1891,6 +2699,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   ) => {
     const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
     if (!target) return;
+    persistStudentPatch(studentId, {
+      enrollmentStatus: 'transferred',
+      transferredAt: new Date().toISOString(),
+      destinationSchool: details.destinationSchool,
+      transferReason: details.reason || 'نقل رسمي إلى مدرسة أخرى',
+    });
 
     const now = new Date().toISOString();
     setAllStudents((prev) => {
@@ -1905,8 +2719,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             }
           : s
       );
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_students', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
       }
       return updated;
     });
@@ -1925,6 +2739,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const restoreStudent = (studentId: string) => {
     const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
     if (!target) return;
+    persistStudentPatch(studentId, {
+      enrollmentStatus: 'active',
+      transferredAt: undefined,
+      destinationSchool: undefined,
+      transferReason: undefined,
+    });
 
     setAllStudents((prev) => {
       const updated = prev.map((s) =>
@@ -1938,8 +2758,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             }
           : s
       );
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_students', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
       }
       return updated;
     });
@@ -1958,13 +2778,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const deleteStudent = (studentId: string): { success: boolean; message: string } => {
     const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
     if (!target) {
+    if (firebaseUser) {
+      void deleteDoc(doc(db, 'students', studentId)).catch((error) =>
+        console.error('[STUDENTS] Could not delete student:', error)
+      );
+    }
       return { success: false, message: 'الطالب غير موجود' };
     }
 
     setAllStudents((prev) => {
       const updated = prev.filter((s) => s.id !== studentId);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_students', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
       }
       return updated;
     });
@@ -1995,8 +2820,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           ...newSettings,
         },
       };
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_settings', JSON.stringify(updated));
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_settings', JSON.stringify(updated));
       }
       return updated;
     });
@@ -2022,9 +2847,21 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const updated: TenantSchoolProfile = {
         ...current,
         ...newProfile,
+        countryCallingCode:
+          newProfile.countryCallingCode ||
+          newProfile.address?.countryCallingCode ||
+          current.countryCallingCode ||
+          current.address?.countryCallingCode ||
+          '+966',
         address: {
           ...current.address,
           ...(newProfile.address || {}),
+          countryCallingCode:
+            newProfile.address?.countryCallingCode ||
+            newProfile.countryCallingCode ||
+            current.address?.countryCallingCode ||
+            current.countryCallingCode ||
+            '+966',
         },
         leadership: {
           ...current.leadership,
@@ -2035,12 +2872,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           ...(newProfile.academicYear || {}),
         },
         timetablePeriods: newProfile.timetablePeriods || current.timetablePeriods,
+        educationalGrades: newProfile.educationalGrades || current.educationalGrades,
         classes: newProfile.classes || current.classes,
         subjects: newProfile.subjects || current.subjects,
         assemblyPoints: newProfile.assemblyPoints || current.assemblyPoints,
+        messagingGateway: isSuperAdmin
+          ? (newProfile.messagingGateway || current.messagingGateway)
+          : current.messagingGateway,
       };
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem(
           'tenant_school_profiles',
           JSON.stringify({
             ...prev,
@@ -2063,6 +2904,95 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUser.role,
       details: 'تحديث بيانات المدرسة الرسمية، القيادة المدرسية، التقويم الدراسي، ونقاط التجمع للطوارئ.',
     });
+  };
+
+  const updateMessagingGateway = (
+    config: Partial<SchoolMessagingGatewayConfig>
+  ): { success: boolean; message: string } => {
+    if (!isSuperAdmin) {
+      const errorMsg = 'عذراً، صلاحية ضبط وتعديل بوابات الرسائل والواتساب محصورة بمالك المنصة (The Owner) فقط.';
+      console.warn(errorMsg);
+      return { success: false, message: errorMsg };
+    }
+
+    const currentGw =
+      schoolProfile.messagingGateway ||
+      settings.messagingGateway || {
+        whatsappPhoneNumber: '',
+        whatsappServiceMode: 'web_direct',
+        smsProvider: 'taqnyat',
+        smsSenderId: '',
+        enableWhatsAppNotifications: false,
+        enableSmsNotifications: false,
+      };
+
+    const updatedGateway: SchoolMessagingGatewayConfig = {
+      ...currentGw,
+      ...config,
+      lastConfiguredByRole: 'super_admin',
+      lastConfiguredByEmail: currentUser?.email,
+      lastConfiguredAt: new Date().toISOString(),
+    };
+
+    // 1. Update in SchoolProfilesMap
+    setSchoolProfilesMap((prev) => {
+      const current = prev[tenantId] || getDefaultSchoolProfile(tenantId);
+      const updatedProfile = {
+        ...current,
+        messagingGateway: updatedGateway,
+      };
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem(
+          'tenant_school_profiles',
+          JSON.stringify({
+            ...prev,
+            [tenantId]: updatedProfile,
+          })
+        );
+      }
+      return {
+        ...prev,
+        [tenantId]: updatedProfile,
+      };
+    });
+
+    // 2. Update in SettingsMap
+    setSettingsMap((prev) => {
+      const current = prev[tenantId] || getDefaultSchoolSettings(tenantId);
+      const updatedSettings = {
+        ...current,
+        messagingGateway: updatedGateway,
+      };
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem(
+          'school_settings',
+          JSON.stringify({
+            ...prev,
+            [tenantId]: updatedSettings,
+          })
+        );
+      }
+      return {
+        ...prev,
+        [tenantId]: updatedSettings,
+      };
+    });
+
+    // 3. Log audit event
+    addAuditLog({
+      entityType: 'settings',
+      entityId: `gateway-${tenantId}`,
+      action: 'update',
+      performerId: currentUser.id,
+      performerName: currentUser.name,
+      performerRole: currentUser.role,
+      details: `تحديث بيانات وبوابات المراسلة والواتساب (رقم الواتساب: ${updatedGateway.whatsappPhoneNumber}، وضع الخدمة: ${updatedGateway.whatsappServiceMode}، مزود SMS: ${updatedGateway.smsProvider}) بواسطة مالك المنصة.`,
+    });
+
+    return {
+      success: true,
+      message: 'تم حفظ وتفعيل بوابات المراسلة والواتساب للمدرسة بنجاح من قبل مالك المنصة.',
+    };
   };
 
   const updateDigestConfig = (cfg: Partial<DailyEmailDigestConfig>) => {
@@ -2124,23 +3054,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       }
     }
 
-    // Default fallback briefing if offline or empty
-    if (!geminiBriefing && effectiveConfig.includeGeminiBriefing) {
-      geminiBriefing = {
-        headline: `نشرة الصباح اليومية للانضباط - ${currentTenant.name}`,
-        urgencyLevel: baseData.anomalies.length > 0 ? 'elevated' : 'normal',
-        executiveSummary: `متابعة انضباط مدرسة ${currentTenant.name}. نسبة الحضور العامة ${baseData.overallAttendanceRate}%. رُصد ${baseData.anomaliesCount} شذوذات سلوكية، و${baseData.pendingJustificationsCount} أعذار معلقة، و${baseData.highRiskStudentsCount} طلاب بحاجة لمتابعة إرشادية.`,
-        keyPriorities: [
-          'اعتماد كشوف الحضور غير المعتمدة للشعب قبل انطلاق الحصة الأولى.',
-          'تدقيق الأعذار الطبية المعلقة وفحص المستندات ذات الملاحظات بالذكاء الاصطناعي.',
-          'تواصل الموجه الطلابي مع أولياء أمور الطلاب المعرضين للحرمان (5+ أيام غياب).',
-        ],
-        counselorDirectives: [
-          'إجراء مقابلات إرشادية صباحية للطلاب متكرري الغياب.',
-          'تسجيل أسباب الغياب في ملف الرعاية الطلابية.',
-        ],
-      };
-    }
+    // When the AI briefing is requested but unavailable, the digest is sent with
+    // the real attendance data only — no fabricated briefing is injected.
 
     const digestItem: DailyEmailDigestItem = {
       ...baseData,
@@ -2179,10 +3094,32 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       });
 
       const resJson = res.ok ? await res.json() : null;
+
+      if (!res.ok || !resJson) {
+        const reason = resJson?.error || `The email transport rejected the daily digest (HTTP ${res.status}).`;
+        const failedDigest: DailyEmailDigestItem = {
+          ...digest,
+          status: 'failed',
+          dispatchedAt: new Date().toISOString(),
+          recipients: effectiveRecipients,
+        };
+        setDigestHistory((prev) => [failedDigest, ...prev.slice(0, 49)]);
+        addAuditLog({
+          entityType: 'settings',
+          entityId: failedDigest.id,
+          action: 'submit',
+          performerId: currentUser.id,
+          performerName: currentUser.name,
+          performerRole: currentUser.role,
+          details: `فشل إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم): ${reason}`,
+        });
+        return { success: false, message: reason, digestItem: failedDigest };
+      }
+
       const dispatchedDigest: DailyEmailDigestItem = {
         ...digest,
         status: 'delivered',
-        dispatchedAt: new Date().toISOString(),
+        dispatchedAt: resJson.dispatchedAt || new Date().toISOString(),
         recipients: effectiveRecipients,
       };
 
@@ -2205,33 +3142,207 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
       return {
         success: true,
-        message: resJson?.message || `تم إرسال النشرة الصباحية بنجاح إلى ${effectiveRecipients.length} من قيادات المدرسة.`,
+        message: resJson.message || `تم إرسال النشرة الصباحية بنجاح إلى ${effectiveRecipients.length} من قيادات المدرسة.`,
         digestItem: dispatchedDigest,
       };
     } catch (err: any) {
+      const reason = err?.message || 'Network error while dispatching the daily digest.';
       console.error('Failed to dispatch digest:', err);
-      const simulatedDigest: DailyEmailDigestItem = {
+      const failedDigest: DailyEmailDigestItem = {
         ...digest,
-        status: 'simulated',
+        status: 'failed',
         dispatchedAt: new Date().toISOString(),
         recipients: effectiveRecipients,
       };
-      setDigestHistory((prev) => [simulatedDigest, ...prev.slice(0, 49)]);
+      setDigestHistory((prev) => [failedDigest, ...prev.slice(0, 49)]);
 
       addAuditLog({
         entityType: 'settings',
-        entityId: simulatedDigest.id,
+        entityId: failedDigest.id,
         action: 'submit',
         performerId: currentUser.id,
         performerName: currentUser.name,
         performerRole: currentUser.role,
-        details: `محاكاة إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم).`,
+        details: `فشل إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم): ${reason}`,
+      });
+
+      return {
+        success: false,
+        message: `فشل إرسال النشرة الصباحية: ${reason}`,
+        digestItem: failedDigest,
+      };
+    }
+  };
+
+  const provisionNewSchool = async (
+    input: SchoolProvisionInput
+  ): Promise<{ success: boolean; message: string; tenantId: string }> => {
+    try {
+      const trimmedId = input.id.trim();
+      const trimmedSubdomain = input.subdomain.trim().toLowerCase();
+
+      // Check for conflict
+      const activeRegistry = getActiveTenantRegistry();
+      if (activeRegistry[trimmedId]) {
+        return {
+          success: false,
+          message: `معرّف المدرسة (${trimmedId}) مسجل مسبقاً في المنصة.`,
+          tenantId: trimmedId,
+        };
+      }
+      const existingSubdomains = Object.values(activeRegistry).map((c) => c.subdomain.toLowerCase());
+      if (existingSubdomains.includes(trimmedSubdomain)) {
+        return {
+          success: false,
+          message: `النطاق الفرعي (${trimmedSubdomain}) محجوز مسبقاً لمدرسة أخرى.`,
+          tenantId: trimmedId,
+        };
+      }
+
+      // 1. Create TenantDomainConfig
+      const newDomainConfig: TenantDomainConfig = {
+        tenantId: trimmedId,
+        subdomain: trimmedSubdomain,
+        customDomains: input.customDomains && input.customDomains.length > 0
+          ? input.customDomains
+          : [
+              `portal.${trimmedSubdomain}.edu`,
+              `attendance.${trimmedSubdomain}-school.edu.sa`,
+              `${trimmedSubdomain}.smartschool.com`,
+              `${trimmedSubdomain}.localhost`,
+            ],
+        nameAr: input.nameAr.trim(),
+        nameEn: input.nameEn.trim(),
+        code: input.code.trim().toUpperCase(),
+        cityAr: input.cityAr.trim(),
+        cityEn: input.cityEn.trim(),
+        academicYear: input.academicYear.trim(),
+        currentTerm: 'الفصل الدراسي الأول',
+        schoolType: input.schoolType,
+        primaryColor: input.primaryColor || '#059669',
+        logoText: input.logoText.trim() || input.nameAr.trim().charAt(0) || 'م',
+        isActive: true,
+      };
+
+      // 2. Persist dynamic tenant
+      const updatedDynamic = [...dynamicTenants.filter((d) => d.tenantId !== trimmedId), newDomainConfig];
+      setDynamicTenants(updatedDynamic);
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_dynamic_tenants', JSON.stringify(updatedDynamic));
+      }
+
+      // Persist to server filesystem so all subdomains immediately have access
+      try {
+        await authenticatedFetch('/api/tenants/provision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newDomainConfig),
+        });
+      } catch (syncErr) {
+        console.warn('Could not sync dynamic tenant to server file:', syncErr);
+      }
+
+      // 3. Create TenantSchoolProfile
+      const defaultProfile = getDefaultSchoolProfile(trimmedId);
+      const chosenCountry = input.countryAr?.trim() || defaultProfile.address?.country || 'المملكة العربية السعودية';
+      const chosenDialCode = input.countryCallingCode?.trim() || defaultProfile.countryCallingCode || '+966';
+
+      const newProfile: TenantSchoolProfile = {
+        ...defaultProfile,
+        tenantId: trimmedId,
+        schoolName: input.nameAr.trim(),
+        schoolCode: input.code.trim().toUpperCase(),
+        genderType: input.schoolType,
+        officialEmail: input.principalEmail.trim().toLowerCase(),
+        countryCallingCode: chosenDialCode,
+        generalPhone: input.principalPhone?.trim() || `${chosenDialCode}500000000`,
+        websiteUrl: `https://${trimmedSubdomain}.smartschool.com`,
+        address: {
+          ...defaultProfile.address,
+          country: chosenCountry,
+          countryCallingCode: chosenDialCode,
+          city: input.cityAr.trim(),
+          district: 'حي النرجس',
+          streetAddress: 'طريق الملك فهد',
+        },
+        leadership: {
+          ...defaultProfile.leadership,
+          principalName: input.principalName.trim(),
+          principalEmail: input.principalEmail.trim().toLowerCase(),
+          principalPhone: input.principalPhone?.trim() || `${chosenDialCode}500000000`,
+        },
+        academicYear: {
+          ...defaultProfile.academicYear,
+          hijriYear: input.academicYear.trim(),
+        },
+      };
+
+      setSchoolProfilesMap((prev) => {
+        const next = { ...prev, [trimmedId]: newProfile };
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('tenant_school_profiles', JSON.stringify(next));
+        }
+        return next;
+      });
+
+      // 4. Create default SchoolSettings
+      setSettingsMap((prev) => {
+        const next = {
+          ...prev,
+          [trimmedId]: {
+            ...getDefaultSchoolSettings(tenantId),
+            schoolName: input.nameAr.trim(),
+          },
+        };
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_settings', JSON.stringify(next));
+        }
+        return next;
+      });
+
+      // 5. Create Principal user profile
+      const principalUser: UserProfile = {
+        id: `user-admin-${trimmedId}`,
+        tenantId: trimmedId,
+        name: input.principalName.trim(),
+        role: 'admin',
+        email: input.principalEmail.trim().toLowerCase(),
+        phone: input.principalPhone?.trim() || '+966500000000',
+        jobTitle: 'مدير المدرسة (School Principal)',
+        status: 'active',
+      };
+
+      setAllUsers((prev) => {
+        const filtered = prev.filter((u) => u.email.toLowerCase() !== principalUser.email.toLowerCase());
+        const next = [...filtered, principalUser];
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_users', JSON.stringify(next));
+        }
+        return next;
+      });
+
+      // 6. Record in Audit Log
+      addAuditLog({
+        entityType: 'settings',
+        entityId: trimmedId,
+        action: 'create',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `تأسيس مدرسة جديدة بالمنصة: ${input.nameAr} (${input.code}) بنطاق فرعي (${trimmedSubdomain}). تم إنشاء حساب المدير: ${input.principalEmail}`,
       });
 
       return {
         success: true,
-        message: `تمت محاكاة إرسال النشرة الصباحية بنجاح إلى بريد القيادة المدرسية (${effectiveRecipients.length} مستلم).`,
-        digestItem: simulatedDigest,
+        message: `تم تأسيس مدرسة (${input.nameAr}) بنجاح وتفعيل النطاق السحابي وحساب المدير!`,
+        tenantId: trimmedId,
+      };
+    } catch (err: any) {
+      console.error('Failed to provision school:', err);
+      return {
+        success: false,
+        message: `فشل تأسيس المدرسة: ${err?.message || 'خطأ غير متوقع'}`,
+        tenantId: input.id,
       };
     }
   };
@@ -2242,14 +3353,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         firebaseUser,
         signInWithGoogle,
         signOutGoogle,
+        signInWithCredentials,
         currentTenant,
         tenantDomainConfig,
-        tenants: INITIAL_TENANTS,
+        tenants,
         setTenantId,
         currentUser,
         setUserRole,
         lang,
         setLang,
+        isSuperAdmin,
         canManageSettings,
         canReviewJustifications,
         canReopenSessions,
@@ -2257,6 +3370,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         canDispatchDigest,
         canManageOutbox,
         canEditSession,
+        provisionNewSchool,
+        refreshDynamicTenants: syncTenantsWithServer,
         users,
         createUser,
         updateUser,
@@ -2293,6 +3408,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         updateSettings,
         schoolProfile,
         updateSchoolProfile,
+        messagingGateway,
+        updateMessagingGateway,
         isOffDay,
         weekendDays,
         officialHolidays,

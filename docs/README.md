@@ -30,4 +30,4 @@ All functions, mathematical calculations, date boundaries, and data ingestion pi
 
 ## Quality & Verification
 
-The repository includes a comprehensive automated test suite (8 test suites, 61 passing tests) executed via Vitest, ensuring zero regressions across RBAC, calculations, calendar persistence, and settings compliance.
+The repository includes a comprehensive automated test suite (27 test suites, 192 passing tests) executed via Vitest (`npm test`) and a local security audit (`npm run audit`), ensuring zero regressions across RBAC, calculations, calendar persistence, parent portal isolation, messaging-provider adapters, and settings compliance.

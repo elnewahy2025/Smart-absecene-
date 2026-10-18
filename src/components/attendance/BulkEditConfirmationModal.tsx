@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Student, AttendanceStatus } from '../../types/attendance';
 import { AlertTriangle, Users, CheckCircle2, X } from 'lucide-react';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface Props {
   isOpen: boolean;
@@ -22,6 +23,8 @@ export const BulkEditConfirmationModal: React.FC<Props> = ({
   sessionTitle,
   lang,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   if (!isOpen) return null;
 
   const isAbsentAction = targetStatus === 'absent';
@@ -37,6 +40,8 @@ export const BulkEditConfirmationModal: React.FC<Props> = ({
   const content = (
     <div
       className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-in fade-in duration-150"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >

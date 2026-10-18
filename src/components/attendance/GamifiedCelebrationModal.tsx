@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PartyPopper, Sparkles, CheckCircle2, Award } from 'lucide-react';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface Props {
   isOpen: boolean;
@@ -33,6 +34,9 @@ export const GamifiedCelebrationModal: React.FC<Props> = ({
     }
   }, [isOpen, onClose]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
+
   if (!isOpen) return null;
 
   const isFullAttendance = attendanceRate >= 100;
@@ -41,6 +45,8 @@ export const GamifiedCelebrationModal: React.FC<Props> = ({
     <div
       className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200"
       onClick={onClose}
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >

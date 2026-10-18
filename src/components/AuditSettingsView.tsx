@@ -15,15 +15,19 @@ import {
   Building2,
   UserCog,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import { SchoolIdentityTab } from './settings/SchoolIdentityTab';
 import { SchoolContactTab } from './settings/SchoolContactTab';
 import { SchoolLeadershipTab } from './settings/SchoolLeadershipTab';
 import { AcademicCalendarTab } from './settings/AcademicCalendarTab';
+import { GradesAndClassesTab } from './settings/GradesAndClassesTab';
+import { TimetablePeriodsTab } from './settings/TimetablePeriodsTab';
 import { EmergencyPolicyTab } from './settings/EmergencyPolicyTab';
 import { UserManagementTab } from './settings/UserManagementTab';
 import { SchoolAIGeminiTab } from './settings/SchoolAIGeminiTab';
 import { HolidaysAndWeekendsCard } from './settings/HolidaysAndWeekendsCard';
+import { SchoolMessagingGatewaysTab } from './settings/SchoolMessagingGatewaysTab';
 
 export const AuditSettingsView: React.FC = () => {
   const {
@@ -32,9 +36,12 @@ export const AuditSettingsView: React.FC = () => {
     updateSettings,
     schoolProfile,
     updateSchoolProfile,
+    messagingGateway,
+    updateMessagingGateway,
     lang,
     currentTenant,
     currentUser,
+    isSuperAdmin,
     canManageSettings,
     users,
     createUser,
@@ -43,8 +50,8 @@ export const AuditSettingsView: React.FC = () => {
     classesStats,
   } = useAttendance();
 
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'settings' | 'users' | 'ai' | 'audit'>('profile');
-  const [activeProfileTab, setActiveProfileTab] = useState<'identity' | 'contact' | 'leadership' | 'calendar' | 'emergency'>('identity');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'settings' | 'gateways' | 'users' | 'ai' | 'audit'>('profile');
+  const [activeProfileTab, setActiveProfileTab] = useState<'identity' | 'contact' | 'leadership' | 'calendar' | 'grades-classes' | 'timetable' | 'emergency'>('identity');
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [searchAudit, setSearchAudit] = useState<string>('');
 
@@ -139,6 +146,21 @@ export const AuditSettingsView: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveSubTab('gateways')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+            activeSubTab === 'gateways'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4 text-emerald-500" />
+          <span>{lang === 'ar' ? 'بوابات المراسلة والواتساب (Gateways)' : 'Messaging & WhatsApp Gateways'}</span>
+          <span className="text-[10px] bg-emerald-700 text-emerald-100 px-1.5 py-0.2 rounded font-mono">
+            {isSuperAdmin ? (lang === 'ar' ? 'تحكم المالك' : 'Owner') : (lang === 'ar' ? 'للقراءة فقط' : 'Read-only')}
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('users')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
             activeSubTab === 'users'
@@ -196,9 +218,6 @@ export const AuditSettingsView: React.FC = () => {
               <h3 className="font-bold text-slate-900 text-sm">
                 {lang === 'ar' ? 'الملف التعريفي والقيادي الموحد للمدرسة' : 'School Profile & Leadership Hub'}
               </h3>
-              <p className="text-xs text-slate-500">
-                {formProfile.schoolName} ({formProfile.schoolCode}) · ترتبط كافة التقارير الرسمية، الإشعارات، وكشوف الطوارئ بهذه البيانات
-              </p>
             </div>
 
             {canManageSettings && (
@@ -257,7 +276,29 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              التقويم والفصول والحصص
+              التقويم الدراسي
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('grades-classes')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                activeProfileTab === 'grades-classes'
+                  ? 'bg-slate-900 text-white dark:bg-emerald-600 shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+            >
+              المراحل والفصول الدراسية
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('timetable')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                activeProfileTab === 'timetable'
+                  ? 'bg-slate-900 text-white dark:bg-emerald-600 shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+            >
+              توقيت الحصص اليومية
             </button>
             <button
               type="button"
@@ -311,6 +352,34 @@ export const AuditSettingsView: React.FC = () => {
                     });
                   }
                   setSaveSuccessMsg('تم حفظ وتطبيق تحديثات التقويم المدرسي بنجاح وتوثيقها في سجل التدقيق.');
+                  setTimeout(() => setSaveSuccessMsg(null), 4000);
+                }}
+                disabled={!canManageSettings}
+              />
+            )}
+            {activeProfileTab === 'grades-classes' && (
+              <GradesAndClassesTab
+                profile={formProfile}
+                onChange={(updates) => setFormProfile((prev) => ({ ...prev, ...updates }))}
+                onAutoSave={async (updates) => {
+                  const merged = { ...formProfile, ...updates };
+                  setFormProfile(merged);
+                  await updateSchoolProfile(merged);
+                  setSaveSuccessMsg('تم حفظ وتحديث المراحل والفصول والمواد بنجاح وتوثيقها في سجل التدقيق.');
+                  setTimeout(() => setSaveSuccessMsg(null), 4000);
+                }}
+                disabled={!canManageSettings}
+              />
+            )}
+            {activeProfileTab === 'timetable' && (
+              <TimetablePeriodsTab
+                profile={formProfile}
+                onChange={(updates) => setFormProfile((prev) => ({ ...prev, ...updates }))}
+                onAutoSave={async (updates) => {
+                  const merged = { ...formProfile, ...updates };
+                  setFormProfile(merged);
+                  await updateSchoolProfile(merged);
+                  setSaveSuccessMsg('تم حفظ وتحديث جدول الحصص اليومية بنجاح وتوثيقه في سجل التدقيق.');
                   setTimeout(() => setSaveSuccessMsg(null), 4000);
                 }}
                 disabled={!canManageSettings}
@@ -455,9 +524,6 @@ export const AuditSettingsView: React.FC = () => {
               <h3 className="font-bold text-sm">
                 {lang === 'ar' ? 'إعدادات وقواعد الانضباط المدرسي' : 'School Attendance Policies'}
               </h3>
-              <p className="text-xs opacity-80 mt-0.5">
-                {currentTenant.name} · التغييرات تحفظ في سجل التدقيق مع توثيق اسم المستخدم والتاريخ
-              </p>
             </div>
             <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/40 border border-current font-mono">
               قواعد الحضور
@@ -680,6 +746,8 @@ export const AuditSettingsView: React.FC = () => {
             officialHolidays={formSettings.officialHolidays}
             onChange={(updates) => setFormSettings({ ...formSettings, ...updates })}
             disabled={!canManageSettings}
+            country={schoolProfile?.address?.country}
+            isSuperAdmin={isSuperAdmin}
           />
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
@@ -702,6 +770,17 @@ export const AuditSettingsView: React.FC = () => {
             )}
           </div>
         </form>
+      )}
+
+      {/* SUB-TAB: SCHOOL MESSAGING GATEWAYS & WHATSAPP (EXCLUSIVE TO OWNER) */}
+      {activeSubTab === 'gateways' && (
+        <SchoolMessagingGatewaysTab
+          gatewayConfig={messagingGateway}
+          onSave={updateMessagingGateway}
+          isSuperAdmin={isSuperAdmin}
+          schoolName={schoolProfile.schoolName || currentTenant.name}
+          defaultCallingCode={schoolProfile.countryCallingCode || schoolProfile.address?.countryCallingCode || '+966'}
+        />
       )}
 
       {/* SUB-TAB 2: USER MANAGEMENT & RBAC */}

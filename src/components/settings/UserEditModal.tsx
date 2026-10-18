@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import {
   UserCheck,
   ShieldCheck,
@@ -13,6 +14,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../../types/attendance';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   isOpen: boolean;
@@ -33,6 +35,9 @@ export const UserEditModal: React.FC<Props> = ({
   availableSubjects,
   lang,
 }) => {
+  const { schoolProfile } = useAttendance();
+  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+966';
+
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -42,6 +47,9 @@ export const UserEditModal: React.FC<Props> = ({
   const [assignedClasses, setAssignedClasses] = useState<string[]>(user?.assignedClasses || []);
   const [assignedSubjects, setAssignedSubjects] = useState<string[]>(user?.assignedSubjects || []);
   const [customSubject, setCustomSubject] = useState('');
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
 
   if (!isOpen) return null;
 
@@ -85,7 +93,7 @@ export const UserEditModal: React.FC<Props> = ({
   };
 
   const content = (
-    <div
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Edit staff member"
       className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in duration-150"
       onClick={onClose}
     >
@@ -155,13 +163,17 @@ export const UserEditModal: React.FC<Props> = ({
               />
             </div>
 
+
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{lang === 'ar' ? 'رقم الهاتف / الجوال:' : 'Phone Number:'}</label>
+              <label className="font-semibold text-slate-700 flex items-center justify-between">
+                <span>{lang === 'ar' ? 'رقم الهاتف / الجوال:' : 'Phone Number:'}</span>
+                <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
+              </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+966500000000"
+                placeholder={`${dialCode}500000000`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>

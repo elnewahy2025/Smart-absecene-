@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { ActiveTab } from './HeaderNav';
 import { WeeklyAttendanceTrendCard } from './WeeklyAttendanceTrendCard';
+import { ExecutiveMorningBriefingCard } from './dashboard/ExecutiveMorningBriefingCard';
 import {
   CalendarDays,
   FileCheck2,
@@ -49,7 +50,6 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
     lang,
     currentTenant,
     schoolProfile,
-    currentUser,
     students,
     sessions,
     justifications,
@@ -175,26 +175,16 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
     const totalAbsencesRecorded = students.reduce((acc, s) => acc + (s.totalAbsences || 0), 0);
     const unexcusedCount = Math.max(0, totalAbsencesRecorded - totalApproved);
 
-    // If zero records yet, provide intuitive realistic proportions for visual display
-    if (totalAbsencesRecorded === 0 && totalApproved === 0) {
-      return [
-        { name: isAr ? 'بدون عذر (مخالفة)' : 'Unexcused', value: 14, color: '#f43f5e' },
-        { name: isAr ? 'عذر طبي معتمد' : 'Medical', value: 8, color: '#3b82f6' },
-        { name: isAr ? 'عذر أسري معتمد' : 'Family', value: 5, color: '#10b981' },
-        { name: isAr ? 'أعذار أخرى' : 'Other', value: 2, color: '#f59e0b' },
-      ];
-    }
-
     const items = [
-      { name: isAr ? 'بدون عذر (مخالفة)' : 'Unexcused', value: unexcusedCount > 0 ? unexcusedCount : 1, color: '#f43f5e' },
-      { name: isAr ? 'عذر طبي معتمد' : 'Medical', value: medicalCount > 0 ? medicalCount : (unexcusedCount === 0 ? 3 : 0), color: '#3b82f6' },
-      { name: isAr ? 'عذر أسري معتمد' : 'Family', value: familyCount > 0 ? familyCount : (unexcusedCount === 0 ? 2 : 0), color: '#10b981' },
-      { name: isAr ? 'أعذار أخرى' : 'Other', value: otherExcusedCount > 0 ? otherExcusedCount : 0, color: '#f59e0b' },
+      { name: isAr ? 'بدون عذر (مخالفة)' : 'Unexcused', value: unexcusedCount, color: '#f43f5e' },
+      { name: isAr ? 'عذر طبي معتمد' : 'Medical', value: medicalCount, color: '#3b82f6' },
+      { name: isAr ? 'عذر أسري معتمد' : 'Family', value: familyCount, color: '#10b981' },
+      { name: isAr ? 'أعذار أخرى' : 'Other', value: otherExcusedCount, color: '#f59e0b' },
     ];
     return items.filter((item) => item.value > 0);
   }, [justifications, students, isAr]);
 
-  // 9. Visual Chart 2: Grade Absence Comparison (Bar Chart)
+  // 9. Visual Chart 2: Grade Absence Comparison (Bar Chart - Real Database Derivation)
   const gradeComparisonData = useMemo(() => {
     // Group classesStats by Grade
     const gradeMap: Record<string, { totalStudents: number; totalAbsenceWeight: number; count: number }> = {};
@@ -209,7 +199,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
       gradeMap[gName].count += 1;
     });
 
-    const entries = Object.entries(gradeMap).map(([gradeName, data]) => {
+    return Object.entries(gradeMap).map(([gradeName, data]) => {
       const avgAbsence = Math.round(data.totalAbsenceWeight / Math.max(1, data.count));
       const avgAttendance = 100 - avgAbsence;
       return {
@@ -219,21 +209,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
         studentCount: data.totalStudents,
       };
     });
-
-    // If no grade stats, supply realistic grades
-    if (entries.length === 0) {
-      return [
-        { gradeName: isAr ? 'الأول' : 'Grade 1', attendanceRate: 94, absenceRate: 6, studentCount: 120 },
-        { gradeName: isAr ? 'الثاني' : 'Grade 2', attendanceRate: 91, absenceRate: 9, studentCount: 115 },
-        { gradeName: isAr ? 'الثالث' : 'Grade 3', attendanceRate: 88, absenceRate: 12, studentCount: 110 },
-      ];
-    }
-    return entries;
   }, [classesStats, isAr]);
 
-  // 10. Visual Chart 3: Day-of-Week Absence Pattern (Bar Chart)
+  // 10. Visual Chart 3: Day-of-Week Absence Pattern (Bar Chart - Real Session History)
   const weekdayAbsenceData = useMemo(() => {
-    // School weekdays: Sunday (0) to Thursday (4) in typical Saudi/Arab schools
+    // School weekdays: Sunday (0) to Thursday (4) in Saudi/Arab academic calendar
     const daysMeta = [
       { dayIndex: 0, nameAr: 'الأحد', nameEn: 'Sun' },
       { dayIndex: 1, nameAr: 'الإثنين', nameEn: 'Mon' },
@@ -245,7 +225,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
     const validSessions = sessions.filter((s) => s.status === 'submitted' && s.date);
 
     return daysMeta.map((dm) => {
-      // Find sessions on this weekday
+      // Find submitted sessions on this weekday
       const matched = validSessions.filter((s) => {
         const parts = s.date.slice(0, 10).split('-').map(Number);
         const day = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
@@ -257,10 +237,6 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
         const totalAbs = matched.reduce((acc, s) => acc + (s.absentCount || 0), 0);
         const totalStud = matched.reduce((acc, s) => acc + (s.totalStudents || 1), 0);
         avgAbsenceRate = totalStud > 0 ? Math.round((totalAbs / totalStud) * 100) : 0;
-      } else {
-        // Realistic default pattern if no historic days recorded yet (Thursdays & Sundays typically higher)
-        const defaults = [8, 5, 4, 6, 11];
-        avgAbsenceRate = defaults[dm.dayIndex];
       }
 
       return {
@@ -289,22 +265,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           EXECUTIVE HERO HEADER
       ========================================================================= */}
       <div className="app-section-header rounded-2xl border p-5 sm:p-6 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5 z-10">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-              <Activity className="w-3.5 h-3.5 animate-pulse" />
-              <span>{isAr ? 'لوحة القيادة والمؤشرات التنفيذية' : 'Executive Command Center'}</span>
-            </span>
-            <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20">
-              {isAr ? 'دعم القرار والتدخل المبكر' : 'Decision Support & Action'}
-            </span>
-          </div>
-
+        <div className="space-y-1 z-10">
           <h1 className="text-xl sm:text-2xl font-black tracking-tight" style={{ color: 'var(--app-text-main)' }}>
-            {`مرحباً بك، ${currentUser?.name || ''} — ${schoolProfile?.schoolName || currentTenant?.name || ''}`}
+            {isAr ? 'لوحة القيادة والمؤشرات التنفيذية' : 'Executive Command Center'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            {formattedDate} • {isAr ? 'المتابعة الميدانية اللحظية لانضباط الحضور' : 'Real-time Attendance Monitoring & Control'}
+            {formattedDate}
           </p>
         </div>
 
@@ -312,7 +278,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
         <div className="flex flex-wrap items-center gap-2 z-10">
           <button
             onClick={() => onNavigateTab('sessions')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs transition-colors cursor-pointer"
           >
             <CalendarDays className="w-4 h-4" />
             <span>{isAr ? 'رصد الحصص' : 'Take Attendance'}</span>
@@ -340,6 +306,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
       </div>
 
       {/* =========================================================================
+          EXECUTIVE MORNING BRIEFING & EARLY INTERVENTION CAPSULE
+      ========================================================================= */}
+      <ExecutiveMorningBriefingCard onNavigateTab={(tab) => onNavigateTab(tab as any)} />
+
+      {/* =========================================================================
           4 DISTINCT EXECUTIVE DECISION TILES (ZERO DUPLICATION)
       ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -350,18 +321,18 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {isAr ? 'نسبة الحضور اليومي الفعلي' : 'Daily Attendance Rate'}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-teal-600 dark:text-teal-400">
+            <span className="text-3xl font-black text-primary">
               {todayMetrics.attendanceRate}%
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
               {isAr
                 ? `(حاضر ${todayMetrics.presentCount} من ${activeStudents.length})`
                 : `(${todayMetrics.presentCount} of ${activeStudents.length})`}
@@ -371,7 +342,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 todayMetrics.attendanceRate >= 90
-                  ? 'bg-teal-500'
+                  ? 'bg-primary'
                   : todayMetrics.attendanceRate >= 80
                   ? 'bg-amber-500'
                   : 'bg-rose-500'
@@ -379,9 +350,9 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
               style={{ width: `${Math.min(100, Math.max(0, todayMetrics.attendanceRate))}%` }}
             />
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
             <span>{isAr ? 'الحد الأدنى المستهدف: 90%' : 'Target: 90%'}</span>
-            <span className="text-teal-600 dark:text-teal-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
+            <span className="text-primary font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
               {isAr ? 'التفاصيل' : 'Details'} <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
@@ -394,7 +365,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {isAr ? 'الغياب اليوم (بعذر / بدون عذر)' : 'Today Absences (Excused vs Unexcused)'}
             </span>
             <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
@@ -405,29 +376,29 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
             <span className="text-3xl font-black text-rose-600 dark:text-rose-400">
               {todayMetrics.absentCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
               {isAr ? 'إجمالي الغائبين اليوم' : 'total absentees'}
             </span>
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-2 text-center text-xs">
-            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-lg p-1.5">
-              <span className="text-[10px] text-rose-700 dark:text-rose-300 block font-bold">
+            <div className="bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl p-2 shadow-2xs">
+              <span className="text-[11px] text-rose-800 dark:text-rose-300 block font-bold">
                 {isAr ? 'بدون عذر (مخالف)' : 'Unexcused'}
               </span>
-              <span className="text-base font-black text-rose-800 dark:text-rose-200">
+              <span className="text-lg font-black text-rose-700 dark:text-rose-200 font-mono">
                 {todayMetrics.unexcusedCount}
               </span>
             </div>
-            <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900/40 rounded-lg p-1.5">
-              <span className="text-[10px] text-sky-700 dark:text-sky-300 block font-bold">
+            <div className="bg-sky-50/90 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900/40 rounded-xl p-2 shadow-2xs">
+              <span className="text-[11px] text-sky-800 dark:text-sky-300 block font-bold">
                 {isAr ? 'بعذر معتمد' : 'Excused'}
               </span>
-              <span className="text-base font-black text-sky-800 dark:text-sky-200">
+              <span className="text-lg font-black text-sky-700 dark:text-sky-200 font-mono">
                 {todayMetrics.excusedCount}
               </span>
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
             <span>{isAr ? 'يتطلب متابعة أولياء الأمور' : 'Requires guardian action'}</span>
             <span className="text-rose-600 dark:text-rose-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
               {isAr ? 'الكشف' : 'Review'} <ArrowUpRight className="w-3 h-3" />
@@ -442,7 +413,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {isAr ? 'التأخير الصباحي والاستئذان' : 'Tardiness & Early Departures'}
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -453,19 +424,19 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
             <span className="text-3xl font-black text-amber-600 dark:text-amber-400">
               {todayMetrics.lateCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
               {isAr ? 'طالب متأخر صباحاً' : 'tardy students'}
             </span>
           </div>
-          <div className="mt-2.5 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/30 flex items-center justify-between text-xs">
-            <span className="text-amber-800 dark:text-amber-300 font-semibold">
+          <div className="mt-2.5 p-2 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/30 flex items-center justify-between text-xs shadow-2xs">
+            <span className="text-amber-900 dark:text-amber-300 font-bold text-[11px]">
               {isAr ? 'انصراف مبكر / مستأذنون:' : 'Early dismissals:'}
             </span>
-            <span className="font-black text-amber-900 dark:text-amber-100 font-mono">
+            <span className="font-black text-amber-800 dark:text-amber-100 font-mono text-sm">
               {todayMetrics.excusedCount}
             </span>
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
             <span>{isAr ? 'رصد دقيق لدقائق التأخير' : 'Tracked by minutes'}</span>
             <span className="text-amber-600 dark:text-amber-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
               {isAr ? 'سجل الانضباط' : 'Log'} <ArrowUpRight className="w-3 h-3" />
@@ -480,38 +451,38 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           style={{ backgroundColor: 'var(--app-card-bg)', borderColor: 'var(--app-card-border)' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {isAr ? 'اكتمال رصد كشوف الفصول' : 'Roll-call Completeness'}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <ClipboardCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+            <span className="text-3xl font-black text-primary">
               {recordedClassesCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
               {isAr ? `من إجمالي ${totalClassesCount} فصلاً` : `of ${totalClassesCount} classes`}
             </span>
           </div>
           <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mt-3 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                unrecordedClassesCount === 0 ? 'bg-emerald-500' : 'bg-indigo-500'
+                unrecordedClassesCount === 0 ? 'bg-primary' : 'bg-slate-400'
               }`}
               style={{
                 width: `${totalClassesCount > 0 ? (recordedClassesCount / totalClassesCount) * 100 : 0}%`,
               }}
             />
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span className={unrecordedClassesCount > 0 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-emerald-600 font-bold'}>
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+            <span className={unrecordedClassesCount > 0 ? 'text-amber-700 dark:text-amber-400 font-bold' : 'text-primary font-bold'}>
               {unrecordedClassesCount > 0
                 ? isAr ? `${unrecordedClassesCount} فصول لم تسجل بعد` : `${unrecordedClassesCount} pending completion`
                 : isAr ? 'اكتمل رصد جميع الفصول بنجاح' : 'All classes submitted'}
             </span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
+            <span className="text-primary font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
               {isAr ? 'متابعة المعلمين' : 'Check'} <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
@@ -545,67 +516,73 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                   {isAr ? 'تفكيك أسباب وأعذار الغياب' : 'Absence Reason Decomposition'}
                 </h3>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
-                {isAr ? 'تحليل نوعي' : 'Qualitative'}
-              </span>
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-              {isAr
-                ? 'توزيع حالات الغياب بين الأعذار الطبية والأسرية المعتمدة مقابل المخالفات بدون عذر.'
-                : 'Proportion of unexcused violations vs medical & family verified excuses.'}
-            </p>
-
-            <div className="h-48 w-full flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={absenceDecompositionData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={48}
-                    outerRadius={72}
-                    paddingAngle={3}
-                  >
-                    {absenceDecompositionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--app-card-bg)',
-                      borderColor: 'var(--app-card-border)',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      color: 'var(--app-text-main)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    }}
-                    formatter={(val: number) => [`${val} ${isAr ? 'حالة' : 'cases'}`, '']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] text-slate-400">{isAr ? 'الإجمالي' : 'Total'}</span>
-                <span className="text-sm font-black" style={{ color: 'var(--app-text-main)' }}>
-                  {absenceDecompositionData.reduce((acc, curr) => acc + curr.value, 0)}
+            {absenceDecompositionData.length === 0 ? (
+              <div className="h-48 w-full flex flex-col items-center justify-center text-center p-4">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mb-2" />
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {isAr ? 'لا توجد حالات غياب مسجلة' : 'No absences recorded'}
+                </span>
+                <span className="text-[11px] text-slate-400 mt-1">
+                  {isAr ? 'جميع الطلاب في حالة انتظام وانضباط تام' : 'All students currently present'}
                 </span>
               </div>
-            </div>
-
-            {/* Custom Legend */}
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              {absenceDecompositionData.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 text-[11px]">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-slate-600 dark:text-slate-400 truncate">{item.name}</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100 font-mono ms-auto">
-                    {item.value}
-                  </span>
+            ) : (
+              <>
+                <div className="h-48 w-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={absenceDecompositionData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={72}
+                        paddingAngle={3}
+                      >
+                        {absenceDecompositionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        cursor={{ fill: 'transparent' }}
+                        contentStyle={{
+                          backgroundColor: 'var(--app-card-bg)',
+                          borderColor: 'var(--app-card-border)',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          color: 'var(--app-text-main)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        }}
+                        formatter={(val: number) => [`${val} ${isAr ? 'حالة' : 'cases'}`, '']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-[10px] text-slate-400">{isAr ? 'الإجمالي' : 'Total'}</span>
+                    <span className="text-sm font-black" style={{ color: 'var(--app-text-main)' }}>
+                      {absenceDecompositionData.reduce((acc, curr) => acc + curr.value, 0)}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Custom Legend */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {absenceDecompositionData.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-slate-600 dark:text-slate-400 truncate">{item.name}</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 font-mono ms-auto">
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -627,21 +604,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-500" />
+                <Layers className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-bold" style={{ color: 'var(--app-text-main)' }}>
                   {isAr ? 'مقارنة الغياب بين الصفوف' : 'Absence by Grade Level'}
                 </h3>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold">
-                {isAr ? 'مقارنة أداء' : 'Comparison'}
-              </span>
             </div>
-
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-              {isAr
-                ? 'متوسط معدل الغياب لكل صف ومرحلة دراسية لاكتشاف الصفوف الأكثر تراجعاً.'
-                : 'Average absence rate per grade level to identify lagging cohorts.'}
-            </p>
 
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -661,6 +629,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                     domain={[0, 'dataMax + 5']}
                   />
                   <Tooltip
+                    cursor={{ fill: 'transparent' }}
                     contentStyle={{
                       backgroundColor: 'var(--app-card-bg)',
                       borderColor: 'var(--app-card-border)',
@@ -675,7 +644,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                     {gradeComparisonData.map((entry, index) => (
                       <Cell
                         key={`grade-cell-${index}`}
-                        fill={entry.absenceRate >= 10 ? '#f43f5e' : entry.absenceRate >= 7 ? '#f59e0b' : '#6366f1'}
+                        fill={entry.absenceRate >= 10 ? '#f43f5e' : entry.absenceRate >= 7 ? '#f59e0b' : 'var(--app-primary)'}
                       />
                     ))}
                   </Bar>
@@ -685,7 +654,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
 
             <div className="flex items-center justify-around pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                <span className="w-2 h-2 rounded-full bg-primary" />
                 {isAr ? 'طبيعي (< 7%)' : 'Normal'}
               </span>
               <span className="flex items-center gap-1">
@@ -723,16 +692,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                   {isAr ? 'نمط الغياب حسب أيام الأسبوع' : 'Absence Pattern by Weekday'}
                 </h3>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold">
-                {isAr ? 'الغياب حول العطل' : 'Weekend Border'}
-              </span>
             </div>
-
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-              {isAr
-                ? 'رصد ذروة الغياب قبل وبعد الإجازة الأسبوعية (الأحد والخميس) لتفعيل حملات الانضباط.'
-                : 'Peak absences on Sundays & Thursdays flanking official weekends.'}
-            </p>
 
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -752,6 +712,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                     domain={[0, 'dataMax + 4']}
                   />
                   <Tooltip
+                    cursor={{ fill: 'transparent' }}
                     contentStyle={{
                       backgroundColor: 'var(--app-card-bg)',
                       borderColor: 'var(--app-card-border)',
@@ -766,7 +727,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                     {weekdayAbsenceData.map((entry, index) => (
                       <Cell
                         key={`weekday-cell-${index}`}
-                        fill={entry.isWeekendBorder ? '#f59e0b' : '#0d9488'}
+                        fill={entry.isWeekendBorder ? '#f59e0b' : 'var(--app-primary)'}
                       />
                     ))}
                   </Bar>
@@ -780,7 +741,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                 {isAr ? 'الأحد والخميس (أطراف الإجازة)' : 'Sun & Thu (Weekend flanks)'}
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-teal-600" />
+                <span className="w-2.5 h-2.5 rounded-full bg-primary" />
                 {isAr ? 'منتصف الأسبوع' : 'Mid-week'}
               </span>
             </div>
@@ -788,7 +749,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
 
           <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
             <span className="text-slate-400">{isAr ? 'مستهدف الانضباط' : 'Discipline'}</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+            <span className="text-primary font-bold text-[11px]">
               {isAr ? 'تأكيد الحضور الصباحي' : 'Morning Check'}
             </span>
           </div>
@@ -823,12 +784,6 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {isAr
-                ? 'ترتيب الفصول تصاعدياً وفق أعلى معدل غياب لتوجيه الإدارة والوكيل للفصول المستهدفة.'
-                : 'Ranked by highest absence rate to prioritize administrative classroom visits.'}
-            </p>
-
             <div className="space-y-2.5 pt-1">
               {classesByAbsence.map((c, idx) => (
                 <div
@@ -853,7 +808,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
                     <div className="w-20 sm:w-28 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${
-                          c.absenceRate >= 15 ? 'bg-rose-500' : c.absenceRate >= 8 ? 'bg-amber-500' : 'bg-teal-500'
+                          c.absenceRate >= 15 ? 'bg-rose-500' : c.absenceRate >= 8 ? 'bg-amber-500' : 'bg-primary'
                         }`}
                         style={{ width: `${Math.min(100, Math.max(5, c.absenceRate))}%` }}
                       />

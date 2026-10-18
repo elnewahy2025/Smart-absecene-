@@ -11,6 +11,7 @@ import {
   History,
   Eye,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { DigestOverviewTab } from './digest/DigestOverviewTab';
 import { DigestEmailPreviewTab } from './digest/DigestEmailPreviewTab';
@@ -40,6 +41,7 @@ export const DailyEmailDigestView: React.FC<DailyEmailDigestViewProps> = ({ onNa
   const [loading, setLoading] = useState<boolean>(true);
   const [dispatching, setDispatching] = useState<boolean>(false);
   const [dispatchSuccessMsg, setDispatchSuccessMsg] = useState<string | null>(null);
+  const [dispatchErrorMsg, setDispatchErrorMsg] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [copiedHtml, setCopiedHtml] = useState<boolean>(false);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<DailyEmailDigestItem | null>(null);
@@ -70,11 +72,16 @@ export const DailyEmailDigestView: React.FC<DailyEmailDigestViewProps> = ({ onNa
     setDispatching(true);
     try {
       const result = await dispatchDailyDigest();
-      setDispatchSuccessMsg(result.message);
       if (result.digestItem) {
         setCurrentDigest(result.digestItem);
       }
-      setTimeout(() => setDispatchSuccessMsg(null), 5000);
+      if (result.success) {
+        setDispatchSuccessMsg(result.message);
+        setTimeout(() => setDispatchSuccessMsg(null), 5000);
+      } else {
+        setDispatchErrorMsg(result.message);
+        setTimeout(() => setDispatchErrorMsg(null), 8000);
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -206,6 +213,13 @@ export const DailyEmailDigestView: React.FC<DailyEmailDigestViewProps> = ({ onNa
             >
               {lang === 'ar' ? 'عرض في سجل الإرسال' : 'View in History'}
             </button>
+          </div>
+        )}
+
+        {dispatchErrorMsg && (
+          <div className="mt-4 bg-rose-50 border border-rose-200 text-rose-900 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-fade-in">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="font-semibold">{dispatchErrorMsg}</span>
           </div>
         )}
 

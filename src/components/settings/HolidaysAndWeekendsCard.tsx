@@ -12,12 +12,16 @@ import {
   Sparkles,
   Info,
   Clock,
+  Crown,
 } from 'lucide-react';
 import {
   DEFAULT_WEEKEND_DAYS,
   DEFAULT_OFFICIAL_HOLIDAYS,
   getHolidayTypeLabel,
 } from '../../utils/holidayUtils';
+import { SmartHolidayImportModal } from './SmartHolidayImportModal';
+import { getCountryPreset } from '../../config/countryPresets';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   weekendDays?: number[];
@@ -25,6 +29,9 @@ interface Props {
   onChange: (updates: { weekendDays?: number[]; officialHolidays?: OfficialHoliday[] }) => void;
   onAutoSave?: (updates: { weekendDays?: number[]; officialHolidays?: OfficialHoliday[] }) => Promise<void> | void;
   disabled?: boolean;
+  country?: string;
+  isSuperAdmin?: boolean;
+  onUpdateMinistryHeader?: (header: string) => Promise<void> | void;
 }
 
 const WEEK_DAYS = [
@@ -43,10 +50,27 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
   onChange,
   onAutoSave,
   disabled,
+  country,
+  isSuperAdmin,
+  onUpdateMinistryHeader,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showOwnerSearchModal, setShowOwnerSearchModal] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  let attendanceCtx: any = null;
+  try {
+    attendanceCtx = useAttendance();
+  } catch {}
+
+  const effectiveIsSuperAdmin =
+    isSuperAdmin ??
+    Boolean(attendanceCtx?.isSuperAdmin || attendanceCtx?.currentUser?.role === 'super_admin');
+
+  const effectiveCountry =
+    country || attendanceCtx?.schoolProfile?.address?.country || 'المملكة العربية السعودية';
+  const activePreset = getCountryPreset(effectiveCountry);
   const [newHoliday, setNewHoliday] = useState<Partial<OfficialHoliday>>({
     nameAr: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -173,21 +197,54 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     }
   };
 
-  // Reset to MOE Official Calendar
+  // Reset to Official Calendar for Active Country
   const handleRestoreMOECalendar = async () => {
     if (disabled || isSaving) return;
     if (
       confirm(
-        'هل تريد استعادة التقويم الرسمي لوزارة التعليم 1446-1447 هـ؟ سيتم تطبيق العطلات الرسمية المعتمدة للمملكة.'
+        `هل تريد استيراد وتطبيق التقويم الدراسي الرسمي المعتمد لـ (${activePreset.countryNameAr})؟ سيتم تطبيق العطلات الرسمية المعتمدة ونمط العطلة الأسبوعية.`
       )
     ) {
       await triggerAutoSave(
         {
-          weekendDays: [5, 6],
-          officialHolidays: [...DEFAULT_OFFICIAL_HOLIDAYS],
+          weekendDays: activePreset.defaultWeekendDays,
+          officialHolidays: [...activePreset.officialHolidays],
         },
-        'تمت استعادة تقويم وزارة التعليم الرسمي وحفظ كافة العطلات بنجاح ✓'
+        `تم استيراد تقويم (${activePreset.countryNameAr}) الرسمي المعتمد وحفظه بنجاح ✓`
       );
+      if (attendanceCtx?.updateSchoolProfile && activePreset.ministryHeaderAr) {
+        attendanceCtx.updateSchoolProfile({
+          ministryHeaderAr: activePreset.ministryHeaderAr,
+        });
+      }
+    }
+  };
+
+  // Apply Smart Discovered Holidays from Owner Modal
+  const handleApplySmartHolidays = async (result: {
+    officialHolidays: OfficialHoliday[];
+    weekendDays?: number[];
+    ministryHeaderAr?: string;
+  }) => {
+    const updates: { weekendDays?: number[]; officialHolidays?: OfficialHoliday[] } = {
+      officialHolidays: result.officialHolidays,
+    };
+    if (result.weekendDays) {
+      updates.weekendDays = result.weekendDays;
+    }
+    await triggerAutoSave(
+      updates,
+      `تم استيراد واعتماد (${result.officialHolidays.length}) إجازة رسمية وحفظها بنجاح في المنظومة ✓`
+    );
+    if (result.ministryHeaderAr) {
+      if (attendanceCtx?.updateSchoolProfile) {
+        attendanceCtx.updateSchoolProfile({
+          ministryHeaderAr: result.ministryHeaderAr,
+        });
+      }
+      if (onUpdateMinistryHeader) {
+        await onUpdateMinistryHeader(result.ministryHeaderAr);
+      }
     }
   };
 
@@ -226,15 +283,31 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/40 dark:bg-slate-800/60 border border-current font-mono">
             {activeSchoolDaysCount} أيام دوام / {activeWeekendCount} أيام عطلة
           </span>
+
+          {/* Platform Owner Exclusive Smart AI Search Button */}
+          {effectiveIsSuperAdmin && !disabled && (
+            <button
+              type="button"
+              onClick={() => setShowOwnerSearchModal(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] cursor-pointer shadow-xs transition-all border border-amber-400 transform hover:scale-[1.02] active:scale-[0.98]"
+              title="زر البحث والاستيراد الذكي المعتمد (خاص بمالك المنصة The Owner)"
+            >
+              <Crown className="w-3.5 h-3.5 text-yellow-200" />
+              <Sparkles className="w-3 h-3 text-yellow-200 animate-pulse" />
+              <span>بحث واستيراد ذكي (The Owner)</span>
+              <span className="text-[9px] px-1.5 py-0.2 bg-white/20 rounded-full font-mono">AI Search</span>
+            </button>
+          )}
+
           {!disabled && (
             <button
               type="button"
               onClick={handleRestoreMOECalendar}
-              className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
-              title="استعادة التقويم الرسمي لوزارة التعليم"
+              className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+              title={`استيراد التقويم الرسمي المعتمد لـ (${activePreset.countryNameAr})`}
             >
               <RotateCcw className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-              <span>استيراد تقويم وزارة التعليم</span>
+              <span>استيراد تقويم {activePreset.countryNameAr}</span>
             </button>
           )}
         </div>
@@ -576,6 +649,14 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* Smart Holiday Import Modal (Platform Owner Exclusive) */}
+      <SmartHolidayImportModal
+        isOpen={showOwnerSearchModal}
+        onClose={() => setShowOwnerSearchModal(false)}
+        initialCountry={effectiveCountry}
+        onApplyHolidays={handleApplySmartHolidays}
+      />
     </div>
   );
 };

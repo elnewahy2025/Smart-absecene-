@@ -1,0 +1,23 @@
+[
+  {
+    "tenantId": "school-majd",
+    "subdomain": "majd",
+    "customDomains": [
+      "portal.majd.edu",
+      "attendance.majd-school.edu.sa",
+      "majd.smartschool.com",
+      "majd.localhost"
+    ],
+    "nameAr": "مدارس المجد الأهلية النموذجية",
+    "nameEn": "Al-Majd Model School",
+    "code": "MAJD-301",
+    "cityAr": "الرياض",
+    "cityEn": "Riyadh",
+    "academicYear": "1447-1448 هـ / 2026 م",
+    "currentTerm": "الفصل الدراسي الأول",
+    "schoolType": "boys",
+    "primaryColor": "#059669",
+    "logoText": "م",
+    "isActive": true
+  }
+]

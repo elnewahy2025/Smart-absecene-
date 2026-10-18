@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student, StudentBehaviourIncident, AttendanceRecord, Justification } from '../types/attendance';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
+import { generateStudentAbsenceReportHtml } from '../utils/printTemplates/studentAbsenceReportTemplate';
 import {
   UserCheck,
   Filter,
@@ -59,7 +60,6 @@ export const StudentAbsenceInquiryView: React.FC = () => {
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
-  const printAreaRef = useRef<HTMLDivElement>(null);
 
   // Available Terms strictly from Academic Profile in Settings
   const academicTerms = useMemo(() => {
@@ -730,14 +730,27 @@ export const StudentAbsenceInquiryView: React.FC = () => {
 
   // Handle Download Vector PDF
   const handleDownloadPdf = async () => {
-    if (!currentStudent || !printAreaRef.current) {
+    if (!currentStudent || !studentAbsenceAnalysis) {
       window.print();
       return;
     }
 
     try {
       setIsGeneratingPdf(true);
-      const html = printAreaRef.current.innerHTML;
+      const html = generateStudentAbsenceReportHtml({
+        student: currentStudent,
+        schoolProfile,
+        activeDateRange,
+        analysis: {
+          attendanceRate: studentAbsenceAnalysis.attendanceRate,
+          unexcusedDaysCount: studentAbsenceAnalysis.unexcusedDaysCount,
+          excusedDaysCount: studentAbsenceAnalysis.excusedDaysCount,
+          lateDaysCount: studentAbsenceAnalysis.lateDaysCount,
+          records: studentAbsenceAnalysis.records,
+        },
+        infractions: infractionsList,
+      });
+
       const reportTitle = `${currentStudent.fullName} - ${activeDateRange.label} - تقرير الغياب والانضباط`;
       const filename = `تقرير_${currentStudent.fullName.replace(/\s+/g, '_')}_${activeDateRange.start}_${activeDateRange.end}.pdf`;
 
@@ -758,23 +771,35 @@ export const StudentAbsenceInquiryView: React.FC = () => {
 
   // Handle Direct Print Action
   const handlePrint = () => {
-    if (printAreaRef.current) {
-      const html = printAreaRef.current.innerHTML;
-      const reportTitle = `${currentStudent?.fullName || ''} - تقرير الحضور والغياب`;
-      printNativePdfFromHtml({
-        htmlContent: html,
-        title: reportTitle,
-      });
-    } else {
+    if (!currentStudent || !studentAbsenceAnalysis) {
       window.print();
+      return;
     }
+    const html = generateStudentAbsenceReportHtml({
+      student: currentStudent,
+      schoolProfile,
+      activeDateRange,
+      analysis: {
+        attendanceRate: studentAbsenceAnalysis.attendanceRate,
+        unexcusedDaysCount: studentAbsenceAnalysis.unexcusedDaysCount,
+        excusedDaysCount: studentAbsenceAnalysis.excusedDaysCount,
+        lateDaysCount: studentAbsenceAnalysis.lateDaysCount,
+        records: studentAbsenceAnalysis.records,
+      },
+      infractions: infractionsList,
+    });
+    const reportTitle = `${currentStudent?.fullName || ''} - تقرير الحضور والغياب`;
+    printNativePdfFromHtml({
+      htmlContent: html,
+      title: reportTitle,
+    });
   };
 
   return (
     <div className="space-y-6 pb-16 animate-fadeIn">
       {/* Toast alert */}
       {toastMsg && (
-        <div className="fixed bottom-6 end-6 z-50 bg-emerald-600 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-6 end-6 z-50 bg-primary text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-bounce">
           <UserCheck className="w-4 h-4" />
           <span>{toastMsg}</span>
         </div>
@@ -785,23 +810,9 @@ export const StudentAbsenceInquiryView: React.FC = () => {
       ========================================================================= */}
       <div className="app-section-header rounded-2xl border p-5 sm:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-              <Search className="w-3.5 h-3.5" />
-              <span>{isAr ? 'استعلام ومتابعة غياب طالب' : 'Student Absence & Violations'}</span>
-            </span>
-            <span className="text-xs px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
-              {isAr ? 'فترات مرنة ومخالفات السلوك' : 'Flexible Timeframes & Behavior'}
-            </span>
-          </div>
           <h1 className="text-xl sm:text-2xl font-black" style={{ color: 'var(--app-text-main)' }}>
             {isAr ? 'سجل غياب وانضباط الطالب' : 'Student Attendance & Conduct Record'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            {isAr
-              ? 'احصاء فوري ودقيق لمرات الغياب والتأخر والمخالفات السلوكية خلال أي فترة زمنية محددة.'
-              : 'Detailed breakdown of absences, tardiness, and conduct violations across custom horizons.'}
-          </p>
         </div>
 
         {currentStudent && (
@@ -809,17 +820,17 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             <button
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
-              className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50"
               title="توليد وتنزيل ملف PDF أصلي حقيقي ذو نصوص قابلة للتحديد (Vector PDF)"
             >
               {isGeneratingPdf ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
                   <span>{isAr ? 'جارٍ إنشاء مستند PDF...' : 'Generating PDF...'}</span>
                 </>
               ) : (
                 <>
-                  <FileText className="w-4 h-4 text-slate-950" />
+                  <FileText className="w-4 h-4 text-white" />
                   <span>{isAr ? 'تنزيل مستند PDF رسمي معتمد' : 'Download Official PDF Report'}</span>
                 </>
               )}
@@ -827,7 +838,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
 
             <button
               onClick={handlePrint}
-              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm"
+              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm"
               title="طباعة مباشرة للمستند الرسمي عبر إطار معزول"
             >
               <Printer className="w-4 h-4 text-white" />
@@ -1007,7 +1018,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                           <span
                             className={
                               (s.attendanceRate || 100) >= 90
-                                ? 'text-teal-600 dark:text-teal-400'
+                                ? 'text-primary'
                                 : (s.attendanceRate || 100) >= 80
                                 ? 'text-amber-600 dark:text-amber-400'
                                 : 'text-rose-600 dark:text-rose-400'
@@ -1033,7 +1044,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                               {isAr ? 'إنذار' : 'Warning'}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
                               {isAr ? 'منضبط' : 'Good'}
                             </span>
                           )}
@@ -1157,7 +1168,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                     onClick={() => setSelectedTermId(term.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
                       selectedTermId === term.id
-                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        ? 'bg-primary text-white border-primary shadow-xs'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                     }`}
                   >
@@ -1253,7 +1264,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                       ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
                       : (studentAbsenceAnalysis?.unexcusedDaysCount || 0) >= 3
                       ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                      : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                      : 'bg-primary/10 text-primary border-primary/20'
                   }`}
                 >
                   {(studentAbsenceAnalysis?.unexcusedDaysCount || 0) >= 5
@@ -1278,14 +1289,14 @@ export const StudentAbsenceInquiryView: React.FC = () => {
             >
               <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">
                 <span>{isAr ? 'نسبة حضور الطالب' : 'Attendance Rate'}</span>
-                <UserCheck className="w-4 h-4 text-teal-600" />
+                <UserCheck className="w-4 h-4 text-primary" />
               </div>
-              <div className="text-3xl font-black text-teal-600 dark:text-teal-400">
+              <div className="text-3xl font-black text-primary">
                 %{studentAbsenceAnalysis?.attendanceRate}
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
                 <div
-                  className="h-full bg-teal-500 rounded-full"
+                  className="h-full bg-primary rounded-full"
                   style={{ width: `${Math.min(100, studentAbsenceAnalysis?.attendanceRate || 0)}%` }}
                 />
               </div>
@@ -1356,7 +1367,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                 </span>
                 <span className="text-xs text-slate-500">{isAr ? 'مخالفة' : 'infractions'}</span>
               </div>
-              <div className="mt-2.5 text-[11px] text-emerald-600 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+              <div className="mt-2.5 text-[11px] text-primary font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
                 {isAr
                   ? `نقاط التميز الإيجابي: +${positivePointsList.reduce((acc, p) => acc + (p.points || 0), 0)}`
                   : `Positive merits: +${positivePointsList.reduce((acc, p) => acc + (p.points || 0), 0)}`}
@@ -1472,7 +1483,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold ${
                             entry.isExcused
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40'
+                              ? 'bg-primary/10 text-primary border border-primary/20'
                               : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -1497,7 +1508,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                   ) : (!studentAbsenceAnalysis?.records || studentAbsenceAnalysis.records.length === 0) ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
-                        <UserCheck className="w-10 h-10 text-emerald-500 mx-auto" />
+                        <UserCheck className="w-10 h-10 text-primary mx-auto" />
                         <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
                           {isAr ? 'لا توجد أي أيام غياب أو تأخر مسجلة للطالب خلال هذه الفترة' : 'No absences or tardies recorded'}
                         </p>
@@ -1541,7 +1552,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
                   {infractionsList.length} {isAr ? 'مخالفة' : 'infractions'}
                 </span>
                 {positivePointsList.length > 0 && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 font-bold">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
                     ✨ +{positivePointsList.reduce((acc, p) => acc + (p.points || 0), 0)} {isAr ? 'نقاط تميز' : 'merits'}
                   </span>
                 )}
@@ -1589,7 +1600,7 @@ export const StudentAbsenceInquiryView: React.FC = () => {
 
               {infractionsList.length === 0 && (
                 <div className="p-8 text-center text-slate-400 space-y-1 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-700">
-                  <Award className="w-8 h-8 text-emerald-500 mx-auto" />
+                  <Award className="w-8 h-8 text-primary mx-auto" />
                   <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
                     {isAr ? 'سجل السلوك نظيف تماماً!' : 'Clean Conduct Record!'}
                   </p>
@@ -1624,209 +1635,6 @@ export const StudentAbsenceInquiryView: React.FC = () => {
               ? 'اختر الصف ثم الفصل من الأعلى، أو اكتب اسم الطالب في مربع البحث لاحتساب مرات الغياب والتأخر والمخالفات في أي مدة تريدها.'
               : 'Select grade and class above, or type in search box to view absence counts, tardiness, and conduct violations for any chosen horizon.'}
           </p>
-        </div>
-      )}
-      {/* =========================================================================
-          OFFICIAL PRINTABLE CANVAS (FOR VECTOR PDF & DIRECT PRINT)
-      ========================================================================= */}
-      {currentStudent && (
-        <div style={{ display: 'none' }}>
-          <div
-            ref={printAreaRef}
-            className="p-8 bg-white text-slate-900 space-y-6 font-sans"
-            style={{ width: '800px', backgroundColor: '#ffffff', color: '#0f172a', direction: 'rtl', fontFamily: 'Cairo, Tahoma, sans-serif' }}
-          >
-            {/* Ministry & School Official Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '16px' }}>
-              <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#0f172a', whiteSpace: 'pre-line' }}>
-                  {schoolProfile?.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
-                </div>
-                <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginTop: '3px' }}>
-                  {schoolProfile?.schoolName || 'المدرسة'}
-                </div>
-                <div style={{ color: '#64748b', fontSize: '11px' }}>كود المنشأة: {schoolProfile?.schoolCode || '—'}</div>
-                {/* Only display directorate if NOT already included inside ministryHeaderAr to prevent repetition */}
-                {schoolProfile?.directorateAr && !schoolProfile?.ministryHeaderAr?.includes(schoolProfile.directorateAr) && (
-                  <div style={{ color: '#475569', fontSize: '11px' }}>{schoolProfile.directorateAr}</div>
-                )}
-              </div>
-
-              <div style={{ textAlign: 'center', lineHeight: '1.4' }}>
-                <div style={{ fontWeight: '900', fontSize: '18px', color: '#0f172a' }}>تقرير سجل غياب وانضباط الطالب</div>
-                <div style={{ fontSize: '13px', color: '#047857', fontWeight: 'bold' }}>
-                  {activeDateRange.label}
-                </div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                  تاريخ استخراج التقرير: {new Date().toLocaleDateString('ar-SA')}
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'left', fontSize: '11px', lineHeight: '1.6', direction: 'ltr' }}>
-                <div>العام: {schoolProfile?.academicYear?.hijriYear || '1446-1447 هـ'}</div>
-                <div>الفصل: {currentStudent.className}</div>
-                <div>الصف: {currentStudent.grade}</div>
-              </div>
-            </div>
-
-            {/* Student Identity Card Box */}
-            <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 16px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>اسم الطالب: </span>
-                <strong style={{ fontSize: '15px', color: '#0f172a' }}>{currentStudent.fullName}</strong>
-                <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>رقم السجل المدني: </span>
-                <strong style={{ fontSize: '13px', fontFamily: 'monospace' }}>{currentStudent.nationalId || '—'}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>ولي الأمر: </span>
-                <strong style={{ fontSize: '12px' }}>{currentStudent.guardianName || '—'}</strong>
-                <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>الهاتف: </span>
-                <strong style={{ fontSize: '12px', fontFamily: 'monospace' }}>{currentStudent.guardianPhone || '—'}</strong>
-              </div>
-            </div>
-
-            {/* Executive Statistical Summary Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', textAlign: 'center' }}>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#f0fdf4' }}>
-                <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold' }}>نسبة الحضور</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#15803d' }}>%{studentAbsenceAnalysis?.attendanceRate}</div>
-              </div>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#fef2f2' }}>
-                <div style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold' }}>إجمالي الغياب (بدون عذر)</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#b91c1c' }}>{studentAbsenceAnalysis?.unexcusedDaysCount} يوم</div>
-              </div>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#eff6ff' }}>
-                <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>غياب بعذر معتمد</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#1d4ed8' }}>{studentAbsenceAnalysis?.excusedDaysCount} يوم</div>
-              </div>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px', backgroundColor: '#fffbeb' }}>
-                <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 'bold' }}>مرات التأخر الصباحي</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#b45309' }}>{studentAbsenceAnalysis?.lateDaysCount} مرات</div>
-              </div>
-            </div>
-
-            {/* Absence Dates Table */}
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
-                سجل تواريخ الغياب والتأخر في الفترة بالتفصيل:
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'right' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '25px', textAlign: 'center' }}>#</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '70px' }}>اليوم</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '85px' }}>التاريخ</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '110px' }}>نوع الحالة</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '105px' }}>الفترة / الحصة</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>التفاصيل ومبررات العذر</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '110px' }}>المعلم / الراصد</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1', width: '120px', textAlign: 'center' }}>إجراء التواصل</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {studentAbsenceAnalysis?.records.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace' }}>{i + 1}</td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>{r.dayName}</td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontWeight: 'bold' }}>{r.date}</td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>
-                        <span
-                          style={{
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            backgroundColor: r.status === 'late' ? '#fef3c7' : r.isExcused ? '#dbeafe' : '#fee2e2',
-                            color: r.status === 'late' ? '#92400e' : r.isExcused ? '#1e40af' : '#991b1b',
-                          }}
-                        >
-                          {r.status === 'late' ? `تأخر (${r.minutesLate || 15} دقيقة)` : r.isExcused ? 'غياب بعذر معتمد' : 'غياب بدون عذر'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', color: '#334155' }}>
-                        {r.periodLabel}
-                      </td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>
-                        <div style={{ fontWeight: 'bold' }}>{r.justificationReason || 'غياب غير مبرر'}</div>
-                        {r.note && <div style={{ fontSize: '10px', color: '#64748b' }}>{r.note}</div>}
-                      </td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', color: '#475569' }}>
-                        {r.teacherName || r.className}
-                      </td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '10px' }}>
-                        <span style={{ color: r.isExcused ? '#047857' : '#b91c1c', fontWeight: 'bold' }}>
-                          {r.actionStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {(!studentAbsenceAnalysis?.records || studentAbsenceAnalysis.records.length === 0) && (
-                    <tr>
-                      <td colSpan={8} style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>
-                        لا توجد أي أيام غياب أو تأخر مسجلة للطالب خلال هذه الفترة.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Conduct Violations Section if any */}
-            {infractionsList.length > 0 && (
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px', color: '#991b1b' }}>
-                  المخالفات السلوكية المسجلة في الفترة:
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'right' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#fef2f2', borderBottom: '2px solid #fecaca' }}>
-                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '30px', textAlign: 'center' }}>#</th>
-                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '90px' }}>التاريخ</th>
-                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '100px' }}>الدرجة</th>
-                      <th style={{ padding: '6px', border: '1px solid #fecaca' }}>وصف المخالفة</th>
-                      <th style={{ padding: '6px', border: '1px solid #fecaca', width: '120px' }}>الإجراء المتخذ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {infractionsList.map((inf, i) => (
-                      <tr key={inf.id} style={{ borderBottom: '1px solid #fecaca' }}>
-                        <td style={{ padding: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>{i + 1}</td>
-                        <td style={{ padding: '6px', border: '1px solid #fecaca', fontFamily: 'monospace' }}>{inf.date}</td>
-                        <td style={{ padding: '6px', border: '1px solid #fecaca', fontWeight: 'bold', color: '#b91c1c' }}>
-                          {inf.severity === 'major' ? 'جسيمة' : inf.severity === 'moderate' ? 'متوسطة' : 'بسيطة'}
-                        </td>
-                        <td style={{ padding: '6px', border: '1px solid #fecaca' }}>{inf.title} - {inf.description}</td>
-                        <td style={{ padding: '6px', border: '1px solid #fecaca' }}>{inf.actionTaken || 'متابعة المرشد'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Official Signatures & Stamp Footer */}
-            <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '2px solid #0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', textAlign: 'center' }}>
-              <div style={{ width: '200px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '32px' }}>المرشد الطلابي / الوكيل</div>
-                <div style={{ borderTop: '1px dashed #94a3b8', paddingTop: '4px', color: '#64748b' }}>التوقيع: .....................</div>
-              </div>
-
-              <div style={{ width: '150px' }}>
-                <div style={{ border: '2px dashed #94a3b8', borderRadius: '50%', width: '90px', height: '90px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '10px' }}>
-                  ختم المدرسة
-                </div>
-              </div>
-
-              <div style={{ width: '200px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '32px' }}>مدير المدرسة</div>
-                <div style={{ borderTop: '1px dashed #94a3b8', paddingTop: '4px', color: '#64748b' }}>
-                  {schoolProfile?.leadership?.principalName || 'التوقيع والاعتماد'}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

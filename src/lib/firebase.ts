@@ -1,25 +1,46 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, doc, getDocFromServer, connectFirestoreEmulator } from 'firebase/firestore';
 
-import appletConfig from '../../firebase-applet-config.json';
+const env = (import.meta as any).env || {};
+
+const useEmulator = String(env.VITE_USE_FIREBASE_EMULATOR || '').toLowerCase() === 'true';
+const emulatorProjectId = env.VITE_FIREBASE_EMULATOR_PROJECT_ID || 'demo-smart-school';
 
 const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || appletConfig.projectId || 'demo-project-id',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || appletConfig.appId || '1:000000000000:web:0000000000000000000000',
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || appletConfig.apiKey || 'demo-firebase-api-key',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || appletConfig.authDomain || 'demo-project-id.firebaseapp.com',
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || appletConfig.firestoreDatabaseId || '(default)',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || appletConfig.storageBucket || 'demo-project-id.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || appletConfig.messagingSenderId || '000000000000',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || appletConfig.measurementId || '',
-  oAuthClientId: import.meta.env.VITE_FIREBASE_OAUTH_CLIENT_ID || appletConfig.oAuthClientId || '',
-  recaptchaSiteKey: import.meta.env.VITE_FIREBASE_RECAPTCHA_SITE_KEY || appletConfig.recaptchaSiteKey || '',
+  projectId: useEmulator
+    ? emulatorProjectId
+    : env.VITE_FIREBASE_PROJECT_ID || 'demo-project-id',
+  appId: env.VITE_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
+  apiKey: env.VITE_FIREBASE_API_KEY || 'demo-firebase-api-key',
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'demo-project-id.firebaseapp.com',
+  firestoreDatabaseId: useEmulator
+    ? '(default)'
+    : env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)',
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'demo-project-id.firebasestorage.app',
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '000000000000',
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || '',
+  oAuthClientId: env.VITE_FIREBASE_OAUTH_CLIENT_ID || '',
+  recaptchaSiteKey: env.VITE_FIREBASE_RECAPTCHA_SITE_KEY || '',
 };
 
 const app = initializeApp(firebaseConfig as any);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+if (useEmulator && !(globalThis as any).__SMART_SCHOOL_EMULATORS__) {
+  connectAuthEmulator(
+    auth,
+    env.VITE_FIREBASE_AUTH_EMULATOR_URL || 'http://127.0.0.1:9099',
+    { disableWarnings: true }
+  );
+  connectFirestoreEmulator(
+    db,
+    env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST || '127.0.0.1',
+    Number(env.VITE_FIREBASE_FIRESTORE_EMULATOR_PORT || 8099)
+  );
+  (globalThis as any).__SMART_SCHOOL_EMULATORS__ = true;
+}
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Student } from '../../types/attendance';
 import { ArrowRightLeft, X, AlertCircle, Check } from 'lucide-react';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface TransferStudentModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   const [destinationSchool, setDestinationSchool] = useState('');
   const [reason, setReason] = useState('انتقال سكن ولي الأمر إلى حي/مدينة أخرى');
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
 
   if (!isOpen || !student) return null;
 
@@ -39,7 +42,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Transfer student" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">

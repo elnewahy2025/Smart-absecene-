@@ -23,13 +23,21 @@ import {
   CheckSquare,
   Square,
   Palmtree,
+  ShieldAlert,
 } from 'lucide-react';
 import { QRScannerModal } from './QRScannerModal';
 import { BulkEditConfirmationModal } from './attendance/BulkEditConfirmationModal';
 import { ClassCalendarView } from './attendance/ClassCalendarView';
 import { GamifiedCelebrationModal } from './attendance/GamifiedCelebrationModal';
+import { EmergencyRosterModal } from './attendance/EmergencyRosterModal';
 
-export const AttendanceSessionsView: React.FC = () => {
+interface AttendanceSessionsViewProps {
+  initialOpenEmergencyModal?: boolean;
+}
+
+export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
+  initialOpenEmergencyModal = false,
+}) => {
   const {
     sessions,
     students,
@@ -74,6 +82,13 @@ export const AttendanceSessionsView: React.FC = () => {
   const [pendingBulkStatus, setPendingBulkStatus] = useState<AttendanceStatus>('absent');
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
   const [celebrationStats, setCelebrationStats] = useState({ rate: 100, present: 0, total: 0 });
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(initialOpenEmergencyModal);
+
+  React.useEffect(() => {
+    if (initialOpenEmergencyModal) {
+      setIsEmergencyModalOpen(true);
+    }
+  }, [initialOpenEmergencyModal]);
 
   // Configured timetable periods & subjects from Settings
   const configuredLessonPeriods = (schoolProfile?.timetablePeriods || []).filter(
@@ -151,7 +166,7 @@ export const AttendanceSessionsView: React.FC = () => {
   const handleQuickMarkWholeClass = () => {
     if (!selectedSession) return;
     if (selectedSession.status === 'submitted') {
-      if (currentUser.role === 'admin' || currentUser.role === 'registrar') {
+      if (currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin') {
         const proceed = confirm(
           lang === 'ar'
             ? 'الكشف معتمد حالياً. يلزم إعادة فتح الكشف أولاً لاستخدام التحضير السريع. هل تريد فتح نافذة إعادة الفتح؟'
@@ -182,7 +197,7 @@ export const AttendanceSessionsView: React.FC = () => {
   // Quick Mark: Mark Selected Group of Students as Present
   const handleQuickMarkSelectedGroup = () => {
     if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
-    if (selectedSession.status === 'submitted' && currentUser.role !== 'admin') {
+    if (selectedSession.status === 'submitted' && currentUser.role !== 'admin' && currentUser.role !== 'super_admin') {
       alert(
         lang === 'ar'
           ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف أولاً.'
@@ -456,6 +471,16 @@ export const AttendanceSessionsView: React.FC = () => {
               <PlusCircle className="w-4 h-4" />
               <span>{lang === 'ar' ? 'إنشاء كشف حصة جديد' : 'New Session'}</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEmergencyModalOpen(true)}
+              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+              title={lang === 'ar' ? 'تفعيل وضع الطوارئ وحصر الإخلاء الميداني' : 'Emergency & Evacuation Mode'}
+            >
+              <ShieldAlert className="w-4 h-4 text-white animate-pulse" />
+              <span>{lang === 'ar' ? 'وضع الطوارئ والإخلاء' : 'Emergency Roster'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -629,7 +654,7 @@ export const AttendanceSessionsView: React.FC = () => {
                       <span>{lang === 'ar' ? 'كشف مقفل ومحمي من التعديل العشوائي' : 'Locked & Immutable'}</span>
                     </div>
 
-                    {(currentUser.role === 'admin' || currentUser.role === 'registrar') && (
+                    {(currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin') && (
                       <button
                         onClick={() => setIsReopenModalOpen(true)}
                         className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer"
@@ -1330,6 +1355,12 @@ export const AttendanceSessionsView: React.FC = () => {
         totalPresent={celebrationStats.present}
         totalStudents={celebrationStats.total}
         lang={lang}
+      />
+
+      {/* Fullscreen Emergency & Evacuation Modal */}
+      <EmergencyRosterModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
       />
     </div>
   );

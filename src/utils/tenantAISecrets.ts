@@ -4,11 +4,18 @@ import path from 'path';
 
 // Master encryption key derived from system environment or persistent secret
 // In production, set TENANT_ENCRYPTION_MASTER_KEY in environment
-const ENCRYPTION_SECRET = process.env.TENANT_ENCRYPTION_MASTER_KEY || 'smart-school-master-secret-key-salt-2026';
+const getMasterKey = (): Buffer => {
+  const secret = process.env.TENANT_ENCRYPTION_MASTER_KEY;
+  if (!secret) {
+    throw new Error('TENANT_ENCRYPTION_MASTER_KEY is required to encrypt or decrypt tenant AI keys.');
+  }
+  return crypto.createHash('sha256').update(secret).digest();
+};
 // Derive consistent 32-byte key using SHA-256
-const MASTER_KEY = crypto.createHash('sha256').update(ENCRYPTION_SECRET).digest();
 
-const SECRETS_FILE_PATH = path.resolve(process.cwd(), 'tenant-ai-secrets.json');
+const SECRETS_FILE_PATH = process.env.TENANT_AI_SECRETS_PATH
+  ? path.resolve(process.env.TENANT_AI_SECRETS_PATH)
+  : path.resolve(process.cwd(), 'tenant-ai-secrets.json');
 
 export interface TenantAIConfig {
   tenantId: string;
@@ -63,7 +70,7 @@ loadSecretsFromDisk();
  */
 function encryptKey(plainKey: string): { iv: string; tag: string; data: string } {
   const iv = crypto.randomBytes(12); // 96-bit IV recommended for GCM
-  const cipher = crypto.createCipheriv('aes-256-gcm', MASTER_KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getMasterKey(), iv);
   
   let encrypted = cipher.update(plainKey, 'utf-8', 'hex');
   encrypted += cipher.final('hex');
@@ -81,7 +88,7 @@ function encryptKey(plainKey: string): { iv: string; tag: string; data: string }
  */
 function decryptKey(payload: { iv: string; tag: string; data: string }): string | null {
   try {
-    const decipher = crypto.createDecipheriv('aes-256-gcm', MASTER_KEY, Buffer.from(payload.iv, 'hex'));
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getMasterKey(), Buffer.from(payload.iv, 'hex'));
     decipher.setAuthTag(Buffer.from(payload.tag, 'hex'));
     let decrypted = decipher.update(payload.data, 'hex', 'utf-8');
     decrypted += decipher.final('utf-8');

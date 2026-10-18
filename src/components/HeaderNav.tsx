@@ -5,7 +5,6 @@ import {
   Menu,
   Languages,
   LogOut,
-  Flame,
   UserCheck,
   CalendarDays,
   Mail,
@@ -19,12 +18,21 @@ import {
   Bell,
   PanelLeft,
   LayoutDashboard,
+  Globe,
+  Crown,
 } from 'lucide-react';
 import { ThemeSwitcherDropdown } from './ThemeSwitcherDropdown';
+import { PlatformOwnerModal } from './superadmin/PlatformOwnerModal';
+import {
+  isLocalDevelopmentHost,
+  getDevTestTenants,
+  switchDevTestTenant,
+} from '../config/tenantRegistry';
 
 export type ActiveTab =
   | 'dashboard'
   | 'sessions'
+  | 'communications'
   | 'justifications'
   | 'digest'
   | 'chatbot'
@@ -59,12 +67,15 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
     currentUser,
     lang,
     setLang,
-    firebaseUser,
-    signInWithGoogle,
-    signOutGoogle,
+    isSuperAdmin,
   } = useAttendance();
 
-  const [authLoading, setAuthLoading] = useState(false);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
+
+  // [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION]
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isDevHost = isLocalDevelopmentHost(host);
+  const devTenants = isDevHost ? getDevTestTenants() : [];
 
   const getPageTitle = (tab: ActiveTab): { ar: string; en: string; icon: React.ReactNode } => {
     switch (tab) {
@@ -72,6 +83,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
         return { ar: 'لوحة القيادة والمؤشرات التنفيذية', en: 'Executive Dashboard', icon: <LayoutDashboard className="w-5 h-5 text-emerald-600" /> };
       case 'sessions':
         return { ar: 'كشوف الحضور والغياب اليومية', en: 'Daily Attendance Sessions', icon: <CalendarDays className="w-5 h-5 text-emerald-600" /> };
+      case 'communications':
+        return { ar: 'مركز الأعذار والمراسلات الرسمية', en: 'Communications & Justifications Hub', icon: <FileCheck2 className="w-5 h-5 text-amber-600" /> };
       case 'digest':
         return { ar: 'نشرة الصباح الاستباقية والرادار الذكي', en: 'Morning Daily Digest', icon: <Mail className="w-5 h-5 text-teal-600" /> };
       case 'emergency':
@@ -151,7 +164,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               </span>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                  currentUser.role === 'admin'
+                  currentUser.role === 'super_admin'
+                    ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                    : currentUser.role === 'admin'
                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                     : currentUser.role === 'registrar'
                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800'
@@ -161,7 +176,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
                 }`}
                 title={lang === 'ar' ? 'الصفة / الدور المعتمد من تسجيل الدخول' : 'Authenticated Role from Login'}
               >
-                {currentUser.role === 'admin'
+                {currentUser.role === 'super_admin'
+                  ? (lang === 'ar' ? 'مالك المنصة (Platform Owner)' : 'Platform Owner')
+                  : currentUser.role === 'admin'
                   ? (lang === 'ar' ? 'مدير المدرسة (Admin)' : 'Admin')
                   : currentUser.role === 'registrar'
                   ? (lang === 'ar' ? 'شؤون الطلاب (Registrar)' : 'Registrar')
@@ -171,6 +188,44 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Platform Owner Stealth Launcher (ONLY rendered when isSuperAdmin === true) */}
+          {isSuperAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsPlatformModalOpen(true)}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold px-2.5 py-1 rounded-lg shadow-sm border border-amber-500 text-xs cursor-pointer transition-all"
+                title={lang === 'ar' ? 'إدارة المنصة وتأسيس المدارس السحابية' : 'Platform Owner Hub & School Provisioning'}
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-200" />
+                <span className="hidden sm:inline">{lang === 'ar' ? 'بوابة المالك' : 'Owner Hub'}</span>
+              </button>
+              <PlatformOwnerModal
+                isOpen={isPlatformModalOpen}
+                onClose={() => setIsPlatformModalOpen(false)}
+              />
+            </>
+          )}
+
+          {/* [TESTING / DEV ONLY - TO BE REMOVED IN PRODUCTION] Dev Tenant Quick Switcher */}
+          {isDevHost && devTenants.length > 1 && (
+            <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg text-amber-300 text-xs">
+              <span className="font-bold hidden md:inline">🧪 تجربة:</span>
+              <select
+                value={currentTenant.id}
+                onChange={(e) => switchDevTestTenant(e.target.value)}
+                className="bg-transparent text-amber-300 dark:text-amber-200 text-xs font-bold border-none focus:outline-hidden cursor-pointer"
+                title="تبديل المدرسة للاختبار والتطوير (للتجربة فقط)"
+              >
+                {devTenants.map((t) => (
+                  <option key={t.tenantId} value={t.tenantId} className="bg-slate-800 text-white">
+                    {t.nameAr.split(' ')[1] || t.nameAr}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Theme & Dark Mode Switcher */}
           <ThemeSwitcherDropdown lang={lang} />
@@ -194,48 +249,6 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{lang === 'ar' ? 'خروج' : 'Sign out'}</span>
-            </button>
-          )}
-
-          {/* Firebase Authentication Status */}
-          {firebaseUser ? (
-            <div className="hidden md:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg text-emerald-900 text-[11px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold max-w-[100px] truncate" title={firebaseUser.email || ''}>
-                {firebaseUser.displayName || firebaseUser.email}
-              </span>
-              <button
-                onClick={async () => {
-                  try {
-                    await signOutGoogle();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
-                className="text-emerald-700 hover:text-red-600 p-0.5 cursor-pointer"
-                title={lang === 'ar' ? 'تسجيل الخروج السحابي' : 'Sign out'}
-              >
-                <LogOut className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <button
-              disabled={authLoading}
-              onClick={async () => {
-                setAuthLoading(true);
-                try {
-                  await signInWithGoogle();
-                } catch (e) {
-                  console.error(e);
-                } finally {
-                  setAuthLoading(false);
-                }
-              }}
-              className="hidden md:flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-2 py-1 rounded-lg text-[11px] shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-              title={lang === 'ar' ? 'تسجيل الدخول عبر Google ومزامنة Firebase' : 'Sign in with Google'}
-            >
-              <Flame className="w-3.5 h-3.5" />
-              <span>Firebase</span>
             </button>
           )}
         </div>

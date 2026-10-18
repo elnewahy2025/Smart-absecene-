@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Student } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
+import { useModalAccessibility } from '../hooks/useModalAccessibility';
 import {
   QrCode,
   Download,
@@ -202,10 +203,15 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
     }
   };
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen: true, onClose, containerRef: dialogRef });
+
   const modalContent = (
     <div
       className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto w-screen h-screen print:p-0 print:bg-white print:static print:block"
       style={{ margin: 0, padding: '0.75rem', left: 0, top: 0, right: 0, bottom: 0 }}
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >
@@ -329,7 +335,7 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
               className="w-full flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer"
             >
               <Scan className="w-4 h-4 text-emerald-600" />
-              <span>{lang === 'ar' ? 'تسجيل حضور هذا الطالب فوراً (محاكاة المسح)' : 'Simulate Scan Now'}</span>
+              <span>{lang === 'ar' ? 'تسجيل حضور هذا الطالب فوراً' : 'Mark Present Now'}</span>
             </button>
           )}
         </div>

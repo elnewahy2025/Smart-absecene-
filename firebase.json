@@ -1,0 +1,26 @@
+{
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Smart Absence School Portal",
+        "supportEmail": "support@example.com",
+        "authorizedRedirectUris": [
+          "http://localhost:5050",
+          "http://localhost",
+          "http://127.0.0.1:5050"
+        ]
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8099 },
+    "ui": { "enabled": false }
+  }
+}
+

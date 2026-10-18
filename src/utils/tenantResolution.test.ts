@@ -89,5 +89,38 @@ describe('Tenant Domain Resolution Service', () => {
       // Restore active state
       TENANT_REGISTRY['school-2'].isActive = true;
     });
+
+    // [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION]
+    describe('Mobile & LAN Wi-Fi Testing Switcher', () => {
+      it('switches tenant via ?school= parameter on local LAN / Wi-Fi IP', () => {
+        const result = resolveTenantFromHostname('192.168.1.15:5050', '?school=school-2');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-2');
+        expect(result.config?.nameAr).toBe('مدرسة الفلاح المتوسطة الحديثة');
+      });
+
+      it('switches tenant via subdomain alias in query param (?school=falah)', () => {
+        const result = resolveTenantFromHostname('192.168.1.15:5050', '?school=falah');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-2');
+      });
+
+      it('switches tenant via ?tenant= parameter on localhost', () => {
+        const result = resolveTenantFromHostname('localhost:3000', '?tenant=school-2');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-2');
+      });
+
+      it('strictly ignores ?school= query parameters on production custom/sub domains', () => {
+        // Query param must NEVER override real production domains
+        const prodResult1 = resolveTenantFromHostname('andalus.smartschool.com', '?school=school-2');
+        expect(prodResult1.status).toBe('resolved');
+        expect(prodResult1.tenantId).toBe('school-1');
+
+        const prodResult2 = resolveTenantFromHostname('portal.falah.edu', '?school=school-1');
+        expect(prodResult2.status).toBe('resolved');
+        expect(prodResult2.tenantId).toBe('school-2');
+      });
+    });
   });
 });

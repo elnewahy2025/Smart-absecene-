@@ -178,6 +178,61 @@ body,
   color: var(--settings-header-badge) !important;
 }
 
+/* Universal Theme Utility Tokens across all themes */
+.app-card {
+  background-color: var(--app-card-bg) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text-main) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.bg-primary {
+  background-color: var(--app-primary) !important;
+}
+
+.bg-primary:hover,
+.bg-primary-hover:hover,
+.hover\:bg-primary-hover:hover {
+  background-color: var(--app-primary-hover) !important;
+}
+
+.text-primary {
+  color: var(--app-primary) !important;
+}
+
+.border-primary {
+  border-color: var(--app-primary) !important;
+}
+
+.bg-primary\/10 {
+  background-color: var(--app-primary-light) !important;
+}
+
+.border-primary\/20,
+.border-primary\/30 {
+  border-color: var(--app-primary-border) !important;
+}
+
+.ring-primary {
+  --tw-ring-color: var(--app-primary) !important;
+}
+
+.ring-primary\/20,
+.ring-primary\/30 {
+  --tw-ring-color: var(--app-primary-border) !important;
+}
+
+.hover\:border-primary\/40:hover,
+.hover\:border-primary\/50:hover {
+  border-color: var(--app-primary-border) !important;
+}
+
+.from-primary {
+  --tw-gradient-from: var(--app-primary) var(--tw-gradient-from-position);
+  --tw-gradient-to: var(--app-primary-hover) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
 /* Distinctive Section, Card, and Form Field Headings across all themes */
 label,
 label.text-slate-700,
@@ -193,7 +248,7 @@ h2,
 h3,
 h4,
 .section-title,
-.font-bold.text-slate-800 {
+.card-title {
   color: var(--app-subheading-color) !important;
   letter-spacing: -0.01em;
 }
@@ -219,11 +274,13 @@ html.dark .form-label {
 [data-theme="dark-slate"] h2,
 [data-theme="dark-slate"] h3,
 [data-theme="dark-slate"] h4,
-[data-theme="dark-slate"] .font-bold.text-slate-800,
+[data-theme="dark-slate"] .section-title,
+[data-theme="dark-slate"] .card-title,
 html.dark h2,
 html.dark h3,
 html.dark h4,
-html.dark .font-bold.text-slate-800 {
+html.dark .section-title,
+html.dark .card-title {
   color: #6ee7b7 !important;
 }
 
@@ -304,6 +361,30 @@ html.dark .font-bold.text-slate-800 {
 [data-theme="elementary-sky"] textarea {
   border-color: #bae6fd !important;
 }
+/* Elementary Sky Metric Tiles & Buttons Harmonization */
+[data-theme="elementary-sky"] .text-teal-600,
+[data-theme="elementary-sky"] .text-teal-500,
+[data-theme="elementary-sky"] .text-emerald-600,
+[data-theme="elementary-sky"] .text-emerald-700,
+[data-theme="elementary-sky"] .text-emerald-800 {
+  color: #0284c7 !important;
+}
+[data-theme="elementary-sky"] .bg-teal-500,
+[data-theme="elementary-sky"] .bg-emerald-500,
+[data-theme="elementary-sky"] .bg-emerald-600 {
+  background-color: #0284c7 !important;
+}
+[data-theme="elementary-sky"] .bg-teal-500\/10,
+[data-theme="elementary-sky"] .bg-emerald-50,
+[data-theme="elementary-sky"] .bg-emerald-500\/10 {
+  background-color: #e0f2fe !important;
+}
+[data-theme="elementary-sky"] .border-teal-500,
+[data-theme="elementary-sky"] .border-emerald-500,
+[data-theme="elementary-sky"] .border-emerald-500\/20,
+[data-theme="elementary-sky"] .border-emerald-500\/30 {
+  border-color: #7dd3fc !important;
+}
 
 /* 2. Rose Blossom Theme (Soft Rose Quartz for Girls' Academies) */
 [data-theme="rose-blossom"] aside {
@@ -357,6 +438,30 @@ html.dark .font-bold.text-slate-800 {
 [data-theme="rose-blossom"] textarea {
   border-color: #fecdd3 !important;
 }
+/* Rose Blossom Metric Tiles & Buttons Harmonization */
+[data-theme="rose-blossom"] .text-teal-600,
+[data-theme="rose-blossom"] .text-teal-500,
+[data-theme="rose-blossom"] .text-emerald-600,
+[data-theme="rose-blossom"] .text-emerald-700,
+[data-theme="rose-blossom"] .text-emerald-800 {
+  color: #e11d48 !important;
+}
+[data-theme="rose-blossom"] .bg-teal-500,
+[data-theme="rose-blossom"] .bg-emerald-500,
+[data-theme="rose-blossom"] .bg-emerald-600 {
+  background-color: #e11d48 !important;
+}
+[data-theme="rose-blossom"] .bg-teal-500\/10,
+[data-theme="rose-blossom"] .bg-emerald-50,
+[data-theme="rose-blossom"] .bg-emerald-500\/10 {
+  background-color: #ffe4e6 !important;
+}
+[data-theme="rose-blossom"] .border-teal-500,
+[data-theme="rose-blossom"] .border-emerald-500,
+[data-theme="rose-blossom"] .border-emerald-500\/20,
+[data-theme="rose-blossom"] .border-emerald-500\/30 {
+  border-color: #fda4af !important;
+}
 
 /* 3. Warm Amber Theme (Calm Heritage & Focus) */
 [data-theme="warm-amber"] aside {
@@ -409,6 +514,45 @@ html.dark .font-bold.text-slate-800 {
 [data-theme="warm-amber"] select,
 [data-theme="warm-amber"] textarea {
   border-color: #fde68a !important;
+}
+/* Warm Amber Metric Tiles & Buttons Harmonization */
+[data-theme="warm-amber"] .text-teal-600,
+[data-theme="warm-amber"] .text-teal-500,
+[data-theme="warm-amber"] .text-emerald-600,
+[data-theme="warm-amber"] .text-emerald-700,
+[data-theme="warm-amber"] .text-emerald-800 {
+  color: #d97706 !important;
+}
+[data-theme="warm-amber"] .bg-teal-500,
+[data-theme="warm-amber"] .bg-emerald-500,
+[data-theme="warm-amber"] .bg-emerald-600 {
+  background-color: #d97706 !important;
+}
+[data-theme="warm-amber"] .bg-teal-500\/10,
+[data-theme="warm-amber"] .bg-emerald-50,
+[data-theme="warm-amber"] .bg-emerald-500\/10 {
+  background-color: #fef3c7 !important;
+}
+[data-theme="warm-amber"] .border-teal-500,
+[data-theme="warm-amber"] .border-emerald-500,
+[data-theme="warm-amber"] .border-emerald-500\/20,
+[data-theme="warm-amber"] .border-emerald-500\/30 {
+  border-color: #fcd34d !important;
+}
+
+/* 4. Light Emerald Metric Tiles Harmonization */
+[data-theme="light-emerald"] .text-teal-600,
+[data-theme="light-emerald"] .text-teal-500 {
+  color: #059669 !important;
+}
+[data-theme="light-emerald"] .bg-teal-500 {
+  background-color: #059669 !important;
+}
+[data-theme="light-emerald"] .bg-teal-500\/10 {
+  background-color: #ecfdf5 !important;
+}
+[data-theme="light-emerald"] .border-teal-500 {
+  border-color: #a7f3d0 !important;
 }
 
 /* Comprehensive Dark Mode Rules (Spotify-Style) */
@@ -807,6 +951,16 @@ html.dark footer,
 }
 
 /* Chart SVG Theme Support */
+.recharts-tooltip-cursor,
+svg .recharts-tooltip-cursor,
+svg rect.recharts-tooltip-cursor,
+svg path.recharts-tooltip-cursor,
+svg line.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: transparent !important;
+  opacity: 0 !important;
+}
+
 html.dark .recharts-cartesian-grid line,
 [data-theme="dark-slate"] .recharts-cartesian-grid line {
   stroke: #282828 !important;

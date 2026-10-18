@@ -10,9 +10,14 @@ Use this checklist to manually test and verify the Smart School Attendance Syste
   *Result: 0 errors.*
 - [x] **Unit Testing with Vitest**:
   ```powershell
-  npx vitest run
+  npm test
   ```
-  *Result: 61 tests passed across 8 test suites (including `settingsComplianceAudit.test.ts`, `calculationsAudit.test.ts`, `rbac.test.ts`, `academicCalendarPersistence.test.ts`).*
+  *Result: 192 tests passed across 27 test suites (including `parentPortalAudit.test.ts`, `settingsComplianceAudit.test.ts`, `calculationsAudit.test.ts`, `rbac.test.ts`, `academicCalendarPersistence.test.ts`, `messagingProviders.test.ts`).*
+- [x] **Local Security & Secret Compliance Audit**:
+  ```powershell
+  npm run audit
+  ```
+  *Result: 100% passed (Node.js cross-platform secret scan, zero committed .env, .env.example verified).*
 - [x] **Settings Compliance & Rejection Engine Audit**:
   ```powershell
   npx vitest run src/utils/settingsComplianceAudit.test.ts

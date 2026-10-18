@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Student, SchoolClassSummary } from '../../types/attendance';
 import { UserPlus, X, Check } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddStudent: (student: Omit<Student, 'id' | 'tenantId' | 'attendanceRate' | 'totalAbsences' | 'totalLates'>) => void;
   classesStats: SchoolClassSummary[];
+  educationalGrades?: string[];
   lang: 'ar' | 'en';
 }
 
@@ -15,18 +18,33 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   onClose,
   onAddStudent,
   classesStats,
+  educationalGrades,
   lang,
 }) => {
   const isAr = lang === 'ar';
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
+  const { schoolProfile } = useAttendance();
+  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+966';
+
+  const availableGrades = React.useMemo(() => {
+    if (educationalGrades && educationalGrades.length > 0) {
+      return educationalGrades;
+    }
+    const fromStats = Array.from(new Set(classesStats.map((c) => c.grade).filter(Boolean)));
+    if (fromStats.length > 0) return fromStats;
+    return ['الصف العاشر', 'الصف الحادي عشر', 'الصف الثاني عشر'];
+  }, [educationalGrades, classesStats]);
+
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [studentNumber, setStudentNumber] = useState('');
-  const [grade, setGrade] = useState(classesStats[0]?.grade || 'المرحلة الدراسية');
+  const [grade, setGrade] = useState(availableGrades[0] || 'الصف العاشر');
   const [className, setClassName] = useState(classesStats[0]?.className || '');
   const [customClass, setCustomClass] = useState('');
   const [useCustomClass, setUseCustomClass] = useState(false);
   const [guardianName, setGuardianName] = useState('');
-  const [guardianPhone, setGuardianPhone] = useState('+9665');
+  const [guardianPhone, setGuardianPhone] = useState(dialCode);
   const [guardianRelationship, setGuardianRelationship] = useState('الأب');
   const [bloodType, setBloodType] = useState('O+');
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +91,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Add student" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
@@ -144,12 +162,21 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               <label className="font-semibold text-slate-700">{isAr ? 'المرحلة الدراسية' : 'Grade'}</label>
               <select
                 value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white"
+                onChange={(e) => {
+                  const newG = e.target.value;
+                  setGrade(newG);
+                  const matchingClass = classesStats.find((c) => c.grade === newG);
+                  if (matchingClass) {
+                    setClassName(matchingClass.className);
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white font-medium"
               >
-                <option value="الصف العاشر">{isAr ? 'الصف العاشر (الأول ثانوي)' : '10th Grade'}</option>
-                <option value="الصف الحادي عشر">{isAr ? 'الصف الحادي عشر (الثاني ثانوي)' : '11th Grade'}</option>
-                <option value="الصف الثاني عشر">{isAr ? 'الصف الثاني عشر (الثالث ثانوي)' : '12th Grade'}</option>
+                {availableGrades.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
@@ -163,7 +190,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                   >
                     {classesStats.map((c) => (
                       <option key={c.className} value={c.className}>
-                        {c.className} ({c.activeStudents} {isAr ? 'طالب' : 'students'})
+                        {c.className} {c.grade ? `(${c.grade})` : ''} ({c.activeStudents} {isAr ? 'طالب' : 'students'})
                       </option>
                     ))}
                   </select>
@@ -208,13 +235,16 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               />
             </div>
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'جوال ولي الأمر *' : 'Guardian Phone *'}</label>
+              <label className="font-semibold text-slate-700 flex items-center justify-between">
+                <span>{isAr ? 'جوال ولي الأمر *' : 'Guardian Phone *'}</span>
+                <span className="font-mono text-[10px] text-emerald-600 font-normal" dir="ltr">{dialCode}</span>
+              </label>
               <input
                 type="text"
                 required
                 value={guardianPhone}
                 onChange={(e) => setGuardianPhone(e.target.value)}
-                placeholder="+9665XXXXXXXX"
+                placeholder={`${dialCode}5XXXXXXXX`}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:bg-white"
               />
             </div>

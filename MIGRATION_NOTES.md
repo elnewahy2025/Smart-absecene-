@@ -84,15 +84,18 @@ npm install
 # 2. Run TypeScript check
 npm run lint
 
-# 3. Run automated tests
-npm run test
+# 3. Run automated tests (192 tests in 27 suites)
+npm test
 
-# 4. Clean previous builds
+# 4. Run local security & secret compliance audit
+npm run audit
+
+# 5. Clean previous builds
 npm run clean
 
-# 5. Build for production
+# 6. Build for production
 npm run build
 
-# 6. Start server
+# 7. Start server
 npm run start
 ```

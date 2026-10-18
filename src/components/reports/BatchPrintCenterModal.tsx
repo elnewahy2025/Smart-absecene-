@@ -4,6 +4,7 @@ import { Student } from '../../types/attendance';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Printer, Download, X, Layers, CheckCircle2, FileText, Loader2 } from 'lucide-react';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../../utils/pdfExport';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface Props {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
   const [selectedDocType, setSelectedDocType] = useState<'attendance_sheet' | 'warning_notice' | 'roster'>('attendance_sheet');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
 
   if (!isOpen) return null;
 
@@ -62,6 +65,8 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
   const content = (
     <div
       className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-in fade-in duration-150"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >
@@ -69,7 +74,7 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold">
               <Layers className="w-4 h-4" />
             </div>
             <div>
@@ -86,7 +91,7 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
             <button
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
+              className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
             >
               {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               <span>تنزيل PDF</span>
@@ -139,7 +144,7 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
           </div>
 
           <div className="text-[11px] text-slate-500 font-mono">
-            المستندات الجاهزة: <strong className="text-indigo-600">{filteredStudents.length}</strong> سجل
+            المستندات الجاهزة: <strong className="text-primary">{filteredStudents.length}</strong> سجل
           </div>
         </div>
 

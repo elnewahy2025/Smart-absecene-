@@ -1,42 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AttendanceProvider, useAttendance } from './context/AttendanceContext';
 import { HeaderNav, ActiveTab } from './components/HeaderNav';
 import { AppSidebar } from './components/AppSidebar';
-import { AttendanceSessionsView } from './components/AttendanceSessionsView';
-import { JustificationsView } from './components/JustificationsView';
-import { GeminiChatbotView } from './components/GeminiChatbotView';
-import { EmergencyRosterView } from './components/EmergencyRosterView';
-import { NotificationOutboxView } from './components/NotificationOutboxView';
-import { ReportsView } from './components/ReportsView';
-import { StudentManagementView } from './components/StudentManagementView';
-import { AuditSettingsView } from './components/AuditSettingsView';
-import { ParentPortalView } from './components/ParentPortalView';
-import { DailyEmailDigestView } from './components/DailyEmailDigestView';
-import { ExecutiveDashboardView } from './components/ExecutiveDashboardView';
-import { StudentAbsenceInquiryView } from './components/StudentAbsenceInquiryView';
 import { UnknownDomainView } from './components/UnknownDomainView';
 import { LoginPage } from './components/LoginPage';
-import { resolveTenantFromHostname } from './config/tenantRegistry';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { resolveTenantFromHostname, TenantResolutionResult } from './config/tenantRegistry';
 
 import { subscribeConnectionStatus, ConnectionStatus } from './lib/firebase';
 import { WifiOff, Database, RefreshCw } from 'lucide-react';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 
+// Code-Splitting: Lazy load views on-demand to reduce initial bundle size by >80%
+const ExecutiveDashboardView = lazy(() =>
+  import('./components/ExecutiveDashboardView').then((m) => ({ default: m.ExecutiveDashboardView }))
+);
+const AttendanceSessionsView = lazy(() =>
+  import('./components/AttendanceSessionsView').then((m) => ({ default: m.AttendanceSessionsView }))
+);
+const StudentManagementView = lazy(() =>
+  import('./components/StudentManagementView').then((m) => ({ default: m.StudentManagementView }))
+);
+const CommunicationsView = lazy(() =>
+  import('./components/communications/CommunicationsView').then((m) => ({ default: m.CommunicationsView }))
+);
+const ReportsView = lazy(() =>
+  import('./components/ReportsView').then((m) => ({ default: m.ReportsView }))
+);
+const AuditSettingsView = lazy(() =>
+  import('./components/AuditSettingsView').then((m) => ({ default: m.AuditSettingsView }))
+);
+const GeminiChatbotView = lazy(() =>
+  import('./components/GeminiChatbotView').then((m) => ({ default: m.GeminiChatbotView }))
+);
+const ParentPortalView = lazy(() =>
+  import('./components/ParentPortalView').then((m) => ({ default: m.ParentPortalView }))
+);
+
+// Backward-compatible fallback views
+const DailyEmailDigestView = lazy(() =>
+  import('./components/DailyEmailDigestView').then((m) => ({ default: m.DailyEmailDigestView }))
+);
+const EmergencyRosterView = lazy(() =>
+  import('./components/EmergencyRosterView').then((m) => ({ default: m.EmergencyRosterView }))
+);
+
+const ViewLoadingFallback: React.FC = () => (
+  <div className="flex flex-col items-center justify-center min-h-[380px] py-16 space-y-3">
+    <div className="w-9 h-9 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
+    <span className="text-xs font-semibold text-slate-500 animate-pulse">جاري تحميل البيانات...</span>
+  </div>
+);
+
 const MainAppContent: React.FC = () => {
-  const { lang, currentTenant, currentUser, setUserRole } = useAttendance();
+  const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
   const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'dashboard');
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('connected');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return typeof localStorage !== 'undefined' && localStorage.getItem('school_user_authenticated') === 'true';
   });
 
+  // Automatically authenticate if returning from a cloud redirect or if a persistent Firebase session exists
+  useEffect(() => {
+    if (firebaseUser) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('school_user_authenticated', 'true');
+      }
+      const userEmail = (firebaseUser.email || '').toLowerCase();
+      const ownerEmails = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAILS || '')
+        .split(',')
+        .map((value: string) => value.trim().toLowerCase())
+        .filter(Boolean);
+      if (ownerEmails.includes(userEmail)) {
+        setUserRole('super_admin');
+      }
+      setIsAuthenticated(true);
+    }
+  }, [firebaseUser]);
+
   const handleSignOut = () => {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('school_user_authenticated');
+    }
+    if (firebaseUser) {
+      signOutGoogle().catch((err) => console.error('Sign out error:', err));
     }
     setIsAuthenticated(false);
   };
@@ -67,9 +120,28 @@ const MainAppContent: React.FC = () => {
 
   // Strict RBAC: Guard unauthorized views based on role
   useEffect(() => {
-    if (isParent && activeTab !== 'parent_portal' && activeTab !== 'justifications' && activeTab !== 'chatbot') {
+    if (
+      isParent &&
+      activeTab !== 'parent_portal' &&
+      activeTab !== 'justifications' &&
+      activeTab !== 'chatbot' &&
+      activeTab !== 'communications'
+    ) {
       setActiveTab('parent_portal');
-    } else if (isTeacher && !['dashboard', 'sessions', 'justifications', 'chatbot', 'emergency', 'reports'].includes(activeTab)) {
+    } else if (
+      isTeacher &&
+      ![
+        'dashboard',
+        'sessions',
+        'students',
+        'student_inquiry',
+        'communications',
+        'justifications',
+        'chatbot',
+        'emergency',
+        'reports',
+      ].includes(activeTab)
+    ) {
       setActiveTab('dashboard');
     }
   }, [isParent, isTeacher, activeTab]);
@@ -78,9 +150,6 @@ const MainAppContent: React.FC = () => {
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
-
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
   const isAr = lang === 'ar';
 
@@ -151,36 +220,55 @@ const MainAppContent: React.FC = () => {
 
         {/* Main Content Viewport */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {isParent ? (
-            <>
-              {activeTab === 'parent_portal' && (
-                <ParentPortalView onOpenExcuseForm={() => setActiveTab('justifications')} />
+          <ErrorBoundary>
+            <Suspense fallback={<ViewLoadingFallback />}>
+              {isParent ? (
+                <>
+                  {activeTab === 'parent_portal' && (
+                    <ParentPortalView onOpenExcuseForm={() => setActiveTab('communications')} />
+                  )}
+                  {(activeTab === 'justifications' || activeTab === 'communications') && (
+                    <CommunicationsView initialTab="justifications" />
+                  )}
+                  {activeTab === 'chatbot' && <GeminiChatbotView />}
+                </>
+              ) : (
+                <>
+                  {activeTab === 'dashboard' && (
+                    <ExecutiveDashboardView onNavigateTab={(tab) => setActiveTab(tab)} />
+                  )}
+                  {activeTab === 'sessions' && <AttendanceSessionsView />}
+                  {activeTab === 'students' && <StudentManagementView />}
+                  {activeTab === 'communications' && (
+                    <CommunicationsView initialTab="justifications" />
+                  )}
+                  {activeTab === 'reports' && <ReportsView />}
+                  {activeTab === 'settings' && <AuditSettingsView />}
+                  {activeTab === 'chatbot' && <GeminiChatbotView />}
+
+                  {/* Backward-Compatible Tab Aliases */}
+                  {activeTab === 'justifications' && (
+                    <CommunicationsView initialTab="justifications" />
+                  )}
+                  {activeTab === 'outbox' && (
+                    <CommunicationsView initialTab="outbox" />
+                  )}
+                  {activeTab === 'digest' && (
+                    <DailyEmailDigestView onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)} />
+                  )}
+                  {activeTab === 'emergency' && (
+                    <AttendanceSessionsView initialOpenEmergencyModal={true} />
+                  )}
+                  {activeTab === 'student_inquiry' && (
+                    <StudentManagementView />
+                  )}
+                  {activeTab === 'parent_portal' && (
+                    <ParentPortalView onOpenExcuseForm={() => setActiveTab('communications')} />
+                  )}
+                </>
               )}
-              {activeTab === 'justifications' && <JustificationsView />}
-              {activeTab === 'chatbot' && <GeminiChatbotView />}
-            </>
-          ) : (
-            <>
-              {activeTab === 'dashboard' && (
-                <ExecutiveDashboardView onNavigateTab={(tab) => setActiveTab(tab)} />
-              )}
-              {activeTab === 'sessions' && <AttendanceSessionsView />}
-              {activeTab === 'justifications' && <JustificationsView />}
-              {activeTab === 'digest' && (
-                <DailyEmailDigestView onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)} />
-              )}
-              {activeTab === 'chatbot' && <GeminiChatbotView />}
-              {activeTab === 'emergency' && <EmergencyRosterView />}
-              {activeTab === 'outbox' && <NotificationOutboxView />}
-              {activeTab === 'reports' && <ReportsView />}
-              {activeTab === 'students' && <StudentManagementView />}
-              {activeTab === 'student_inquiry' && <StudentAbsenceInquiryView />}
-              {activeTab === 'settings' && <AuditSettingsView />}
-              {activeTab === 'parent_portal' && (
-                <ParentPortalView onOpenExcuseForm={() => setActiveTab('justifications')} />
-              )}
-            </>
-          )}
+            </Suspense>
+          </ErrorBoundary>
         </main>
 
         {/* Footer */}
@@ -205,7 +293,35 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const resolution = resolveTenantFromHostname(hostname);
+  const search = typeof window !== 'undefined' ? window.location.search : '';
+  const [resolution, setResolution] = useState<TenantResolutionResult>(() =>
+    resolveTenantFromHostname(hostname, search)
+  );
+  const [isResolving, setIsResolving] = useState<boolean>(false);
+
+  useEffect(() => {
+    // If unknown on this origin, check with server in case this is a newly provisioned school
+    if (resolution.status === 'unknown_domain' && typeof window !== 'undefined') {
+      setIsResolving(true);
+      fetch('/api/tenant/resolve')
+        .then((res) => res.json())
+        .then((serverRes: TenantResolutionResult) => {
+          if (serverRes && serverRes.status === 'resolved') {
+            setResolution(serverRes);
+          }
+        })
+        .catch((err) => console.warn('Could not resolve tenant from server:', err))
+        .finally(() => setIsResolving(false));
+    }
+  }, [hostname]);
+
+  if (isResolving) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (resolution.status === 'unknown_domain') {
     return <UnknownDomainView hostname={resolution.normalizedHostname} reason="unknown_domain" />;
@@ -215,13 +331,16 @@ export default function App() {
     return <UnknownDomainView hostname={resolution.normalizedHostname} reason="inactive_tenant" />;
   }
 
-  const activeTenantId = resolution.tenantId || 'school-1';
+  const activeTenantId =
+    resolution.tenantId || ((import.meta as any).env?.VITE_DEFAULT_TENANT_ID || '');
 
   return (
-    <ThemeProvider>
-      <AttendanceProvider initialTenantId={activeTenantId}>
-        <MainAppContent />
-      </AttendanceProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AttendanceProvider initialTenantId={activeTenantId}>
+          <MainAppContent />
+        </AttendanceProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

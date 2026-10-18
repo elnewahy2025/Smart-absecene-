@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types/attendance';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
+import { useModalAccessibility } from '../hooks/useModalAccessibility';
 import {
   FileText,
   Printer,
@@ -96,10 +97,15 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
     }
   };
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen: true, onClose, containerRef: dialogRef });
+
   const modalContent = (
     <div
       className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto w-screen h-screen print:p-0 print:bg-white print:static print:block"
       style={{ margin: 0, padding: '0.75rem', left: 0, top: 0, right: 0, bottom: 0 }}
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
     >
@@ -107,7 +113,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
         {/* Controls Header (Hidden during Print) */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 print:hidden modal-controls-header">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-xs">
               <FileText className="w-4 h-4" />
             </div>
             <div>
@@ -126,7 +132,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
             <button
               onClick={handleDownloadVectorPdf}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
+              className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
               title="توليد وحفظ ملف PDF أصلي ذو نصوص حقيقية"
             >
               {isGeneratingPdf ? (

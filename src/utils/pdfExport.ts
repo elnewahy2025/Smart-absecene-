@@ -3,12 +3,14 @@
  * Ensures proper Arabic font embedding (Cairo, Amiri) and RTL shaping with selectable text.
  * Output is a real, standards-compliant vector PDF that opens reliably in all desktop and mobile browsers.
  */
+import { authenticatedFetch } from '../lib/api';
+
 export async function fetchNativePdfBlob(options: {
   htmlContent: string;
   title: string;
   filename: string;
 }): Promise<Blob> {
-  const response = await fetch('/api/pdf/generate', {
+  const response = await authenticatedFetch('/api/pdf/generate', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

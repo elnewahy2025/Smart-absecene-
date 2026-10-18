@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import {
   ShieldAlert,
   ThumbsUp,
@@ -51,6 +52,9 @@ export const StudentBehaviourModal: React.FC<Props> = ({
   const [guardianNotified, setGuardianNotified] = useState<boolean>(true);
   const [successToast, setSuccessToast] = useState<boolean>(false);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
+
   if (!isOpen) return null;
 
   const studentIncidents = incidents.filter((i) => i.studentId === student.id);
@@ -93,7 +97,7 @@ export const StudentBehaviourModal: React.FC<Props> = ({
   };
 
   const modalContent = (
-    <div
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Student behaviour record"
       className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in duration-150"
       onClick={onClose}
     >

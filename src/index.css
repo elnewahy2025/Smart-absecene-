@@ -2,6 +2,13 @@
 @import "./styles/themes.css";
 @import "./styles/print.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: var(--app-primary);
+  --color-primary-hover: var(--app-primary-hover);
+}
+
 html,
 body {
   max-width: 100vw;

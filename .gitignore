@@ -6,8 +6,33 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Compiled server bundle (built from server.ts via esbuild)
+server.js
 firebase-applet-config.local.json
 firebase-applet-config.local.*
 serviceAccountKey*.json
 service-account*.json
 tenant-ai-secrets.json
+
+# Package-manager lockfiles: npm is the single source of truth
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
+# Generated report / validation artifacts (PDF & preview PNG exports)
+/*.pdf
+/*.png
+scripts/*.pdf
+scripts/*.png
+
+# Office scratch & temp files
+~$*
+*.docx
+analize_extracted.txt
+
+# Firebase emulator logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

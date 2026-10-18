@@ -116,4 +116,30 @@ To preserve code integrity, implementation will proceed strictly modularly—mod
 17. **Strict Universal Settings Adherence & File Upload Rejection Engine (`#17`)**: [Completed ✅]
     - **Target Files**: `src/config/tenantSettings.ts`, `src/components/StudentAbsenceInquiryView.tsx`, `src/components/StudentManagementView.tsx`, `src/components/JustificationsView.tsx`, `src/components/justifications/JustificationSubmitForm.tsx`, `src/components/AttendanceSessionsView.tsx`, `src/context/AttendanceContext.tsx`, `src/components/ExecutiveDashboardView.tsx`, `src/utils/settingsComplianceAudit.test.ts`
     - **Scope**: Full, universal enforcement of all settings data across all functions, math calculations, and calendar filters platform-wide. Eliminates Month 8 (`2026-08`), bounds date inquiries strictly to academic year start (`2026-09-01`), filters out official holidays and weekends. Validates all uploaded CSV student rosters against `schoolProfile.classes`, strictly rejecting records with unapproved classrooms or grades with explicit error messages and an alert banner. Rejects excuse and session submissions on off-days or outside academic calendar terms. Fully covered by automated test suite (`settingsComplianceAudit.test.ts`).
-
+18. **Comprehensive Parent Portal Detailed Records & Unified Timeline Table (`#18`)**: [Completed ✅]
+    - **Target Files**: `src/components/parent/ParentRecordsTable.tsx`, `src/components/parent/ParentRecordDetailsModal.tsx`, `src/components/ParentPortalView.tsx`, `src/utils/parentPortalAudit.test.ts`, `src/data/mockData.ts`
+    - **Scope**: Re-engineered Parent Portal to present student records in a comprehensive, interactive multi-tab data table. Features 5 distinct tabs: Master Unified Timeline, Absence & Tardiness Table, Conduct Infractions & Violations Table, Excuses & Medical Reports Table, and Guardian Messages & Notifications Table. Each record displays full dates, timestamps, session subjects, detailed descriptions, teacher notes, action taken, and delivery channels. Includes an interactive inspection modal (`ParentRecordDetailsModal.tsx`), live keyword search, status filtering, print support, and 5-card metric overview with 100% guardian privacy isolation.
+19. **Dynamic Multi-Tenant Subdomain Resolution & Cross-Origin Persistence (`#19`)**: [Completed ✅]
+    - **Target Files**: `src/config/tenantRegistry.ts`, `src/config/dynamicTenants.json`, `server.ts`, `src/App.tsx`, `src/utils/tenantResolution.test.ts`
+    - **Scope**: Enabled persistent cross-origin domain resolution via filesystem-backed `dynamicTenants.json` and a server resolution API (`GET /api/tenant/resolve`). Schools provisioned dynamically (such as `majd.localhost:5050`) resolve reliably without cross-origin localStorage isolation errors.
+20. **Platform Owner Hub & Stealth School Provisioning (`#20`)**: [Completed ✅]
+    - **Target Files**: `src/components/PlatformOwnerModal.tsx`, `src/components/HeaderNav.tsx`, `src/utils/superAdminStealthAndProvisioning.test.ts`
+    - **Scope**: Exclusive platform owner management interface accessible only to `super_admin` (`owner@smartschool.platform`). Supports one-click school provisioning, multi-tenant overview, tenant activation/deactivation, and stealth administrative inspection.
+21. **Top Bar & Platform Owner Identity Alignment (`#21`)**: [Completed ✅]
+    - **Target Files**: `src/components/HeaderNav.tsx`, `src/App.tsx`, `src/utils/uiCleanlinessAudit.test.ts`
+    - **Scope**: Streamlined top navigation bar, eliminating redundant floating badges while unifying the user identity cleanly inside the primary User Card on the right.
+22. **Live Firebase Authentication & Dual Mode Fallback (`#22`)**: [Completed ✅]
+    - **Target Files**: `src/lib/firebase.ts`, `src/context/AttendanceContext.tsx`, `src/components/LoginPage.tsx`, `scripts/seed-firebase-auth.ts`, `src/utils/cloudAuthAudit.test.ts`
+    - **Scope**: Provisioned live Firebase Auth (`Email/Password` and `Google Sign-In`) on Cloud project `winged-freedom-j7c1c` with seamless fallback for offline and local testing.
+23. **Universal Country Selection & Dynamic International Calling Code System (`#23`)**: [Completed ✅]
+    - **Target Files**: `src/config/countryCodes.ts`, `src/components/settings/SchoolContactTab.tsx`, `src/utils/countryCallingCodes.test.ts`
+    - **Scope**: Standardized country registry covering all Arab League nations and international countries with flags and dial codes. Allows custom manual country entry, automatic phone code derivation, and one-tap quick-selection chips.
+24. **Platform Owner Smart Holiday Search & Dynamic Ministerial Hints Adaptation (`#24`)**: [Completed ✅]
+    - **Target Files**: `src/config/countryPresets.ts`, `src/components/settings/SmartHolidayImportModal.tsx`, `server.ts`, `src/utils/countryPresetsAndSmartHolidays.test.ts`
+    - **Scope**: Platform Owner exclusive AI/Gemini and preset-backed smart holiday search fetching official ministerial calendars for any country and academic year with one-click import, automatic weekend adjustment (Fri-Sat vs Sat-Sun), and dynamic adaptation of ministry letterheads, directorates, and administrative labels across all settings tabs.
+25. **Touchless QR Attendance 3-Condition Check-In Architecture (`#25`)**: [Completed ✅]
+    - **Target Files**: `src/components/QRScannerModal.tsx`
+    - **Scope**: Implemented a 3-condition architecture for QR attendance:
+      1. Roster reset to pending only after explicit teacher modal confirmation with clear warning.
+      2. Unscanned students remain pending until the session ends; teacher reviews a deferred finalization modal with one-click toggle to mark late arrivals (with 5-45m selector) before committing final absences.
+      3. Duplicate scan prevention with amber alert banners, audio warning tones, and exact scan timestamping logged to audit history.

@@ -50,6 +50,7 @@ export const UserManagementTab: React.FC<Props> = ({
   const availableSubjects = propSubjects && propSubjects.length > 0 ? propSubjects : fallbackSubjects;
 
   const roleLabels: Record<UserRole, { ar: string; en: string; badge: string }> = {
+    super_admin: { ar: 'مالك المنصة', en: 'Platform Owner', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
     admin: { ar: 'مدير المدرسة', en: 'Principal (Admin)', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
     registrar: { ar: 'شؤون الطلاب', en: 'Registrar / Counselor', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
     teacher: { ar: 'معلم الفصل', en: 'Teacher', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
@@ -57,6 +58,8 @@ export const UserManagementTab: React.FC<Props> = ({
   };
 
   const filteredUsers = users.filter((u) => {
+    // STEALTH: The Owner / super_admin is NEVER displayed in standard school staff lists
+    if (u.role === 'super_admin') return false;
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -209,7 +212,7 @@ export const UserManagementTab: React.FC<Props> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-600 space-y-0.5">
-                      <div>{u.email}</div>
+                      <div className="font-semibold text-slate-800">{u.email}</div>
                       <div className="text-[11px] text-slate-400" dir="ltr">{u.phone}</div>
                     </td>
                     <td className="py-3 px-4">

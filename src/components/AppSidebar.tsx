@@ -87,7 +87,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const sections: NavSection[] = [
     {
       id: 'operations',
-      titleAr: 'العمليات والحضور',
+      titleAr: 'العمليات والتحضير',
       titleEn: 'Daily Operations',
       icon: <CalendarDays className="w-4 h-4 text-emerald-600" />,
       items: [
@@ -103,59 +103,36 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           labelEn: 'Attendance Sessions',
           icon: <CalendarDays className="w-4 h-4 text-emerald-600" />,
         },
-        {
-          id: 'digest',
-          labelAr: 'نشرة الصباح الاستباقية',
-          labelEn: 'Morning Daily Digest',
-          icon: <Mail className="w-4 h-4 text-teal-600" />,
-        },
-        {
-          id: 'emergency',
-          labelAr: 'كشف الطوارئ ونقاط الإخلاء',
-          labelEn: 'Emergency Roster',
-          icon: <ShieldAlert className="w-4 h-4 text-rose-600" />,
-        },
       ],
     },
     {
       id: 'students',
-      titleAr: 'شؤون الطلاب والشعب',
-      titleEn: 'Students & Classes',
+      titleAr: 'شؤون الطلاب',
+      titleEn: 'Students Hub',
       icon: <Users2 className="w-4 h-4 text-indigo-600" />,
       items: [
         {
           id: 'students',
-          labelAr: 'سجلات واستيراد الطلاب',
-          labelEn: 'Students Registry & Import',
+          labelAr: 'سجل واستعلام الطلاب',
+          labelEn: 'Students & Roster Registry',
           icon: <Users2 className="w-4 h-4 text-indigo-600" />,
-        },
-        {
-          id: 'student_inquiry',
-          labelAr: 'استعلام ومتابعة غياب طالب',
-          labelEn: 'Student Absence Inquiry',
-          icon: <Search className="w-4 h-4 text-emerald-600" />,
         },
       ],
     },
     {
       id: 'communications',
       titleAr: 'الأعذار والمراسلات',
-      titleEn: 'Excuses & Communications',
+      titleEn: 'Communications & Excuses',
       icon: <FileCheck2 className="w-4 h-4 text-amber-600" />,
       items: [
         {
-          id: 'justifications',
-          labelAr: isParent ? 'أعذار واستئذان الأبناء' : isTeacher ? 'أعذار طلاب الفصول' : 'تدقيق وتحليل الأعذار الذكي',
-          labelEn: isParent ? 'Child Excuses' : isTeacher ? 'Class Excuses' : 'Excuses & AI Analysis',
+          id: 'communications',
+          labelAr: isParent ? 'أعذار واستئذان الأبناء' : isTeacher ? 'أعذار طلاب الفصول' : 'مركز الأعذار والمراسلات',
+          labelEn: isParent ? 'Child Excuses' : isTeacher ? 'Class Excuses' : 'Communications Hub',
           icon: <FileCheck2 className="w-4 h-4 text-amber-600" />,
-          badge: pendingJustificationsCount > 0 ? pendingJustificationsCount : undefined,
-        },
-        {
-          id: 'outbox',
-          labelAr: 'طابور الإشعارات والمراسلات',
-          labelEn: 'Notification Outbox',
-          icon: <Send className="w-4 h-4 text-sky-600" />,
-          badge: failedNotificationsCount > 0 ? failedNotificationsCount : undefined,
+          badge: (pendingJustificationsCount + (currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin' ? failedNotificationsCount : 0)) > 0
+            ? (pendingJustificationsCount + (currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin' ? failedNotificationsCount : 0))
+            : undefined,
         },
       ],
     },
@@ -195,14 +172,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       if (isParent) {
         return {
           ...sec,
-          items: sec.items.filter((i) => i.id === 'justifications'),
+          items: sec.items.filter((i) => i.id === 'communications'),
         };
       }
       if (isTeacher) {
         return {
           ...sec,
           items: sec.items.filter((i) =>
-            ['dashboard', 'sessions', 'emergency', 'student_inquiry', 'justifications', 'reports'].includes(i.id)
+            ['dashboard', 'sessions', 'students', 'communications', 'reports'].includes(i.id)
           ),
         };
       }
@@ -307,8 +284,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
           {/* Workflow Sections */}
           {visibleSections.map((sec) => {
+            const isItemActive = (targetId: ActiveTab) => {
+              if (activeTab === targetId) return true;
+              if (targetId === 'communications' && (activeTab === 'justifications' || activeTab === 'outbox')) return true;
+              if (targetId === 'students' && activeTab === 'student_inquiry') return true;
+              if (targetId === 'sessions' && activeTab === 'emergency') return true;
+              if (targetId === 'dashboard' && activeTab === 'digest') return true;
+              return false;
+            };
+
             const isExpanded = expandedSections[sec.id] !== false;
-            const hasActiveChild = sec.items.some((i) => i.id === activeTab);
+            const hasActiveChild = sec.items.some((i) => isItemActive(i.id));
 
             return (
               <div key={sec.id} className="space-y-1">
@@ -338,7 +324,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 {(isExpanded || isCollapsed) && (
                   <div className={`space-y-0.5 ${!isCollapsed ? (isAr ? 'pr-2' : 'pl-2') : ''}`}>
                     {sec.items.map((item) => {
-                      const isActive = activeTab === item.id;
+                      const isActive = isItemActive(item.id);
                       return (
                         <button
                           key={item.id}

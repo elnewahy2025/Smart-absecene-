@@ -291,7 +291,7 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {currentTenant.name} · {lang === 'ar' ? `الأسبوع: (${weekStartStr} إلى ${weekEndStr})` : `Week: (${weekStartStr} to ${weekEndStr})`}
+              {lang === 'ar' ? `الأسبوع: (${weekStartStr} إلى ${weekEndStr})` : `Week: (${weekStartStr} to ${weekEndStr})`}
             </p>
           </div>
         </div>
@@ -352,18 +352,18 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
 
       {/* KPI Highlights Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <div className="p-3 rounded-xl border border-[var(--app-border,#e2e8f0)] bg-slate-50/50 dark:bg-slate-900/40">
-          <span className="text-[11px] opacity-70 block mb-0.5">
+        <div className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-0.5">
             {lang === 'ar' ? 'متوسط حضور الأيام المرصودة' : 'Recorded Days Average'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-400">
               {weeklyAverage}%
             </span>
             {recordedDays.length >= 2 && (
               <span
-                className={`text-[10px] flex items-center font-medium ${
-                  rateDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                className={`text-[10px] flex items-center font-bold ${
+                  rateDiff >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
                 }`}
               >
                 {rateDiff >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -373,45 +373,45 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border border-emerald-200/60 bg-emerald-50/40 dark:bg-emerald-950/20">
-          <span className="text-[11px] text-emerald-800 dark:text-emerald-300 block mb-0.5 font-medium">
+        <div className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/90 dark:bg-emerald-950/30 shadow-2xs">
+          <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block mb-0.5">
             {lang === 'ar' ? 'أعلى انضباط مسجل' : 'Peak Attendance'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300">
+            <span className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300">
               {highestDay ? `${highestDay.attendanceRate}%` : '-'}
             </span>
             {highestDay && (
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+              <span className="text-[11px] text-emerald-800 dark:text-emerald-400 font-bold">
                 ({highestDay.dayName})
               </span>
             )}
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20">
-          <span className="text-[11px] text-amber-800 dark:text-amber-300 block mb-0.5 font-medium">
+        <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/90 dark:bg-amber-950/30 shadow-2xs">
+          <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 block mb-0.5">
             {lang === 'ar' ? 'أدنى نسبة مسجلة' : 'Lowest Day'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300">
+            <span className="text-2xl font-black font-mono text-amber-700 dark:text-amber-300">
               {lowestDay ? `${lowestDay.attendanceRate}%` : '-'}
             </span>
             {lowestDay && (
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+              <span className="text-[11px] text-amber-800 dark:text-amber-400 font-bold">
                 ({lowestDay.dayName})
               </span>
             )}
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border border-[var(--app-border,#e2e8f0)] bg-slate-50/50 dark:bg-slate-900/40">
-          <span className="text-[11px] opacity-70 block mb-0.5">
+        <div className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-0.5">
             {lang === 'ar' ? 'المستهدف الوزاري' : 'Target Benchmark'}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold font-mono opacity-90">95.0%</span>
-            <span className="text-[11px] opacity-50">{lang === 'ar' ? 'حد التميز' : 'Standard'}</span>
+            <span className="text-2xl font-black font-mono text-slate-800 dark:text-slate-100">95.0%</span>
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-bold">{lang === 'ar' ? 'حد التميز' : 'Standard'}</span>
           </div>
         </div>
       </div>
@@ -447,7 +447,7 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
               unit="%"
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip cursor={{ stroke: 'transparent', fill: 'transparent' }} content={<CustomTooltip />} />
 
             {/* Benchmark Reference Line at 95% */}
             <ReferenceLine
@@ -487,7 +487,7 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
             <CalendarDays className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>{lang === 'ar' ? 'حالة أيام الأسبوع الدراسي الخمسة (الأحد - الخميس):' : '5-Day School Week Status (Sun - Thu):'}</span>
           </span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-normal">
+          <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono font-medium">
             {lang === 'ar' ? 'انقر على اليوم لرؤية التفاصيل' : 'Hover over days for details'}
           </span>
         </div>
@@ -500,51 +500,59 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
                 key={slot.date}
                 className={`p-2.5 rounded-xl border transition-all ${
                   slot.isToday
-                    ? 'border-emerald-500 bg-emerald-500/10 shadow-xs'
+                    ? 'border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/40 shadow-xs ring-1 ring-emerald-500/20'
                     : slot.isHoliday
-                    ? 'border-purple-300 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/40 border-dashed'
+                    ? 'border-purple-300 dark:border-purple-800/60 bg-purple-50/90 dark:bg-purple-950/40 border-dashed shadow-2xs'
                     : isRecorded
-                    ? 'border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60'
-                    : 'border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/40'
+                    ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs'
+                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-slate-800 dark:text-slate-100">{slot.dayName}</span>
+                  <span className={`font-bold text-xs ${
+                    slot.isHoliday ? 'text-purple-950 dark:text-purple-100' : slot.isToday ? 'text-emerald-950 dark:text-emerald-100' : 'text-slate-800 dark:text-slate-100'
+                  }`}>
+                    {slot.dayName}
+                  </span>
                   {slot.isToday && (
-                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full font-bold">
                       {lang === 'ar' ? 'اليوم' : 'Today'}
                     </span>
                   )}
                   {slot.isHoliday && (
-                    <span className="text-[9px] bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 px-1 rounded font-bold">
+                    <span className="text-[9px] bg-purple-100 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200 px-1.5 py-0.5 rounded font-bold">
                       {lang === 'ar' ? 'عطلة' : 'Off'}
                     </span>
                   )}
                 </div>
 
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mb-1.5">{slot.date}</div>
+                <div className={`text-[10px] font-mono mb-1.5 ${
+                  slot.isHoliday ? 'text-purple-700 dark:text-purple-300' : slot.isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                }`}>
+                  {slot.date}
+                </div>
 
                 <div>
                   {slot.isHoliday ? (
-                    <div className="text-[10px] text-purple-700 dark:text-purple-300 font-bold truncate" title={slot.holidayName}>
+                    <div className="text-[10px] text-purple-900 dark:text-purple-200 font-bold truncate" title={slot.holidayName}>
                       {slot.holidayName || (lang === 'ar' ? 'عطلة رسمية' : 'Holiday')}
                     </div>
                   ) : isRecorded ? (
                     <div className="flex items-baseline justify-between">
-                      <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                      <span className="font-bold font-mono text-sm text-emerald-700 dark:text-emerald-400">
                         {slot.attendanceRate}%
                       </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono font-medium">
                         ({slot.presentCount}/{slot.totalStudents})
                       </span>
                     </div>
                   ) : slot.isUpcoming ? (
-                    <div className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium">
+                    <div className="text-[10px] text-amber-700 dark:text-amber-400 flex items-center gap-1 font-bold">
                       <Clock className="w-3 h-3" />
                       <span>{lang === 'ar' ? 'بانتظار الرصد' : 'Upcoming'}</span>
                     </div>
                   ) : (
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                       {lang === 'ar' ? 'لم يرصد' : 'Not recorded'}
                     </div>
                   )}
@@ -556,10 +564,10 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
       </div>
 
       {/* Footer Insight Note */}
-      <div className="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg border border-[var(--app-border,#e2e8f0)] dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200">
+      <div className="flex items-center justify-between text-[11px] px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/80 text-slate-800 dark:text-slate-200 shadow-2xs">
         <div className="flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span className="font-medium text-slate-700 dark:text-slate-200">
+          <span className="font-medium text-slate-800 dark:text-slate-200">
             {highestDay && lowestDay
               ? lang === 'ar'
                 ? `ملاحظة تحليلية: حقق يوم ${highestDay.dayName} (${highestDay.date}) أعلى انضباط بنسبة ${highestDay.attendanceRate}%، بينما سجل يوم ${lowestDay.dayName} (${lowestDay.date}) أدنى نسبة (${lowestDay.attendanceRate}%). العطلات الرسمية لا تؤثر سلباً على معدلات غياب الطلاب.`

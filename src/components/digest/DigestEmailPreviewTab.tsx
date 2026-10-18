@@ -7,6 +7,7 @@ import {
   Check,
   Send,
 } from 'lucide-react';
+import { SandboxedEmailHtml } from './SandboxedEmailHtml';
 
 interface DigestEmailPreviewTabProps {
   currentDigest: DailyEmailDigestItem | null;
@@ -100,7 +101,7 @@ export const DigestEmailPreviewTab: React.FC<DigestEmailPreviewTabProps> = ({
         </div>
       </div>
 
-      {/* Simulated Email Client Container */}
+      {/* Email Client Preview Container */}
       <div className="bg-slate-200 p-4 sm:p-6 rounded-2xl border border-slate-300 flex justify-center">
         <div
           className={`bg-white rounded-xl shadow-lg border border-slate-300 overflow-hidden transition-all duration-300 ${
@@ -146,9 +147,11 @@ export const DigestEmailPreviewTab: React.FC<DigestEmailPreviewTabProps> = ({
           {/* Rendered HTML Body */}
           <div className="p-4 sm:p-6 bg-white overflow-y-auto max-h-[750px]">
             {currentDigest?.htmlContent ? (
-              <div
-                dangerouslySetInnerHTML={{ __html: currentDigest.htmlContent }}
+              <SandboxedEmailHtml
+                html={currentDigest.htmlContent}
+                title={lang === 'ar' ? 'معاينة البريد' : 'Email preview'}
                 className="email-render-container"
+                minHeight={600}
               />
             ) : (
               <div className="p-8 text-center text-slate-500 text-xs">

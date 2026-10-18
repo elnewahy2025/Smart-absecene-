@@ -7,6 +7,7 @@ export const checkCanEditSession = (
   user: { id: string; assignedClasses?: string[] },
   session: AttendanceSession
 ): boolean => {
+  if (role === 'super_admin') return true;
   if (role === 'parent') return false;
   if (role === 'admin' || role === 'registrar') return true;
   if (role === 'teacher') {

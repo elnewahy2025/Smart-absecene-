@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
-import { INITIAL_USERS } from '../data/mockData';
 import {
   ShieldCheck,
   Lock,
@@ -12,26 +11,43 @@ import {
   GraduationCap,
   Users2,
   Flame,
-  CheckCircle2,
   LogIn,
 } from 'lucide-react';
+
+import {
+  isLocalDevelopmentHost,
+  getDevTestTenants,
+  switchDevTestTenant,
+} from '../config/tenantRegistry';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const { currentTenant, tenantDomainConfig, lang, signInWithGoogle, firebaseUser } = useAttendance();
+  const { currentTenant, tenantDomainConfig, signInWithGoogle, signInWithCredentials, users } = useAttendance();
   const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const platformOwnerEmail = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAIL || '').toLowerCase();
 
-  // Filter valid mock users belonging STRICTLY to currentTenant
-  const tenantUsers = INITIAL_USERS.filter((u) => u.tenantId === currentTenant.id);
+  // [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION]
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isDevHost = isLocalDevelopmentHost(host);
+  const devTenants = isDevHost ? getDevTestTenants() : [];
+
+  // Filter valid users belonging STRICTLY to currentTenant (includes dynamically created staff from Settings)
+  const tenantUsers = (users || []).filter((u) => u.tenantId === currentTenant.id);
 
   const roleLabels: Record<UserRole, { ar: string; en: string; descAr: string; icon: any }> = {
+    super_admin: {
+      ar: 'مالك المنصة',
+      en: 'Platform Owner',
+      descAr: 'صلاحيات الإشراف الشاملة وتأسيس المدارس على مستوى المنصة السحابية',
+      icon: <ShieldCheck className="w-4 h-4 text-amber-500" />,
+    },
     admin: {
       ar: 'مدير النظام',
       en: 'System Admin',
@@ -61,34 +77,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg(null);
-    const userForRole = tenantUsers.find((u) => u.role === role);
-    if (userForRole) {
-      setEmail(userForRole.email);
-    }
   };
 
-  // Perform Login with strict Tenant Membership Verification
-  const handleAuthenticate = (targetEmail: string) => {
+  // Perform Login using Firebase Credentials with Hybrid Fallback
+  const handleAuthenticate = async (targetEmail: string, targetPass: string) => {
     setErrorMsg(null);
-    const trimmed = targetEmail.trim().toLowerCase();
-
-    // Check if user exists in the system
-    const systemUser = INITIAL_USERS.find((u) => u.email.toLowerCase() === trimmed);
-
-    if (!systemUser) {
-      setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة.');
-      return;
+    setAuthLoading(true);
+    try {
+      const result = await signInWithCredentials(targetEmail, targetPass);
+      if (result.success && result.user) {
+        onLoginSuccess(result.user);
+      } else {
+        setErrorMsg(result.error || 'اسم المستخدم أو كلمة المرور غير صحيحة.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'حدث خطأ أثناء محاولة تسجيل الدخول.');
+    } finally {
+      setAuthLoading(false);
     }
-
-    // STRICT MULTI-TENANT VERIFICATION: User MUST belong to this resolved school!
-    if (systemUser.tenantId !== currentTenant.id) {
-      setErrorMsg(
-        `تم رفض الدخول: هذا الحساب مسجل لمدرسة أخرى (${systemUser.tenantId}). لا تملك صلاحية الوصول إلى بوابة ${currentTenant.name}.`
-      );
-      return;
-    }
-
-    onLoginSuccess(systemUser);
   };
 
   return (
@@ -126,7 +132,58 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
+      {/* [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION] Mobile & Local LAN School Switcher */}
+      {isDevHost && (
+        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
+          <div className="bg-amber-950/40 border border-amber-500/40 rounded-2xl p-3.5 backdrop-blur-md shadow-lg text-amber-200">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-amber-300">
+                <span>🧪</span>
+                <span>بيئة التجربة والاختبار المحلي (Dev Testing Only)</span>
+              </span>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 font-mono px-2 py-0.5 rounded border border-amber-500/30">
+                LAN Wi-Fi
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[11px] text-slate-300 shrink-0 font-medium">المدرسة:</label>
+                <select
+                  value={currentTenant.id}
+                  onChange={(e) => switchDevTestTenant(e.target.value)}
+                  className="bg-slate-900 border border-amber-500/40 rounded-xl px-2.5 py-1.5 text-white text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500 w-full cursor-pointer"
+                >
+                  {devTenants.map((t) => (
+                    <option key={t.tenantId} value={t.tenantId}>
+                      {t.nameAr} ({t.subdomain})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick 1-tap fill for Platform Owner on Mobile */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!platformOwnerEmail) return;
+                  setEmail(platformOwnerEmail);
+                  setSelectedRole('super_admin');
+                }}
+                className="text-[11px] bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer text-center shrink-0"
+                title="تعبئة بيانات مالك المنصة لتسريع التجربة على الموبايل"
+              >
+                👑 مالك المنصة (Owner)
+              </button>
+            </div>
+            <p className="text-[10px] text-amber-400/80 mt-2 leading-relaxed">
+              * مخصص للتجربة واختبار الموبايل فقط، ويتم حذفه تلقائياً عند النشر السحابي الفعلي.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-slate-800/90 border border-slate-700/90 py-8 px-6 sm:px-10 shadow-2xl rounded-2xl backdrop-blur-md">
           {/* Role Tabs */}
           <div className="mb-6">
@@ -134,14 +191,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               اختر دورك لتسجيل الدخول:
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {(['admin', 'registrar', 'teacher', 'parent'] as UserRole[]).map((r) => {
+              {((isDevHost ? ['admin', 'registrar', 'teacher', 'parent', 'super_admin'] : ['admin', 'registrar', 'teacher', 'parent']) as UserRole[]).map((r) => {
                 const isSelected = selectedRole === r;
+                const isSpanFull = r === 'super_admin';
                 return (
                   <button
                     key={r}
                     type="button"
                     onClick={() => handleRoleSelect(r)}
                     className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-right ${
+                      isSpanFull ? 'col-span-2' : ''
+                    } ${
                       isSelected
                         ? 'bg-slate-700/90 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500'
                         : 'bg-slate-900/50 border-slate-700/70 text-slate-400 hover:text-white hover:border-slate-600'
@@ -175,7 +235,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleAuthenticate(email);
+              handleAuthenticate(email, password);
             }}
             className="space-y-4"
           >
@@ -218,62 +278,102 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all cursor-pointer"
+              disabled={authLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all cursor-pointer disabled:opacity-50"
             >
-              <LogIn className="w-4 h-4" />
-              <span>تسجيل الدخول إلى البوابة</span>
+              {authLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <LogIn className="w-4 h-4" />
+              )}
+              <span>{authLoading ? 'جاري التحقق...' : 'تسجيل الدخول إلى البوابة'}</span>
             </button>
           </form>
 
-          {/* Quick Demo Credentials for Current School */}
-          <div className="mt-6 border-t border-slate-700/80 pt-5">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2.5">
-              <span className="font-semibold text-slate-300">تسجيل دخول سريع معتمد (تجريبي):</span>
-              <span className="text-[10px] text-emerald-400 font-mono">نقرة واحدة</span>
+          {/* Google / Firebase SSO Option */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-700/80" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {tenantUsers.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRole(u.role);
-                    setEmail(u.email);
-                    handleAuthenticate(u.email);
-                  }}
-                  className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-700/70 hover:border-emerald-500 text-right transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-[11px] font-bold text-white truncate">{u.name}</span>
-                    <span className="text-[9px] bg-slate-800 text-slate-300 px-1 py-0.2 rounded font-mono">
-                      {u.role}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate font-mono" dir="ltr">
-                    {u.email}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Test Cross-Tenant Rejection */}
-            <div className="mt-4 pt-3 border-t border-slate-700/60">
-              <button
-                type="button"
-                onClick={() => {
-                  const otherTenantId = currentTenant.id === 'school-1' ? 'school-2' : 'school-1';
-                  const foreignUser = INITIAL_USERS.find((u) => u.tenantId === otherTenantId);
-                  if (foreignUser) {
-                    setEmail(foreignUser.email);
-                    handleAuthenticate(foreignUser.email);
-                  }
-                }}
-                className="w-full text-center text-[11px] text-amber-400/90 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 py-1.5 px-3 rounded-lg transition-colors cursor-pointer"
-              >
-                اختبار محاولة دخول بحساب من مدرسة أخرى (فحص الحظر 403)
-              </button>
+            <div className="relative flex justify-center text-[11px]">
+              <span className="bg-slate-800 px-2 text-slate-400">أو عبر الحساب السحابي المعتمد</span>
             </div>
           </div>
+
+          <button
+            type="button"
+            disabled={authLoading}
+            onClick={async () => {
+              setAuthLoading(true);
+              setErrorMsg(null);
+              try {
+                const cred = await signInWithGoogle();
+                if (cred?.user) {
+                  const googleEmail = cred.user.email?.toLowerCase();
+
+                  // Check if Platform Owner
+                  if (platformOwnerEmail && googleEmail === platformOwnerEmail) {
+                    const ownerUser: UserProfile = {
+                      id: cred.user.uid,
+                      tenantId: 'platform',
+                      name: cred.user.displayName || '',
+                      role: 'super_admin' as UserRole,
+                      phone: cred.user.phoneNumber || '',
+                      email: platformOwnerEmail,
+                      status: 'active',
+                    };
+                    onLoginSuccess(ownerUser);
+                    return;
+                  }
+
+                  const matchedUser =
+                    tenantUsers.find((u) => u.email.toLowerCase() === googleEmail) ||
+                    tenantUsers.find((u) => u.role === selectedRole) ||
+                    tenantUsers[0] ||
+                    ({
+                      id: cred.user.uid,
+                      tenantId: currentTenant.id,
+                      name: cred.user.displayName || cred.user.email?.split('@')[0] || 'مستخدم معتمد',
+                      role: selectedRole,
+                      phone: cred.user.phoneNumber || '+966500000000',
+                      email: cred.user.email || '',
+                      status: 'active',
+                    } as UserProfile);
+
+                  onLoginSuccess(matchedUser);
+                }
+              } catch (err: any) {
+                const code = err?.code || '';
+                const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+                if (code === 'auth/unauthorized-domain') {
+                  setErrorMsg(
+                    `تم رفض النطاق (${currentHost}): يرجى إضافة هذا النطاق السحابي إلى قائمة النطاقات المصرح بها في كونسول Firebase (Authentication > Settings > Authorized domains).`
+                  );
+                } else if (code === 'auth/popup-blocked') {
+                  setErrorMsg('المتصفح قام بحظر النافذة المنبثقة. جاري التحويل إلى تسجيل الدخول السحابي عبر إعادة التوجيه...');
+                  try {
+                    await signInWithGoogle(true);
+                  } catch (redirectErr: any) {
+                    setErrorMsg('تعذر الدخول السحابي: ' + (redirectErr?.message || 'يرجى المحاولة مجدداً'));
+                  }
+                } else if (code === 'auth/popup-closed-by-user') {
+                  setErrorMsg('تم إغلاق نافذة الدخول قبل اختيار حساب Google. يمكنك المحاولة مرة أخرى.');
+                } else if (code === 'auth/operation-not-allowed') {
+                  setErrorMsg('مزود Google غير مفعّل في كونسول Firebase (Authentication > Sign-in method > Google).');
+                } else {
+                  setErrorMsg(
+                    `تعذر الدخول السحابي (${code || 'خطأ غير معروف'}): ${err?.message || 'يرجى مراجعة إعدادات Firebase Console.'}`
+                  );
+                }
+              } finally {
+                setAuthLoading(false);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-700/90 rounded-xl bg-slate-900/60 hover:bg-slate-900 text-xs font-semibold text-slate-200 hover:text-white hover:border-slate-600 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Flame className="w-4 h-4 text-amber-500" />
+            <span>الدخول الموحد بحساب Google / Firebase السحابي</span>
+          </button>
         </div>
       </div>
     </div>

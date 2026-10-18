@@ -7,7 +7,27 @@ export type AttendanceStatus =
   | 'under_review'
   | 'rejected_excuse';
 
-export type UserRole = 'admin' | 'registrar' | 'teacher' | 'parent';
+export type UserRole = 'super_admin' | 'admin' | 'registrar' | 'teacher' | 'parent';
+
+export interface SchoolProvisionInput {
+  id: string; // Unique school identifier (e.g. 'school-3' or 'al-majd')
+  nameAr: string;
+  nameEn: string;
+  code: string; // e.g. 'MAJD-301'
+  cityAr: string;
+  cityEn: string;
+  subdomain: string; // e.g. 'majd' -> majd.smartschool.com
+  customDomains?: string[];
+  schoolType: 'boys' | 'girls' | 'mixed';
+  academicYear: string;
+  countryAr?: string; // e.g. 'المملكة العربية السعودية' or 'جمهورية مصر العربية'
+  countryCallingCode?: string; // e.g. '+966' or '+20'
+  primaryColor: string;
+  logoText: string;
+  principalName: string;
+  principalEmail: string;
+  principalPhone?: string;
+}
 
 export interface Tenant {
   id: string;
@@ -124,10 +144,29 @@ export interface AttendanceSession {
   records: AttendanceRecord[];
 }
 
+export interface StudentAttendanceRecord {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+  studentId: string;
+  guardianPhone: string;
+  date: string;
+  sessionType: 'daily' | 'period';
+  periodNumber?: number;
+  subject?: string;
+  classId: string;
+  className: string;
+  teacherName?: string;
+  status: AttendanceStatus;
+  minutesLate?: number;
+  note?: string;
+  updatedAt: string;
+}
 export interface Justification {
   id: string;
   tenantId: string;
   studentId: string;
+  guardianPhone?: string;
   studentName: string;
   className: string;
   absenceDate: string;
@@ -183,6 +222,7 @@ export interface NotificationOutboxItem {
   recipientPhone: string;
   recipientName: string;
   studentId: string;
+  guardianPhone?: string;
   studentName: string;
   absenceDate: string;
   sessionTitle: string;
@@ -195,6 +235,8 @@ export interface NotificationOutboxItem {
   errorReason?: string;
   createdAt: string;
   sentAt?: string;
+  gatewayReceiptId?: string;
+  gatewayProvider?: string;
 }
 
 export interface AuditLog {
@@ -229,6 +271,46 @@ export interface SchoolSettings {
   notifyOnExcuseApproved?: boolean;
   weekendDays?: number[]; // Days when school is closed (0=Sun, 1=Mon, ..., 5=Fri, 6=Sat). Default: [5, 6]
   officialHolidays?: OfficialHoliday[];
+  messagingGateway?: SchoolMessagingGatewayConfig;
+}
+
+export type WhatsAppServiceMode = 'web_direct' | 'cloud_api';
+export type SmsGatewayProvider = 'taqnyat' | 'unifonic' | 'twilio' | 'msegat';
+export type EmailGatewayProvider = 'smtp' | 'resend' | 'sendgrid';
+
+export interface SchoolMessagingGatewayConfig {
+  // WhatsApp Configuration
+  whatsappPhoneNumber: string; // The official school mobile/WhatsApp number (used for sending and receiving WhatsApp messages)
+  whatsappServiceMode: WhatsAppServiceMode; // 'web_direct' (WhatsApp Web / App wa.me direct - default, zero cost) or 'cloud_api'
+  whatsappBusinessAccountId?: string;
+  whatsappPhoneNumberId?: string;
+  whatsappApiToken?: string;
+  
+  // SMS Gateway Configuration
+  smsProvider: SmsGatewayProvider; // Taqnyat, Unifonic, Twilio or Msegat
+  smsSenderId: string; // Approved sender name, e.g. "SMARTSCHOOL" or school name
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsSenderPhone?: string; // dedicated phone number for SMS sending if provider requires phone number
+
+  // Email Transport Configuration (used by the daily executive digest)
+  emailEnabled?: boolean;
+  emailProvider?: EmailGatewayProvider; // 'smtp' | 'resend' | 'sendgrid'
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  fromEmail?: string;
+  fromName?: string;
+  emailApiKey?: string;
+  
+  // General & Audit
+  enableWhatsAppNotifications: boolean;
+  enableSmsNotifications: boolean;
+  lastConfiguredByRole?: UserRole; // Must be 'super_admin'
+  lastConfiguredByEmail?: string;
+  lastConfiguredAt?: string;
 }
 
 export type HolidayType = 'national' | 'religious' | 'extended_weekend' | 'official' | 'emergency';
@@ -291,7 +373,7 @@ export interface DailyEmailDigestItem {
   scheduledTime: string;
   recipients: string[];
   subject: string;
-  status: 'delivered' | 'simulated' | 'scheduled';
+  status: 'delivered' | 'failed' | 'scheduled';
   overallAttendanceRate: number;
   totalStudents: number;
   anomaliesCount: number;
@@ -393,6 +475,7 @@ export interface SchoolLeadershipProfile {
 
 export interface SchoolAddressProfile {
   country: string; // e.g. "المملكة العربية السعودية"
+  countryCallingCode?: string; // e.g. "+966"
   region: string; // e.g. "منطقة الرياض"
   city: string; // e.g. "الرياض"
   district: string; // e.g. "حي الأندلس"
@@ -415,6 +498,7 @@ export interface TenantSchoolProfile {
   stampUrl?: string;
   // Contact & Location
   address: SchoolAddressProfile;
+  countryCallingCode?: string; // e.g. "+966", "+20", "+971"
   generalPhone: string;
   emergencyHotline: string;
   officialEmail: string;
@@ -425,6 +509,7 @@ export interface TenantSchoolProfile {
   academicYear: AcademicYearConfig;
   timetablePeriods: TimetablePeriod[];
   // School Classes, Sections & Subjects
+  educationalGrades?: string[]; // e.g. ["الصف السادس", "الصف السابع", "الصف العاشر"]
   classes?: SchoolClassConfig[];
   subjects?: SchoolSubjectConfig[];
   // Safety & Assembly
@@ -436,6 +521,8 @@ export interface TenantSchoolProfile {
   // Official Holidays & Weekends
   weekendDays?: number[];
   officialHolidays?: OfficialHoliday[];
+  // Messaging Gateway & WhatsApp Configuration (Protected: Platform Owner Only)
+  messagingGateway?: SchoolMessagingGatewayConfig;
 }
 
 export type BehaviourType = 'positive' | 'infraction';
@@ -445,6 +532,7 @@ export interface StudentBehaviourIncident {
   id: string;
   tenantId: string;
   studentId: string;
+  guardianPhone?: string;
   studentName: string;
   className: string;
   date: string;

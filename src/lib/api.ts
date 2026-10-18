@@ -1,8 +1,11 @@
 import { auth } from './firebase';
 
 /**
- * Fetch wrapper that automatically injects the Firebase Auth ID Token
- * or falls back to standard fetch headers if in development / simulation.
+ * Fetch wrapper that injects the current Firebase ID token.
+ *
+ * Identity (role / tenant) is resolved by the server from verified claims or
+ * Firestore. The browser must never send role or tenant headers: they are
+ * client-controlled and were previously trusted by the API.
  */
 export async function authenticatedFetch(
   input: RequestInfo | URL,
@@ -15,31 +18,23 @@ export async function authenticatedFetch(
     headers.set('Content-Type', 'application/json');
   }
 
-  // Attempt to fetch current Firebase user's ID token
   try {
     const currentUser = auth.currentUser;
     if (currentUser) {
-      const idToken = await currentUser.getIdToken();
-      if (idToken) {
-        headers.set('Authorization', `Bearer ${idToken}`);
+      const credential = await currentUser.getIdToken();
+      if (credential) {
+        headers.set('Authorization', `Bearer ${credential}`);
       }
     } else {
-      // In development mode, check if there's a dev fallback token or session
-      const devToken = (import.meta as any).env?.VITE_APP_AUTH_TOKEN || 'dev-token-change-me';
-      if (devToken && !headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${devToken}`);
+      // Optional local development credential. It must be set explicitly at
+      // build time; there is no silently-enabled default.
+      const devCredential = (import.meta as any).env?.VITE_DEV_AUTH_TOKEN;
+      if (devCredential && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${devCredential}`);
       }
     }
-
-    // Propagate active tenant ID and user role for multi-tenant & RBAC authorization
-    if (typeof localStorage !== 'undefined') {
-      const storedTenant = localStorage.getItem('school_current_tenant_id') || 'school-1';
-      const storedRole = localStorage.getItem('school_current_user_role') || 'admin';
-      if (!headers.has('x-tenant-id')) headers.set('x-tenant-id', storedTenant);
-      if (!headers.has('x-user-role')) headers.set('x-user-role', storedRole);
-    }
   } catch (err) {
-    console.warn('[authenticatedFetch] Could not get user ID token:', err);
+    console.warn('[authenticatedFetch] Could not obtain a credential:', err);
   }
 
   return fetch(input, {
