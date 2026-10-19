@@ -96,6 +96,18 @@ describe('server.ts integration (real app, real routes)', () => {
     expect(res.status).toBe(401);
   });
 
+  it('requires authentication for tenant member account management', async () => {
+    expect((await request('/api/users', { method: 'POST' })).status).toBe(401);
+    expect((await request('/api/users/some-uid', { method: 'PATCH' })).status).toBe(401);
+    expect((await request('/api/users/some-uid', { method: 'DELETE' })).status).toBe(401);
+  });
+
+  it('accepts an explicit ?tenant= selection on the public tenant resolver', async () => {
+    const res = await request('/api/tenant/resolve?tenant=school-2');
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body).tenantId).toBe('school-2');
+  });
+
   it('rejects protected routes from an unknown tenant domain with 404', async () => {
     const res = await request('/api/tenant/ai-config', { host: 'evil.example.com' });
     expect(res.status).toBe(404);

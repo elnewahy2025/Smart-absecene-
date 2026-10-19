@@ -20,7 +20,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null; // null means create new
-  onSave: (data: Omit<UserProfile, 'id' | 'tenantId'>) => void;
+  onSave: (data: Omit<UserProfile, 'id' | 'tenantId'>) => Promise<{ success: boolean; message?: string }>;
+  isSaving?: boolean;
   availableClasses: string[];
   availableSubjects: string[];
   lang: 'ar' | 'en';
@@ -31,6 +32,7 @@ export const UserEditModal: React.FC<Props> = ({
   onClose,
   user,
   onSave,
+  isSaving = false,
   availableClasses,
   availableSubjects,
   lang,
@@ -75,11 +77,11 @@ export const UserEditModal: React.FC<Props> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
 
-    onSave({
+    const result = await onSave({
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
@@ -89,7 +91,10 @@ export const UserEditModal: React.FC<Props> = ({
       assignedClasses: role === 'teacher' ? assignedClasses : undefined,
       assignedSubjects: role === 'teacher' ? assignedSubjects : undefined,
     });
-    onClose();
+
+    if (!result || result.success) {
+      onClose();
+    }
   };
 
   const content = (
@@ -303,10 +308,11 @@ export const UserEditModal: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              disabled={isSaving}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
             >
               <Save className="w-4 h-4" />
-              <span>{lang === 'ar' ? 'حفظ التغييرات' : 'Save User'}</span>
+              <span>{isSaving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : lang === 'ar' ? 'حفظ التغييرات' : 'Save User'}</span>
             </button>
           </div>
         </form>

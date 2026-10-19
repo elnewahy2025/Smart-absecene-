@@ -147,6 +147,27 @@ export interface TenantResolutionResult {
 }
 
 /**
+ * Reads a tenant identifier from a URL search string or full URL.
+ * Accepts "?tenant=x" (honoured on any host) or the legacy "?school=x" alias,
+ * as well as an absolute/original URL such as "/api/users?tenant=x".
+ */
+export function extractQueryTenant(
+  searchOrQuery: string | undefined,
+  key: 'tenant' | 'school' = 'tenant'
+): string | null {
+  if (!searchOrQuery) return null;
+  const questionMarkIndex = searchOrQuery.indexOf('?');
+  const queryString =
+    questionMarkIndex === -1 ? searchOrQuery : searchOrQuery.slice(questionMarkIndex + 1);
+  try {
+    const params = new URLSearchParams(queryString);
+    return params.get(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Normalizes an incoming hostname:
  * - Strips port numbers (:3000, :5173, etc.)
  * - Trims whitespace and converts to lowercase
@@ -259,57 +280,75 @@ export function resolveTenantFromHostname(
   }
 
   const activeRegistry = getActiveTenantRegistry();
-
-  // Local development host fallback: Default to dev query, localStorage, or primary school
-  // Supports: localhost, 127.0.0.1, 0.0.0.0, .local, and private LAN IP ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
   const isLocalDevHost = isLocalDevelopmentHost(host);
 
-  if (isLocalDevHost) {
-    // [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION]
-    // 1. Check URL query parameters (?school=... or ?tenant=...)
-    let queryTenant: string | null = null;
-    const search =
-      searchOrQuery !== undefined
-        ? searchOrQuery
-        : typeof window !== 'undefined'
-        ? window.location.search
-        : '';
+  // 1. Explicit tenant selection via ?tenant=<tenantId|subdomain>.
+  //    Honoured on every host: picking a school only narrows the request to that
+  //    one school, and access is still gated by the account's own claims/tenant.
+  const search =
+    searchOrQuery !== undefined
+      ? searchOrQuery
+      : typeof window !== 'undefined'
+      ? window.location.search
+      : '';
 
-    if (search) {
-      try {
-        const params = new URLSearchParams(search);
-        queryTenant = params.get('school') || params.get('tenant');
-      } catch (e) {
-        // ignore
+  const queryTenant = extractQueryTenant(search);
+  if (queryTenant) {
+    const normalizedQuery = queryTenant.trim().toLowerCase();
+    const matched =
+      activeRegistry[normalizedQuery] ||
+      Object.values(activeRegistry).find(
+        (t) =>
+          t.tenantId.toLowerCase() === normalizedQuery ||
+          t.subdomain.toLowerCase() === normalizedQuery
+      );
+
+    if (matched) {
+      if (isLocalDevHost && typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('school_dev_selected_tenant', matched.tenantId);
+        } catch (e) {
+          // ignore
+        }
       }
+      return {
+        status: matched.isActive ? 'resolved' : 'inactive_tenant',
+        tenantId: matched.tenantId,
+        config: matched,
+        normalizedHostname: host,
+      };
     }
+  }
 
-    if (queryTenant) {
-      const normalizedQuery = queryTenant.trim().toLowerCase();
-      const matched =
-        activeRegistry[normalizedQuery] ||
+  // 2. Local development host fallback: legacy ?school= alias, then localStorage,
+  //    then the primary school. Supports localhost, 127.0.0.1, 0.0.0.0, .local,
+  //    and private LAN IP ranges.
+  if (isLocalDevHost) {
+    const legacyDevTenant = extractQueryTenant(search, 'school');
+    if (legacyDevTenant) {
+      const normalizedLegacy = legacyDevTenant.trim().toLowerCase();
+      const legacyMatch =
+        activeRegistry[normalizedLegacy] ||
         Object.values(activeRegistry).find(
           (t) =>
-            t.tenantId.toLowerCase() === normalizedQuery ||
-            t.subdomain.toLowerCase() === normalizedQuery
+            t.tenantId.toLowerCase() === normalizedLegacy ||
+            t.subdomain.toLowerCase() === normalizedLegacy
         );
-
-      if (matched) {
+      if (legacyMatch) {
         if (typeof localStorage !== 'undefined') {
           try {
-            localStorage.setItem('school_dev_selected_tenant', matched.tenantId);
+            localStorage.setItem('school_dev_selected_tenant', legacyMatch.tenantId);
           } catch (e) {}
         }
         return {
-          status: matched.isActive ? 'resolved' : 'inactive_tenant',
-          tenantId: matched.tenantId,
-          config: matched,
+          status: legacyMatch.isActive ? 'resolved' : 'inactive_tenant',
+          tenantId: legacyMatch.tenantId,
+          config: legacyMatch,
           normalizedHostname: host,
         };
       }
     }
 
-    // 2. Check localStorage on dev / LAN hosts
     if (typeof localStorage !== 'undefined') {
       try {
         const savedTenantId = localStorage.getItem('school_dev_selected_tenant');
@@ -325,7 +364,7 @@ export function resolveTenantFromHostname(
       } catch (e) {}
     }
 
-    // 3. Fallback to default primary school
+    // Fallback to default primary school
     const defaultTenant = activeRegistry['school-1'] || TENANT_REGISTRY['school-1'];
     return {
       status: 'resolved',

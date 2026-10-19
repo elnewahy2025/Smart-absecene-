@@ -77,7 +77,7 @@ import {
   handleFirestoreError,
   OperationType,
 } from '../lib/firebase';
-import { authenticatedFetch } from '../lib/api';
+import { authenticatedFetch, setApiTenantOverride } from '../lib/api';
 
 const PLATFORM_OWNER_EMAILS = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAILS || '')
   .split(',')
@@ -161,6 +161,14 @@ const buildParentSessions = (records: StudentAttendanceRecord[]): AttendanceSess
   }));
 };
 
+interface UserAccountResult {
+  success: boolean;
+  message: string;
+  user?: UserProfile;
+  /** Present when the server created (or reset) a login and generated the password. */
+  temporaryPassword?: string;
+}
+
 interface AttendanceContextType {
   // Firebase Auth
   firebaseUser: FirebaseUser | null;
@@ -192,7 +200,13 @@ interface AttendanceContextType {
   canEditSession: (session: AttendanceSession) => boolean;
 
   // Platform Owner / Multi-Tenant School Provisioning
-  provisionNewSchool: (input: SchoolProvisionInput) => Promise<{ success: boolean; message: string; tenantId: string }>;
+  provisionNewSchool: (input: SchoolProvisionInput) => Promise<{
+    success: boolean;
+    message: string;
+    tenantId: string;
+    principalEmail?: string;
+    temporaryPassword?: string;
+  }>;
   refreshDynamicTenants: () => Promise<void>;
 
   // Data scoped to currentTenant
@@ -205,9 +219,9 @@ interface AttendanceContextType {
   settings: SchoolSettings;
 
   // User & RBAC Management
-  createUser: (user: Omit<UserProfile, 'id' | 'tenantId'>) => UserProfile;
-  updateUser: (userId: string, updates: Partial<UserProfile>) => void;
-  deleteUser: (userId: string) => { success: boolean; message: string };
+  createUser: (user: Omit<UserProfile, 'id' | 'tenantId'>) => Promise<UserAccountResult>;
+  updateUser: (userId: string, updates: Partial<UserProfile>) => Promise<UserAccountResult>;
+  deleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
 
   // Actions
   updateRecord: (
@@ -316,6 +330,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     return (typeof localCache !== 'undefined' && localCache.getItem('school_current_tenant_id')) || 'school-1';
   });
   const [authenticatedPhone, setAuthenticatedPhone] = useState('');
+
+  // Tell the API client which school this session belongs to. The server still
+  // authorises every call from the account's own claims, so this only routes
+  // the request to the right tenant.
+  useEffect(() => {
+    setApiTenantOverride(tenantId);
+  }, [tenantId]);
 
   const [currentUserRole, setCurrentUserRoleState] = useState<UserRole>(() => {
     return ((typeof localCache !== 'undefined' && localCache.getItem('school_current_user_role')) as UserRole) || 'parent';
@@ -1372,14 +1393,52 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     };
   }, [allStudents, tenantId]);
 
-  const createUser = (userData: Omit<UserProfile, 'id' | 'tenantId'>): UserProfile => {
-    const id = `user-${userData.role}-${Date.now().toString().slice(-4)}`;
+  const createUser = async (userData: Omit<UserProfile, 'id' | 'tenantId'>): Promise<UserAccountResult> => {
+    if (!userData.email || !userData.email.includes('@')) {
+      return { success: false, message: 'البريد الإلكتروني مطلوب لإنشاء حساب دخول صالح.' };
+    }
+
+    let serverUser: UserProfile | null = null;
+    let temporaryPassword: string | undefined;
+
+    try {
+      const response = await authenticatedFetch('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          role: userData.role,
+          jobTitle: userData.jobTitle,
+          status: userData.status || 'active',
+          assignedClasses: userData.assignedClasses,
+          assignedSubjects: userData.assignedSubjects,
+          tenantId,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        return {
+          success: false,
+          message: payload?.error || 'تعذّر إنشاء حساب الدخول على الخادم. تحقق من البيانات وحاول مجدداً.',
+        };
+      }
+
+      temporaryPassword = payload.temporaryPassword;
+      serverUser = payload.user as UserProfile;
+    } catch (err) {
+      console.warn('[USERS] Server account creation unavailable, falling back to local profile:', err);
+    }
+
+    const id = serverUser?.id || `user-${userData.role}-${Date.now().toString().slice(-4)}`;
     const newUser: UserProfile = {
       ...userData,
+      ...(serverUser || {}),
       id,
       tenantId,
       status: userData.status || 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: serverUser?.createdAt || new Date().toISOString(),
     };
 
     setAllUsers((prev) => {
@@ -1390,7 +1449,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       return updated;
     });
 
-    if (firebaseUser) {
+    if (!serverUser && firebaseUser) {
       setDoc(
         doc(db, 'users', id),
         {
@@ -1420,10 +1479,44 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       details: `تم إنشاء حساب مستخدم جديد (${userData.name}) بدور [${userData.role}] وتعيين الصلاحيات`,
     });
 
-    return newUser;
+    return {
+      success: true,
+      message: temporaryPassword
+        ? `تم إنشاء الحساب. كلمة المرور المؤقتة: ${temporaryPassword}`
+        : 'تم إنشاء حساب المستخدم بنجاح.',
+      user: newUser,
+      temporaryPassword,
+    };
   };
 
-  const updateUser = (userId: string, updates: Partial<UserProfile>) => {
+  const updateUser = async (userId: string, updates: Partial<UserProfile>): Promise<UserAccountResult> => {
+    let serverError: string | null = null;
+
+    try {
+      const response = await authenticatedFetch(`/api/users/${encodeURIComponent(userId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: updates.name,
+          phone: updates.phone,
+          role: updates.role,
+          jobTitle: updates.jobTitle,
+          status: updates.status,
+          assignedClasses: updates.assignedClasses,
+          assignedSubjects: updates.assignedSubjects,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        // A missing server account is expected for locally created demo users.
+        if (response.status !== 404) {
+          serverError = payload?.error || 'تعذّر تحديث حساب الدخول على الخادم.';
+        }
+      }
+    } catch (err) {
+      console.warn('[USERS] Server account update unavailable, updating local profile only:', err);
+    }
+
     setAllUsers((prev) => {
       const updated = prev.map((u) => (u.id === userId && u.tenantId === tenantId ? { ...u, ...updates } : u));
       if (typeof localCache !== 'undefined') {
@@ -1441,9 +1534,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       details: `تم تعديل بيانات المستخدم وصلاحياته (${updates.name || userId})`,
     });
+
+    if (serverError) {
+      return { success: false, message: serverError };
+    }
+    return { success: true, message: 'تم تحديث بيانات المستخدم بنجاح.' };
   };
 
-  const deleteUser = (userId: string): { success: boolean; message: string } => {
+  const deleteUser = async (userId: string): Promise<{ success: boolean; message: string }> => {
     const target = allUsers.find((u) => u.id === userId && u.tenantId === tenantId);
     if (!target) {
       return { success: false, message: 'المستخدم غير موجود' };
@@ -1453,6 +1551,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     }
     if (target.id === currentUser.id) {
       return { success: false, message: 'لا يمكنك حذف حسابك الشخصي النشط حالياً' };
+    }
+
+    try {
+      const response = await authenticatedFetch(`/api/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok && response.status !== 404) {
+        return { success: false, message: payload?.error || 'تعذّر حذف حساب الدخول على الخادم.' };
+      }
+    } catch (err) {
+      console.warn('[USERS] Server account deletion unavailable, removing local profile only:', err);
     }
 
     setAllUsers((prev) => {
@@ -3176,7 +3286,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
   const provisionNewSchool = async (
     input: SchoolProvisionInput
-  ): Promise<{ success: boolean; message: string; tenantId: string }> => {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    tenantId: string;
+    principalEmail?: string;
+    temporaryPassword?: string;
+  }> => {
     try {
       const trimmedId = input.id.trim();
       const trimmedSubdomain = input.subdomain.trim().toLowerCase();
@@ -3229,17 +3345,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       setDynamicTenants(updatedDynamic);
       if (typeof localCache !== 'undefined') {
         localCache.setItem('school_dynamic_tenants', JSON.stringify(updatedDynamic));
-      }
-
-      // Persist to server filesystem so all subdomains immediately have access
-      try {
-        await authenticatedFetch('/api/tenants/provision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newDomainConfig),
-        });
-      } catch (syncErr) {
-        console.warn('Could not sync dynamic tenant to server file:', syncErr);
       }
 
       // 3. Create TenantSchoolProfile
@@ -3300,7 +3405,45 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         return next;
       });
 
-      // 5. Create Principal user profile
+      // 5. Persist to the server (Firestore) and create the principal's login so
+      //    the school is reachable from any device/subdomain immediately.
+      let temporaryPassword: string | undefined;
+      let principalCreationWarning: string | null = null;
+      try {
+        const response = await authenticatedFetch('/api/tenants/provision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...newDomainConfig,
+            principal: {
+              name: input.principalName.trim(),
+              email: input.principalEmail.trim().toLowerCase(),
+              phone: input.principalPhone?.trim() || '',
+              password: input.principalPassword,
+            },
+            schoolProfile: newProfile,
+            settings: {
+              ...getDefaultSchoolSettings(tenantId),
+              schoolName: input.nameAr.trim(),
+            },
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success) {
+          return {
+            success: false,
+            message: payload?.error || 'فشل حفظ بيانات المدرسة على الخادم. تحقق من الصلاحيات وحاول مجدداً.',
+            tenantId: trimmedId,
+          };
+        }
+        temporaryPassword = payload.principal?.temporaryPassword;
+      } catch (syncErr: any) {
+        console.warn('Could not sync dynamic tenant to server:', syncErr);
+        principalCreationWarning = syncErr?.message || 'تعذّر الاتصال بخادم الحسابات';
+      }
+
+      // 6. Create Principal user profile
       const principalUser: UserProfile = {
         id: `user-admin-${trimmedId}`,
         tenantId: trimmedId,
@@ -3321,7 +3464,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         return next;
       });
 
-      // 6. Record in Audit Log
+      // 7. Record in Audit Log
       addAuditLog({
         entityType: 'settings',
         entityId: trimmedId,
@@ -3332,10 +3475,20 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         details: `تأسيس مدرسة جديدة بالمنصة: ${input.nameAr} (${input.code}) بنطاق فرعي (${trimmedSubdomain}). تم إنشاء حساب المدير: ${input.principalEmail}`,
       });
 
+      const accessUrl =
+        typeof window !== 'undefined' ? `${window.location.origin}/?tenant=${trimmedId}` : `/?tenant=${trimmedId}`;
+      const loginLines = temporaryPassword
+        ? `\nرابط الدخول: ${accessUrl}\nالبريد: ${input.principalEmail.trim().toLowerCase()}\nكلمة المرور المؤقتة: ${temporaryPassword}`
+        : principalCreationWarning
+        ? `\nتنبيه: ${principalCreationWarning}. أنشئ حساب المدير من صفحة إدارة المستخدمين.`
+        : '';
+
       return {
         success: true,
-        message: `تم تأسيس مدرسة (${input.nameAr}) بنجاح وتفعيل النطاق السحابي وحساب المدير!`,
+        message: `تم تأسيس مدرسة (${input.nameAr}) بنجاح وتفعيل النطاق وحساب المدير.${loginLines}`,
         tenantId: trimmedId,
+        principalEmail: input.principalEmail.trim().toLowerCase(),
+        temporaryPassword,
       };
     } catch (err: any) {
       console.error('Failed to provision school:', err);

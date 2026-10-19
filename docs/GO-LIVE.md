@@ -144,6 +144,35 @@ node scripts/seed-demo-roles.mjs --remove   # delete all of it again
 
 Every seeded document carries `demoSeed: true`, so removal never touches real data.
 
+### Creating a school from the UI (platform owner)
+
+Sign in as the owner → **Platform Owner** panel → **Add school**. It now:
+
+1. saves the school to Firestore (so every device and host sees it),
+2. writes the initial school profile + settings,
+3. **creates the principal's login** and shows a temporary password.
+
+Copy the generated `email` + `password` and hand them to the principal. The same
+panel lists every school — use **التحكم في هذه المدرسة** to switch into one.
+
+### Staff logins
+
+**Settings → Users → Add user** now creates a real login (Firebase Auth account
+with the right role/school claims). A temporary password is shown once, right
+after you save. Editing a user updates their claims; setting them **inactive**
+disables sign-in; deleting removes the login too.
+
+### Reaching a school without a custom domain
+
+Any host can open a specific school by appending `?tenant=<tenantId>`:
+
+```
+https://smart-absecene-drul.vercel.app/?tenant=school-majd
+```
+
+Share that link with the school. The account's own claims still decide what data
+it can see, so this is a convenience, not a security boundary.
+
 ## Step 8 — Visit your app
 
 Open your deployment URL (`https://smart-absecene-drul.vercel.app`), sign in as
@@ -159,6 +188,7 @@ the school's `customDomains` in `src/config/tenantRegistry.ts` **and** to
 | --- | --- | --- |
 | First load is slow | Free tier sleeps when idle | Expected; it wakes in ~30–60s |
 | `403 NO_ROLE_ASSIGNED` | User has no role claim | Set role in Settings → Users, re-run Step 7, user re-logins |
+| `403 TENANT_DOMAIN_MISMATCH` | Signed-in account belongs to another school | Open the link for that school (`...?tenant=<tenantId>`) or add its domain |
 | `auth/unauthorized-domain` on sign-in | Deployment host not in Firebase | Add it in **Firebase → Authentication → Settings → Authorized domains** |
 | "النطاق غير مسجل في النظام" | Host missing from the school's `customDomains` | Add the host in `src/config/tenantRegistry.ts`, commit, redeploy |
 | `503 AUTH_NOT_CONFIGURED` | Service account missing/wrong | Redo Step 1 and set `FIREBASE_SERVICE_ACCOUNT_BASE64` |

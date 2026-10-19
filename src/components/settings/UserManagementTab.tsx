@@ -19,9 +19,13 @@ import { UserEditModal } from './UserEditModal';
 
 interface Props {
   users: UserProfile[];
-  onCreateUser: (data: Omit<UserProfile, 'id' | 'tenantId'>) => UserProfile;
-  onUpdateUser: (userId: string, data: Partial<UserProfile>) => void;
-  onDeleteUser: (userId: string) => { success: boolean; message: string };
+  onCreateUser: (data: Omit<UserProfile, 'id' | 'tenantId'>) => Promise<{
+    success: boolean;
+    message: string;
+    temporaryPassword?: string;
+  }>;
+  onUpdateUser: (userId: string, data: Partial<UserProfile>) => Promise<{ success: boolean; message: string }>;
+  onDeleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
   canManageUsers: boolean;
   availableClasses?: string[];
   availableSubjects?: string[];
@@ -43,6 +47,8 @@ export const UserManagementTab: React.FC<Props> = ({
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const [accountNotice, setAccountNotice] = useState<{ email: string; password: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fallbackClasses = Array.from(new Set(users.flatMap((u) => u.assignedClasses || []))).filter(Boolean);
   const availableClasses = propClasses && propClasses.length > 0 ? propClasses : fallbackClasses;
@@ -83,24 +89,34 @@ export const UserManagementTab: React.FC<Props> = ({
     setIsModalOpen(true);
   };
 
-  const handleDelete = (user: UserProfile) => {
+  const handleDelete = async (user: UserProfile) => {
     if (!window.confirm(lang === 'ar' ? `هل أنت متأكد من حذف المستخدم (${user.name}) نهائياً؟` : `Delete user (${user.name})?`)) {
       return;
     }
-    const res = onDeleteUser(user.id);
+    const res = await onDeleteUser(user.id);
     setFeedbackMsg({ text: res.message, error: !res.success });
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleSaveModal = (data: Omit<UserProfile, 'id' | 'tenantId'>) => {
-    if (editingUser) {
-      onUpdateUser(editingUser.id, data);
-      setFeedbackMsg({ text: lang === 'ar' ? 'تم تحديث بيانات وصلاحيات المستخدم بنجاح' : 'User updated successfully' });
-    } else {
-      onCreateUser(data);
-      setFeedbackMsg({ text: lang === 'ar' ? 'تم إنشاء المستخدم وتعيين الصلاحيات بنجاح' : 'User created successfully' });
+  const handleSaveModal = async (data: Omit<UserProfile, 'id' | 'tenantId'>) => {
+    setIsSaving(true);
+    try {
+      const res = editingUser ? await onUpdateUser(editingUser.id, data) : await onCreateUser(data);
+      setFeedbackMsg({ text: res.message, error: !res.success });
+      setTimeout(() => setFeedbackMsg(null), 6000);
+
+      const created = res as { temporaryPassword?: string };
+      if (!editingUser && res.success && created.temporaryPassword) {
+        setAccountNotice({ email: data.email, password: created.temporaryPassword });
+      }
+      return res;
+    } catch (err: any) {
+      const message = err?.message || (lang === 'ar' ? 'حدث خطأ غير متوقع' : 'Unexpected error');
+      setFeedbackMsg({ text: message, error: true });
+      return { success: false, message };
+    } finally {
+      setIsSaving(false);
     }
-    setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
   return (
@@ -139,6 +155,33 @@ export const UserManagementTab: React.FC<Props> = ({
         >
           {feedbackMsg.error ? <XCircle className="w-4 h-4 text-rose-600" /> : <CheckCircle className="w-4 h-4 text-emerald-600" />}
           <span>{feedbackMsg.text}</span>
+        </div>
+      )}
+
+      {accountNotice && (
+        <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-900 text-xs space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-bold flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              {lang === 'ar' ? 'بيانات دخول الموظف الجديد' : 'New staff login credentials'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setAccountNotice(null)}
+              className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="font-mono text-[11px] space-y-0.5" dir="ltr">
+            <div>email: {accountNotice.email}</div>
+            <div>password: {accountNotice.password}</div>
+          </div>
+          <p className="text-[11px] text-indigo-700">
+            {lang === 'ar'
+              ? 'سلّم هذه البيانات للموظف الآن. يمكن تغيير الدور والصلاحيات لاحقاً من نفس الصفحة.'
+              : 'Share these credentials with the staff member now.'}
+          </p>
         </div>
       )}
 
@@ -293,6 +336,7 @@ export const UserManagementTab: React.FC<Props> = ({
         onClose={() => setIsModalOpen(false)}
         user={editingUser}
         onSave={handleSaveModal}
+        isSaving={isSaving}
         availableClasses={availableClasses}
         availableSubjects={availableSubjects}
         lang={lang}

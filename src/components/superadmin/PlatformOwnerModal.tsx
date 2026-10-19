@@ -254,9 +254,9 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         {/* Alerts */}
         {successMessage && (
-          <div className="mx-5 mt-4 p-3 bg-emerald-950/80 border border-emerald-800/80 rounded-xl text-xs text-emerald-200 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{successMessage}</span>
+          <div className="mx-5 mt-4 p-3 bg-emerald-950/80 border border-emerald-800/80 rounded-xl text-xs text-emerald-200 flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span className="whitespace-pre-line leading-relaxed break-words">{successMessage}</span>
           </div>
         )}
         {errorMessage && (

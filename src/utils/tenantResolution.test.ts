@@ -112,7 +112,7 @@ describe('Tenant Domain Resolution Service', () => {
       });
 
       it('strictly ignores ?school= query parameters on production custom/sub domains', () => {
-        // Query param must NEVER override real production domains
+        // The legacy ?school= alias must NEVER override real production domains
         const prodResult1 = resolveTenantFromHostname('andalus.smartschool.com', '?school=school-2');
         expect(prodResult1.status).toBe('resolved');
         expect(prodResult1.tenantId).toBe('school-1');
@@ -120,6 +120,28 @@ describe('Tenant Domain Resolution Service', () => {
         const prodResult2 = resolveTenantFromHostname('portal.falah.edu', '?school=school-1');
         expect(prodResult2.status).toBe('resolved');
         expect(prodResult2.tenantId).toBe('school-2');
+      });
+
+      it('honours an explicit ?tenant= selection on any host, including production', () => {
+        const result = resolveTenantFromHostname('andalus.smartschool.com', '?tenant=school-2');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-2');
+
+        const bySubdomain = resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=falah');
+        expect(bySubdomain.status).toBe('resolved');
+        expect(bySubdomain.tenantId).toBe('school-2');
+      });
+
+      it('parses ?tenant= from a full original URL (as sent by the API client)', () => {
+        const result = resolveTenantFromHostname('andalus.smartschool.com', '/api/users?tenant=school-2');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-2');
+      });
+
+      it('ignores an unknown ?tenant= value and falls back to the hostname', () => {
+        const result = resolveTenantFromHostname('andalus.smartschool.com', '?tenant=does-not-exist');
+        expect(result.status).toBe('resolved');
+        expect(result.tenantId).toBe('school-1');
       });
     });
   });

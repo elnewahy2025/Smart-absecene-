@@ -96,6 +96,7 @@ function getRequestHostname(req: express.Request): string {
 
 import fs from 'fs';
 import admin from 'firebase-admin';
+import crypto from 'crypto';
 import {
   getTenantApiKey,
   setTenantApiKey,
@@ -470,17 +471,96 @@ function refreshDynamicTenants(): void {
     // Keep the last known registry if the file is missing or unreadable.
   }
 }
-// Extract and resolve tenant from incoming Host / X-Forwarded-Host headers
+// Extract and resolve tenant from incoming Host / X-Forwarded-Host headers.
+// An explicit ?tenant= selection is honoured (it can only ever narrow the
+// request to the caller's own tenant: requireTenant still rejects any account
+// whose claims belong to a different school).
 const getRequestHostTenant = (req: express.Request) => {
   refreshDynamicTenants();
   void refreshTenantDocs();
   const host = getRequestHostname(req);
-  return resolveTenantFromHostname(host);
+  const query = typeof req.originalUrl === 'string' ? req.originalUrl : '';
+  return resolveTenantFromHostname(host, query);
 };
 
 // Resolve identity from verified, server-set claims only.
 // Never from request headers: those are client-controlled.
 const VALID_ROLES = new Set(['admin', 'registrar', 'teacher', 'parent', 'super_admin']);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const generateTemporaryPassword = (): string => `Sm!${crypto.randomBytes(9).toString('base64url')}7`;
+
+/**
+ * Create or refresh a login for a tenant member: Firebase Auth account,
+ * server-set claims, and the Firestore profile keyed by the auth UID (which is
+ * what firestore.rules and the API both read).
+ */
+const upsertManagedAccount = async (input: {
+  tenantId: string;
+  email: string;
+  name?: string;
+  role: string;
+  phone?: string;
+  jobTitle?: string;
+  status?: string;
+  assignedClasses?: string[];
+  assignedSubjects?: string[];
+  password?: string;
+}): Promise<{ uid: string; password: string; created: boolean }> => {
+  if (!firebaseAdminReady) {
+    throw new Error('Firebase Admin is not configured on this server.');
+  }
+
+  const temporaryPassword =
+    input.password && input.password.length >= 8 ? input.password : generateTemporaryPassword();
+  const status = input.status === 'inactive' ? 'inactive' : 'active';
+
+  let user: any;
+  let created = false;
+  try {
+    user = await admin.auth().getUserByEmail(input.email);
+    await admin.auth().updateUser(user.uid, {
+      password: temporaryPassword,
+      emailVerified: true,
+      disabled: status === 'inactive',
+      ...(input.name ? { displayName: input.name } : {}),
+    });
+  } catch (lookupError: any) {
+    if (lookupError?.code === 'auth/user-not-found') {
+      user = await admin.auth().createUser({
+        email: input.email,
+        password: temporaryPassword,
+        emailVerified: true,
+        ...(input.name ? { displayName: input.name } : {}),
+      });
+      created = true;
+    } else {
+      throw lookupError;
+    }
+  }
+
+  await admin.auth().setCustomUserClaims(user.uid, { role: input.role, tenantId: input.tenantId });
+
+  const timestamp = new Date().toISOString();
+  const profile: Record<string, any> = {
+    userId: user.uid,
+    tenantId: input.tenantId,
+    name: input.name || input.email,
+    email: input.email,
+    role: input.role,
+    phone: input.phone || '',
+    jobTitle: input.jobTitle || '',
+    status,
+    updatedAt: timestamp,
+  };
+  if (created) profile.createdAt = timestamp;
+  if (Array.isArray(input.assignedClasses)) profile.assignedClasses = input.assignedClasses;
+  if (Array.isArray(input.assignedSubjects)) profile.assignedSubjects = input.assignedSubjects;
+
+  await admin.firestore().doc(`users/${user.uid}`).set(profile, { merge: true });
+
+  return { uid: user.uid, password: temporaryPassword, created };
+};
 
 const isPlatformOwner = (user: any): boolean =>
   Boolean(
@@ -1507,7 +1587,7 @@ app.get('/api/tenant/resolve', async (req, res) => {
   refreshDynamicTenants();
   await refreshTenantDocs();
   const host = getRequestHostname(req);
-  const resolution = resolveTenantFromHostname(host);
+  const resolution = resolveTenantFromHostname(host, req.originalUrl);
   res.json(resolution);
 });
 
@@ -1575,6 +1655,16 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
           .slice(0, 10)
       : [];
 
+    // Validate the principal up-front so a bad email never leaves a half-built school.
+    const principalInput = payload.principal && typeof payload.principal === 'object' ? payload.principal : null;
+    const principalEmail =
+      principalInput && typeof principalInput.email === 'string' ? principalInput.email.trim().toLowerCase() : '';
+    if (principalInput && !EMAIL_PATTERN.test(principalEmail)) {
+      return res.status(400).json({ success: false, error: 'principal.email must be a valid email address.' });
+    }
+
+    let sanitizedWithPrincipal: { uid: string; email: string; temporaryPassword: string } | null = null;
+
     const sanitized = {
       tenantId,
       subdomain,
@@ -1618,13 +1708,231 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
         console.warn('[TENANTS] Could not persist the Firestore tenant document:', error?.message || error);
       }
     }
+
+    // Persist the initial school profile + settings so the new tenant renders the
+    // same on every device, not only the browser that created it.
+    if (firebaseAdminReady && (payload.schoolProfile || payload.settings)) {
+      try {
+        await admin.firestore().doc(`settings/${sanitized.tenantId}`).set(
+          {
+            ...(payload.settings && typeof payload.settings === 'object' ? { settings: payload.settings } : {}),
+            ...(payload.schoolProfile && typeof payload.schoolProfile === 'object'
+              ? { schoolProfile: payload.schoolProfile }
+              : {}),
+            updatedAt: new Date().toISOString(),
+            updatedBy: (req as any).user?.uid || 'platform-owner',
+          },
+          { merge: true }
+        );
+      } catch (error: any) {
+        console.warn('[TENANTS] Could not persist the initial school profile:', error?.message || error);
+      }
+    }
+
+    // Create the principal's login so the school is usable the moment it exists.
+    if (principalInput) {
+      try {
+        const account = await upsertManagedAccount({
+          tenantId: sanitized.tenantId,
+          email: principalEmail,
+          name:
+            typeof principalInput.name === 'string' && principalInput.name.trim()
+              ? principalInput.name.trim().slice(0, 120)
+              : principalEmail,
+          role: 'admin',
+          phone: typeof principalInput.phone === 'string' ? principalInput.phone.trim().slice(0, 30) : '',
+          jobTitle: 'مدير المدرسة (School Principal)',
+          password: typeof principalInput.password === 'string' ? principalInput.password : undefined,
+        });
+        sanitizedWithPrincipal = { uid: account.uid, email: principalEmail, temporaryPassword: account.password };
+      } catch (error: any) {
+        console.error('[TENANTS] Could not create the principal account:', error?.message || error);
+        return res.status(502).json({
+          success: false,
+          error: `المدرسة سُجلت، لكن إنشاء حساب المدير فشل: ${error?.message || 'unknown error'}`,
+          tenant: sanitized,
+        });
+      }
+    }
+
     console.log(`[TENANTS] Provisioned '${sanitized.tenantId}' by ${(req as any).user?.email || 'unknown'}`);
-    res.json({ success: true, tenant: sanitized });
+    res.json({
+      success: true,
+      tenant: sanitized,
+      ...(sanitizedWithPrincipal ? { principal: sanitizedWithPrincipal } : {}),
+    });
   } catch (err: any) {
     console.error('[TENANTS-PROVISION-ERROR]', err);
     res.status(500).json({ success: false, error: 'Failed to persist the tenant configuration.' });
   }
 });
+
+// --- Tenant member accounts (create real logins for staff) -------------------
+// Body: { name, email, phone?, role, jobTitle?, assignedClasses?, assignedSubjects?, status?, password? }
+app.post('/api/users', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Authentication is not configured on this server.', code: 'AUTH_NOT_CONFIGURED' });
+    }
+
+    const actor = (req as any).user;
+    const body = req.body || {};
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    const role = typeof body.role === 'string' ? body.role : '';
+    const tenantId =
+      isPlatformOwner(actor) && typeof body.tenantId === 'string' && body.tenantId.trim()
+        ? body.tenantId.trim().toLowerCase()
+        : actor.tenantId;
+
+    if (!EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({ success: false, error: 'A valid email address is required.' });
+    }
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'name is required.' });
+    }
+    if (!VALID_ROLES.has(role) || role === 'super_admin') {
+      return res.status(400).json({ success: false, error: 'role must be one of admin, registrar, teacher, parent.' });
+    }
+    if (role === 'admin' && !isPlatformOwner(actor) && actor.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only an administrator can create another administrator.' });
+    }
+
+    const account = await upsertManagedAccount({
+      tenantId,
+      email,
+      name,
+      role,
+      phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 30) : '',
+      jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '',
+      status: typeof body.status === 'string' ? body.status : 'active',
+      assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses.filter((c: unknown) => typeof c === 'string').slice(0, 50) : undefined,
+      assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects.filter((s: unknown) => typeof s === 'string').slice(0, 50) : undefined,
+      password: typeof body.password === 'string' ? body.password : undefined,
+    });
+
+    return res.json({
+      success: true,
+      created: account.created,
+      temporaryPassword: account.password,
+      user: {
+        id: account.uid,
+        userId: account.uid,
+        tenantId,
+        name,
+        email,
+        role,
+        phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 30) : '',
+        jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '',
+        status: typeof body.status === 'string' ? body.status : 'active',
+        assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses : undefined,
+        assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects : undefined,
+      },
+    });
+  } catch (err: any) {
+    console.error('[USERS-CREATE-ERROR]', err?.message || err);
+    return res.status(500).json({ success: false, error: `Could not create the account: ${err?.message || 'unknown error'}` });
+  }
+});
+
+// Body: partial profile updates. Role changes also refresh the server claims.
+app.patch('/api/users/:uid', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Authentication is not configured on this server.', code: 'AUTH_NOT_CONFIGURED' });
+    }
+
+    const actor = (req as any).user;
+    const uid = String(req.params.uid || '');
+    const body = req.body || {};
+
+    const snapshot = await admin.firestore().doc(`users/${uid}`).get();
+    if (!snapshot.exists) {
+      return res.status(404).json({ success: false, error: 'No managed account exists for this member.', code: 'ACCOUNT_NOT_FOUND' });
+    }
+    const existing = snapshot.data() || {};
+    if (!isPlatformOwner(actor) && existing.tenantId !== actor.tenantId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: the account belongs to another school.' });
+    }
+    if (existing.role === 'super_admin' && !isPlatformOwner(actor)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: platform owner accounts are protected.' });
+    }
+
+    const updates: Record<string, any> = {};
+    if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim().slice(0, 120);
+    if (typeof body.phone === 'string') updates.phone = body.phone.trim().slice(0, 30);
+    if (typeof body.jobTitle === 'string') updates.jobTitle = body.jobTitle.trim().slice(0, 120);
+    if (body.status === 'active' || body.status === 'inactive') updates.status = body.status;
+    if (Array.isArray(body.assignedClasses)) updates.assignedClasses = body.assignedClasses.filter((c: unknown) => typeof c === 'string').slice(0, 50);
+    if (Array.isArray(body.assignedSubjects)) updates.assignedSubjects = body.assignedSubjects.filter((s: unknown) => typeof s === 'string').slice(0, 50);
+
+    let roleChanged = false;
+    if (typeof body.role === 'string' && body.role !== existing.role) {
+      if (!VALID_ROLES.has(body.role) || body.role === 'super_admin') {
+        return res.status(400).json({ success: false, error: 'role must be one of admin, registrar, teacher, parent.' });
+      }
+      if (!isPlatformOwner(actor) && actor.role !== 'admin' && body.role === 'admin') {
+        return res.status(403).json({ success: false, error: 'Only an administrator can promote a member to administrator.' });
+      }
+      updates.role = body.role;
+      roleChanged = true;
+    }
+
+    updates.updatedAt = new Date().toISOString();
+    await admin.firestore().doc(`users/${uid}`).set(updates, { merge: true });
+
+    const nextRole = updates.role || existing.role;
+    if (roleChanged) {
+      await admin.auth().setCustomUserClaims(uid, { role: nextRole, tenantId: existing.tenantId });
+    }
+    if (updates.status === 'inactive') {
+      await admin.auth().updateUser(uid, { disabled: true }).catch(() => {});
+      await admin.auth().revokeRefreshTokens(uid).catch(() => {});
+    } else if (updates.status === 'active') {
+      await admin.auth().updateUser(uid, { disabled: false }).catch(() => {});
+    }
+
+    return res.json({ success: true, user: { ...existing, ...updates, id: uid, userId: uid } });
+  } catch (err: any) {
+    console.error('[USERS-UPDATE-ERROR]', err?.message || err);
+    return res.status(500).json({ success: false, error: `Could not update the account: ${err?.message || 'unknown error'}` });
+  }
+});
+
+app.delete('/api/users/:uid', requireRole(['admin']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Authentication is not configured on this server.', code: 'AUTH_NOT_CONFIGURED' });
+    }
+
+    const actor = (req as any).user;
+    const uid = String(req.params.uid || '');
+    if (uid === actor.uid) {
+      return res.status(400).json({ success: false, error: 'You cannot delete your own active account.' });
+    }
+
+    const snapshot = await admin.firestore().doc(`users/${uid}`).get();
+    if (!snapshot.exists) {
+      return res.status(404).json({ success: false, error: 'No managed account exists for this member.', code: 'ACCOUNT_NOT_FOUND' });
+    }
+    const existing = snapshot.data() || {};
+    if (!isPlatformOwner(actor) && existing.tenantId !== actor.tenantId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: the account belongs to another school.' });
+    }
+    if (existing.role === 'super_admin' && !isPlatformOwner(actor)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: platform owner accounts are protected.' });
+    }
+
+    await admin.firestore().doc(`users/${uid}`).delete();
+    await admin.auth().deleteUser(uid).catch(() => {});
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[USERS-DELETE-ERROR]', err?.message || err);
+    return res.status(500).json({ success: false, error: `Could not delete the account: ${err?.message || 'unknown error'}` });
+  }
+});
+
 // Platform Owner: Intelligent & Verified Official Holidays Search Endpoint
 app.post('/api/owner/holidays/search', requirePlatformOwner, async (req, res) => {
   try {

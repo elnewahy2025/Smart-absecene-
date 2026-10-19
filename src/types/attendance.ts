@@ -27,6 +27,8 @@ export interface SchoolProvisionInput {
   principalName: string;
   principalEmail: string;
   principalPhone?: string;
+  /** Optional initial password for the principal login; generated when omitted. */
+  principalPassword?: string;
 }
 
 export interface Tenant {
