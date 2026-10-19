@@ -24,16 +24,20 @@ service cloud.firestore {
       return resource.data;
     }
 
-    /// Bootstrapped Admin verification using trusted admin doc ONLY
+    /// Platform-owner verification. ONLY `admins/{uid}` documents with role
+    /// `super_admin` bypass tenant isolation and subscription gating. A school
+    /// admin lives in `users/{uid}` with role `admin` and stays tenant-scoped.
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin';
     }
 
     // --- ENTITY VALIDATION BLUEPRINTS ---
     function isValidAdmin(data) {
       return data.keys().hasAll(['email', 'role']) &&
              data.email is string && data.email.size() <= 120 &&
-             data.role in ['admin', 'super_admin'];
+             data.role == 'super_admin';
     }
 
     function isValidUserProfile(data) {
@@ -205,7 +209,8 @@ service cloud.firestore {
                     isTenantRole(incoming().tenantId, ['admin', 'registrar']);
       allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
                     isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
-      allow delete: if isAdmin() && isValidId(studentId);
+      allow delete: if isSignedIn() && isValidId(studentId) &&
+                    isTenantRole(resource.data.tenantId, ['admin']);
     }
 
     // 4. Attendance Sessions Collection
@@ -227,7 +232,7 @@ service cloud.firestore {
                       isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
                       (resource.data.status in ['draft', 'reopened'] && isTeacherAssigned(resource.data))
                     );
-      allow delete: if isAdmin() && isValidId(sessionId);
+      allow delete: if isSignedIn() && isValidId(sessionId) && isTenantRole(resource.data.tenantId, ['admin']);
     }
 
     // 4b. Per-student attendance mirrors (parents see only their child)
@@ -242,7 +247,7 @@ service cloud.firestore {
       );
       allow create: if isSignedIn() && isTenantRole(request.resource.data.tenantId, ['admin', 'registrar', 'teacher']);
       allow update: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin', 'registrar', 'teacher']);
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin']);
     }
     // 5. Justifications & Medical Excuses Collection
     match /justifications/{justificationId} {
@@ -265,7 +270,8 @@ service cloud.firestore {
       // Reviewing (status change to approved/rejected): ONLY Admin and Registrar!
       allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
                     isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
-      allow delete: if isAdmin() && isValidId(justificationId);
+      allow delete: if isSignedIn() && isValidId(justificationId) &&
+                    isTenantRole(resource.data.tenantId, ['admin']);
     }
 
     // 6. School Settings Collection (tenant-readable, no credentials)
@@ -291,7 +297,8 @@ service cloud.firestore {
                     isTenantRole(incoming().tenantId, ['admin', 'registrar', 'teacher']);
       allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
                     isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
-      allow delete: if isAdmin() && isValidId(notificationId);
+      allow delete: if isSignedIn() && isValidId(notificationId) &&
+                    isTenantRole(resource.data.tenantId, ['admin']);
     }
 
     // 8. Audit Logs Collection (Append-Only & Multi-Tenant Scoped)

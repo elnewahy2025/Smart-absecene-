@@ -173,9 +173,10 @@ async function createAll() {
       { merge: true }
     );
 
-    if (demo.role === 'admin') {
-      await db.collection('admins').doc(user.uid).set({ email: demo.email, role: 'admin' }, { merge: true });
-    }
+    // `admins/` is the platform-owner bypass only (super_admin). School admins
+    // are tenant-scoped through their `users/{uid}.role` and must never get
+    // cross-tenant Firestore access. Self-heal older demo seeds too.
+    await db.collection('admins').doc(user.uid).delete().catch(() => {});
 
     credentials.push({ role: demo.role, email: demo.email, password });
   }
