@@ -77,12 +77,28 @@ const AUDIT_VALUE_PATTERNS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) =
   { pattern: /^حاضر \((.+)\)$/, en: (m) => `Present (${m[1]})` },
 ];
 
+// Actions written by the server-side subscription control plane.
+const SUBSCRIPTION_ACTION_LABELS: Record<string, { ar: string; en: string }> = {
+  'subscription.suspend': { ar: 'إيقاف اشتراك', en: 'Suspend Subscription' },
+  'subscription.reactivate': { ar: 'إعادة تنشيط اشتراك', en: 'Reactivate Subscription' },
+  'subscription.renew': { ar: 'تجديد اشتراك', en: 'Renew Subscription' },
+  'subscription.update': { ar: 'تحديث اشتراك', en: 'Update Subscription' },
+};
+
+const EXTRA_ENTITY_LABELS: Record<string, { ar: string; en: string }> = {
+  subscription: { ar: 'الاشتراك', en: 'Subscription' },
+};
+
 export const translateAuditAction = (action: string, lang: AppLang): string => {
+  const subscriptionLabel = SUBSCRIPTION_ACTION_LABELS[action];
+  if (subscriptionLabel) return subscriptionLabel[lang];
   const label = AUDIT_ACTION_LABELS[action as AuditLog['action']];
   return label ? label[lang] : action;
 };
 
 export const translateAuditEntity = (entityType: string, lang: AppLang): string => {
+  const extraLabel = EXTRA_ENTITY_LABELS[entityType];
+  if (extraLabel) return extraLabel[lang];
   const label = AUDIT_ENTITY_LABELS[entityType as AuditLog['entityType']];
   return label ? label[lang] : entityType;
 };

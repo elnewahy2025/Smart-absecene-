@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import {
@@ -19,9 +19,16 @@ import {
   Phone,
   Palette,
   RotateCcw,
+  CreditCard,
+  CalendarClock,
+  StopCircle,
+  PlayCircle,
+  BadgeCheck,
+  Loader2,
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { SchoolProvisionInput } from '../../types/attendance';
+import { authenticatedFetch } from '../../lib/api';
 import {
   COUNTRIES_LIST,
   findCountryByName,
@@ -31,6 +38,17 @@ import {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface SubscriptionSummary {
+  plan?: string;
+  billingCycle?: 'monthly' | 'annual';
+  effectiveStatus: 'active' | 'grace' | 'suspended' | 'expired';
+  accessEnabled: boolean;
+  gracePeriodDays?: number;
+  currentPeriodEnd?: string | null;
+  daysRemaining?: number | null;
+  graceDaysRemaining?: number | null;
 }
 
 const PRESET_COLORS = [
@@ -62,6 +80,10 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Per-school subscription summaries (public projection from /api/tenants).
+  const [subscriptions, setSubscriptions] = useState<Record<string, SubscriptionSummary>>({});
+  const [busySubscription, setBusySubscription] = useState<string | null>(null);
+
   // Form states for provisioning a new school
   const [schoolId, setSchoolId] = useState('');
   const [nameAr, setNameAr] = useState('');
@@ -84,6 +106,29 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/tenants');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.success || !Array.isArray(data.tenants)) return;
+        const map: Record<string, SubscriptionSummary> = {};
+        for (const t of data.tenants) {
+          if (t?.tenantId && t.subscription) map[t.tenantId] = t.subscription;
+        }
+        setSubscriptions(map);
+      } catch (err) {
+        console.warn('Could not load school subscriptions:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -178,6 +223,45 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
       setTimeout(() => setErrorMessage(null), 3500);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleSubscriptionAction = async (
+    tenantId: string,
+    action: 'suspend' | 'reactivate' | 'renew'
+  ) => {
+    setBusySubscription(tenantId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const body: Record<string, unknown> = {};
+      if (action === 'renew') {
+        body.cycle = subscriptions[tenantId]?.billingCycle || 'annual';
+      }
+      const res = await authenticatedFetch(
+        `/api/tenants/${encodeURIComponent(tenantId)}/subscription/${action}`,
+        { method: 'POST', body: JSON.stringify(body) }
+      );
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Subscription action failed.');
+      }
+      if (data.summary) {
+        setSubscriptions((prev) => ({ ...prev, [tenantId]: data.summary }));
+      }
+      const label =
+        action === 'renew'
+          ? 'تم تجديد اشتراك المدرسة بنجاح.'
+          : action === 'suspend'
+            ? 'تم إيقاف اشتراك المدرسة. سيُحجب الوصول فوراً.'
+            : 'تمت إعادة تنشيط اشتراك المدرسة.';
+      setSuccessMessage(label);
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'تعذر تنفيذ إجراء الاشتراك.');
+      setTimeout(() => setErrorMessage(null), 4500);
+    } finally {
+      setBusySubscription(null);
     }
   };
 
@@ -278,6 +362,24 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   const isCurrent = t.id === currentTenant.id;
                   const tenantStudentsCount = students.filter((s) => s.tenantId === t.id).length;
                   const tenantStaffCount = users.filter((u) => u.tenantId === t.id && u.role !== 'super_admin').length;
+                  const sub = subscriptions[t.id];
+                  const status = sub?.effectiveStatus || 'active';
+                  const isSuspended = status === 'suspended';
+                  const isBusy = busySubscription === t.id;
+                  const statusLabel =
+                    status === 'suspended'
+                      ? 'موقوف'
+                      : status === 'expired'
+                        ? 'منتهي'
+                        : status === 'grace'
+                          ? 'فترة سماح'
+                          : 'نشط';
+                  const statusClass =
+                    status === 'active'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                      : status === 'grace'
+                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                        : 'bg-rose-500/15 text-rose-300 border-rose-500/40';
 
                   return (
                     <div
@@ -318,6 +420,57 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-blue-400" />
                           <span>الكادر: {tenantStaffCount}</span>
+                        </div>
+                      </div>
+
+                      {/* Subscription & renewal controls */}
+                      <div className="mt-2 pt-2 border-t border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="flex items-center gap-1.5 text-slate-400">
+                            <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                            <span>الاشتراك:</span>
+                            <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${statusClass}`}>
+                              {statusLabel}
+                            </span>
+                          </span>
+                          {sub?.currentPeriodEnd && (
+                            <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                              <CalendarClock className="w-3 h-3" />
+                              {String(sub.currentPeriodEnd).slice(0, 10)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleSubscriptionAction(t.id, 'renew')}
+                            className="flex-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <BadgeCheck className="w-3 h-3" />}
+                            <span>تجديد</span>
+                          </button>
+                          {isSuspended ? (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleSubscriptionAction(t.id, 'reactivate')}
+                              className="flex-1 px-2 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <PlayCircle className="w-3 h-3" />
+                              <span>إعادة تنشيط</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleSubscriptionAction(t.id, 'suspend')}
+                              className="flex-1 px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <StopCircle className="w-3 h-3" />
+                              <span>إيقاف</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 

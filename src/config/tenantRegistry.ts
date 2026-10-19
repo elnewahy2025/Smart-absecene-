@@ -1,4 +1,5 @@
 import { Tenant } from '../types/attendance';
+import type { TenantSubscription } from './subscription';
 
 export interface TenantDomainConfig {
   tenantId: string;
@@ -15,6 +16,8 @@ export interface TenantDomainConfig {
   primaryColor: string;
   logoText: string;
   isActive: boolean;
+  /** Optional per-school subscription/renewal policy (owner-managed). */
+  subscription?: TenantSubscription;
 }
 
 export type TenantConfig = TenantDomainConfig;
@@ -109,11 +112,13 @@ export function getActiveTenantRegistry(): Record<string, TenantDomainConfig> {
   }
 
 
-  // 1b. Firestore tenant documents win over the JSON overlay
+  // 1b. Firestore tenant documents win over the JSON overlay. Merge rather than
+  // replace so a partial document (e.g. one that only carries a subscription
+  // policy) can never erase the school's static domains/name/branding.
   if (Array.isArray(runtimeTenantDocs)) {
     runtimeTenantDocs.forEach((dt) => {
       if (dt && dt.tenantId) {
-        registry[dt.tenantId] = dt;
+        registry[dt.tenantId] = { ...(registry[dt.tenantId] || {}), ...dt };
       }
     });
   }

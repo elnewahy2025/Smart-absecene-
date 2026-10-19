@@ -78,6 +78,8 @@ import {
   OperationType,
 } from '../lib/firebase';
 import { authenticatedFetch, setApiTenantOverride } from '../lib/api';
+import { evaluateSubscription, normalizeSubscription } from '../config/subscription';
+import type { SubscriptionEvaluation, TenantSubscription } from '../config/subscription';
 
 const PLATFORM_OWNER_EMAILS = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAILS || '')
   .split(',')
@@ -182,6 +184,11 @@ interface AttendanceContextType {
   // Tenant & Role
   currentTenant: Tenant;
   tenantDomainConfig?: TenantDomainConfig;
+  /** Owner-managed subscription policy for the current school (null until loaded). */
+  tenantSubscription: TenantSubscription | null;
+  /** Time-aware access decision derived from the stored subscription. */
+  subscriptionAccess: SubscriptionEvaluation;
+  refreshSubscription: () => Promise<void>;
   tenants: Tenant[];
   setTenantId: (id: string) => void;
   currentUser: UserProfile;
@@ -369,6 +376,30 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     }
     return [];
   });
+
+  const [tenantSubscription, setTenantSubscription] = useState<TenantSubscription | null>(null);
+
+  const refreshSubscription = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tenant/resolve?tenant=${encodeURIComponent(tenantId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.status === 'resolved' && data.config) {
+        setTenantSubscription(normalizeSubscription((data.config as any)?.subscription));
+      }
+    } catch (err) {
+      console.warn('Could not load tenant subscription:', err);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    void refreshSubscription();
+  }, [refreshSubscription]);
+
+  const subscriptionAccess = useMemo(
+    () => evaluateSubscription(tenantSubscription),
+    [tenantSubscription]
+  );
 
   const syncTenantsWithServer = useCallback(async () => {
     try {
@@ -3540,6 +3571,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         signInWithCredentials,
         currentTenant,
         tenantDomainConfig,
+        tenantSubscription,
+        subscriptionAccess,
+        refreshSubscription,
         tenants,
         setTenantId,
         currentUser,

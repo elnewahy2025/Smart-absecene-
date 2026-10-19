@@ -6,6 +6,7 @@ import { AppSidebar } from './components/AppSidebar';
 import { UnknownDomainView } from './components/UnknownDomainView';
 import { LoginPage } from './components/LoginPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SubscriptionBanner, SubscriptionSuspendedView } from './components/SubscriptionGate';
 import { resolveTenantFromHostname, TenantResolutionResult } from './config/tenantRegistry';
 
 import { subscribeConnectionStatus, ConnectionStatus } from './lib/firebase';
@@ -54,7 +55,7 @@ const ViewLoadingFallback: React.FC = () => (
 );
 
 const MainAppContent: React.FC = () => {
-  const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle } = useAttendance();
+  const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle, subscriptionAccess } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
   const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'dashboard');
@@ -151,6 +152,19 @@ const MainAppContent: React.FC = () => {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Subscription hard gate. The platform owner bypasses so they can always
+  // sign in and renew any school (enforcement also lives server-side + rules).
+  if (!subscriptionAccess.accessEnabled && currentUser.role !== 'super_admin') {
+    return (
+      <SubscriptionSuspendedView
+        access={subscriptionAccess}
+        lang={lang}
+        schoolName={currentTenant.name}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
+
   const isAr = lang === 'ar';
 
   return (
@@ -207,6 +221,9 @@ const MainAppContent: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Subscription renewal / grace banner */}
+        <SubscriptionBanner access={subscriptionAccess} lang={lang} />
 
         {/* Top Header & Contextual Bar */}
         <HeaderNav

@@ -112,6 +112,16 @@ import {
 } from './src/utils/messagingProviders';
 import type { SchoolMessagingGatewayConfig } from './src/types/attendance';
 import { isPublicRoute } from './src/utils/routeAuth';
+import {
+  applyReactivate,
+  applyRenewal,
+  applySuspend,
+  computeAccessUntilMs,
+  defaultSubscription,
+  evaluateSubscription,
+  normalizeSubscription,
+} from './src/config/subscription';
+import type { TenantSubscription } from './src/config/subscription';
 
 function getSystemChromePath(): string | undefined {
   const candidates = [
@@ -424,7 +434,7 @@ try {
   console.warn('[AUTH] Warning initializing Firebase Admin:', adminErr?.message || adminErr);
 }
 
-import { resolveTenantFromHostname, setRuntimeDynamicTenants, setRuntimeTenantDocs } from './src/config/tenantRegistry';
+import { getActiveTenantRegistry, resolveTenantFromHostname, setRuntimeDynamicTenants, setRuntimeTenantDocs } from './src/config/tenantRegistry';
 import type { TenantDomainConfig } from './src/config/tenantRegistry';
 import { getCountryPreset } from './src/config/countryPresets';
 
@@ -720,7 +730,121 @@ const requireTenant = (req: express.Request, res: express.Response, next: expres
     }
   }
   next();
-};// Rate limiters per endpoint (H2 requirement)
+};
+// --- Subscription / renewal enforcement ---
+// Short-lived per-tenant cache so enforcement costs at most one Firestore read
+// per tenant per TTL window instead of one read per request.
+const TENANT_SUB_CACHE = new Map<string, { sub: TenantSubscription; at: number }>();
+const TENANT_SUB_TTL_MS = 15000;
+const TENANT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,31}$/;
+
+function setTenantSubscriptionCache(tenantId: string, sub: TenantSubscription): void {
+  TENANT_SUB_CACHE.set(tenantId, { sub, at: Date.now() });
+}
+
+async function loadTenantSubscription(tenantId: string): Promise<TenantSubscription> {
+  const cached = TENANT_SUB_CACHE.get(tenantId);
+  if (cached && Date.now() - cached.at < TENANT_SUB_TTL_MS) return cached.sub;
+  if (!firebaseAdminReady) return defaultSubscription();
+  try {
+    const snapshot = await admin.firestore().doc(`tenants/${tenantId}`).get();
+    const sub = normalizeSubscription(snapshot.exists ? (snapshot.data() as any)?.subscription : undefined);
+    setTenantSubscriptionCache(tenantId, sub);
+    return sub;
+  } catch (error: any) {
+    console.warn(`[SUBSCRIPTION:${tenantId}] Could not load subscription:`, error?.message || error);
+    return cached ? cached.sub : defaultSubscription();
+  }
+}
+
+async function writeSubscriptionAudit(
+  tenantId: string,
+  actor: { uid?: string; email?: string } | undefined,
+  entry: { action: string; details: string; detailsEn: string }
+): Promise<void> {
+  if (!firebaseAdminReady) return;
+  try {
+    const id = admin.firestore().collection('audit_logs').doc().id;
+    await admin.firestore().doc(`audit_logs/${id}`).set({
+      id,
+      tenantId,
+      entityType: 'subscription',
+      action: entry.action,
+      details: entry.details,
+      detailsEn: entry.detailsEn,
+      performerName: actor?.email || 'platform-owner',
+      performerId: actor?.uid || '',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.warn(`[SUBSCRIPTION:${tenantId}] Could not write audit entry:`, error?.message || error);
+  }
+}
+
+async function persistTenantSubscription(
+  tenantId: string,
+  subscription: TenantSubscription,
+  actor: { uid?: string; email?: string } | undefined,
+  audit: { action: string; details: string; detailsEn: string }
+): Promise<void> {
+  if (!firebaseAdminReady) {
+    throw new Error('Firebase Admin is not configured on this server.');
+  }
+  // Static tenants (school-1/school-2) may not have a Firestore document yet.
+  // Seed it from the registry first so the durable document is complete; writing
+  // only `{ subscription }` would otherwise leave a partial record behind.
+  const docRef = admin.firestore().doc(`tenants/${tenantId}`);
+  const existing = await docRef.get();
+  if (!existing.exists) {
+    const config = getActiveTenantRegistry()[tenantId];
+    if (config) {
+      const seed: Record<string, any> = { ...config };
+      delete seed.subscription;
+      await docRef.set({ ...seed, tenantId, subscription }, { merge: true });
+    } else {
+      await docRef.set({ tenantId, subscription }, { merge: true });
+    }
+  } else {
+    await docRef.set({ subscription }, { merge: true });
+  }
+  setTenantSubscriptionCache(tenantId, subscription);
+  // Force the registry overlay to re-read so /api/tenant/resolve reflects the change.
+  tenantDocsLoadedAt = 0;
+  void refreshTenantDocs(true);
+  await writeSubscriptionAudit(tenantId, actor, audit);
+}
+
+// Authoritative, real-time gate. Platform owners bypass so the owner can always
+// sign in and manage every school; existing schools with no subscription doc are
+// grandfathered as active.
+const requireActiveSubscription = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const route = (req.path || '').toLowerCase();
+  if (isPublicRoute(route)) return next();
+
+  const user = (req as any).user;
+  if (!user || isPlatformOwner(user)) return next();
+
+  const tenantId = typeof user.tenantId === 'string' ? user.tenantId : '';
+  if (!tenantId) return next();
+
+  const evaluation = evaluateSubscription(await loadTenantSubscription(tenantId));
+  if (evaluation.accessEnabled) return next();
+
+  const suspended = evaluation.effectiveStatus === 'suspended';
+  return res.status(402).json({
+    error: suspended
+      ? 'تم إيقاف اشتراك هذه المدرسة. يرجى التواصل مع الجهة المالكة للمنصة.'
+      : 'انتهى اشتراك هذه المدرسة. يرجى التواصل مع الجهة المالكة للمنصة.',
+    code: suspended ? 'SUBSCRIPTION_SUSPENDED' : 'SUBSCRIPTION_EXPIRED',
+    subscription: evaluation,
+  });
+};
+
+// Rate limiters per endpoint (H2 requirement)
 const apiHealthLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -768,6 +892,7 @@ app.use('/api/daily-digest', dailyDigestLimiter);
 app.use('/api/notifications', notificationDispatchLimiter);
 app.use(authenticateRequest);
 app.use(requireTenant);
+app.use(requireActiveSubscription);
 
 // Initialize GoogleGenAI SDK with required telemetry header
 const geminiKey = process.env.GEMINI_API_KEY || '';
@@ -1594,19 +1719,11 @@ app.get('/api/tenant/resolve', async (req, res) => {
 app.get('/api/tenants', async (req, res) => {
   try {
     await refreshTenantDocs();
-    const dynamicPath = path.resolve(__dirname, 'src/config/dynamicTenants.json');
-    let dynamicList: any[] = [];
-    if (fs.existsSync(dynamicPath)) {
-      dynamicList = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
-    }
+    // Merge static + dynamic(JSON) + Firestore so every school — including the
+    // statically configured school-1/school-2 — is listed with complete fields.
+    const mergedTenants = Object.values(getActiveTenantRegistry());
 
-    // Public projection: the pre-login tenant switcher only needs display fields.
-    const mergedTenants = new Map<string, any>();
-    for (const tenant of [...(Array.isArray(dynamicList) ? dynamicList : []), ...tenantDocsCache]) {
-      if (tenant && tenant.tenantId) mergedTenants.set(tenant.tenantId, tenant);
-    }
-
-    const publicTenants = Array.from(mergedTenants.values()).map((tenant: any) => ({
+    const publicTenants = mergedTenants.map((tenant: any) => ({
       tenantId: typeof tenant?.tenantId === 'string' ? tenant.tenantId : '',
       subdomain: typeof tenant?.subdomain === 'string' ? tenant.subdomain : '',
       customDomains: Array.isArray(tenant?.customDomains)
@@ -1617,6 +1734,20 @@ app.get('/api/tenants', async (req, res) => {
       logoText: typeof tenant?.logoText === 'string' ? tenant.logoText.slice(0, 8) : '',
       primaryColor: typeof tenant?.primaryColor === 'string' ? tenant.primaryColor : '',
       isActive: tenant?.isActive !== false,
+      subscription: (() => {
+        const normalized = normalizeSubscription(tenant?.subscription);
+        const evaluation = evaluateSubscription(normalized);
+        return {
+          plan: normalized.plan,
+          billingCycle: normalized.billingCycle,
+          effectiveStatus: evaluation.effectiveStatus,
+          accessEnabled: evaluation.accessEnabled,
+          gracePeriodDays: normalized.gracePeriodDays,
+          currentPeriodEnd: evaluation.periodEnd,
+          daysRemaining: evaluation.daysRemaining,
+          graceDaysRemaining: evaluation.graceDaysRemaining,
+        };
+      })(),
     }));
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -1680,6 +1811,7 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
       primaryColor: /^#[0-9a-fA-F]{6}$/.test(String(payload.primaryColor)) ? String(payload.primaryColor) : '#059669',
       logoText: typeof payload.logoText === 'string' ? payload.logoText.slice(0, 8) : '',
       isActive: payload.isActive !== false,
+      subscription: defaultSubscription(),
     };
 
     const dynamicPath = process.env.DYNAMIC_TENANTS_PATH || path.resolve(__dirname, 'src/config/dynamicTenants.json');
@@ -1764,6 +1896,173 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
   } catch (err: any) {
     console.error('[TENANTS-PROVISION-ERROR]', err);
     res.status(500).json({ success: false, error: 'Failed to persist the tenant configuration.' });
+  }
+});
+
+// --- Tenant subscription & renewal control (platform owner only) -------------
+// The owner can stop, renew, re-activate, and re-plan any school. Every change
+// is written to the audit log and invalidates the enforcement cache immediately.
+function resolveSubscriptionTenantId(req: express.Request, res: express.Response): string | null {
+  const raw = typeof req.params?.tenantId === 'string' ? req.params.tenantId.trim().toLowerCase() : '';
+  if (!TENANT_ID_PATTERN.test(raw)) {
+    res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+    return null;
+  }
+  return raw;
+}
+
+const subscriptionActor = (req: express.Request) => {
+  const user = (req as any).user || {};
+  return { uid: user.uid, email: user.email };
+};
+
+function subscriptionSummary(sub: TenantSubscription) {
+  const evaluation = evaluateSubscription(sub);
+  return {
+    plan: sub.plan,
+    status: sub.status,
+    effectiveStatus: evaluation.effectiveStatus,
+    accessEnabled: evaluation.accessEnabled,
+    billingCycle: sub.billingCycle,
+    gracePeriodDays: sub.gracePeriodDays,
+    autoRenew: sub.autoRenew,
+    manuallySuspended: sub.manuallySuspended,
+    currentPeriodStart: sub.currentPeriodStart || null,
+    currentPeriodEnd: sub.currentPeriodEnd || null,
+    daysRemaining: evaluation.daysRemaining,
+    graceDaysRemaining: evaluation.graceDaysRemaining,
+    lastPaymentAt: sub.lastPaymentAt || null,
+    amount: sub.amount ?? null,
+    currency: sub.currency || null,
+    limits: sub.limits || {},
+  };
+}
+
+app.get('/api/tenants/:tenantId/subscription', requirePlatformOwner, async (req, res) => {
+  const tenantId = resolveSubscriptionTenantId(req, res);
+  if (!tenantId) return;
+  try {
+    const sub = await loadTenantSubscription(tenantId);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.json({ success: true, tenantId, subscription: sub, summary: subscriptionSummary(sub) });
+  } catch (err: any) {
+    console.error('[SUBSCRIPTION-READ-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to read the subscription.' });
+  }
+});
+
+app.post('/api/tenants/:tenantId/subscription/suspend', requirePlatformOwner, async (req, res) => {
+  const tenantId = resolveSubscriptionTenantId(req, res);
+  if (!tenantId) return;
+  try {
+    const current = await loadTenantSubscription(tenantId);
+    const reason =
+      typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 300) : '';
+    const updated = applySuspend(current, {
+      by: subscriptionActor(req).email,
+      reason: reason || null,
+    });
+    await persistTenantSubscription(tenantId, updated, subscriptionActor(req), {
+      action: 'subscription.suspend',
+      details: `تم إيقاف اشتراك المدرسة${reason ? ` — السبب: ${reason}` : ''}`,
+      detailsEn: `School subscription suspended${reason ? ` — reason: ${reason}` : ''}`,
+    });
+    res.json({ success: true, tenantId, subscription: updated, summary: subscriptionSummary(updated) });
+  } catch (err: any) {
+    console.error('[SUBSCRIPTION-SUSPEND-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to suspend the subscription.' });
+  }
+});
+
+app.post('/api/tenants/:tenantId/subscription/reactivate', requirePlatformOwner, async (req, res) => {
+  const tenantId = resolveSubscriptionTenantId(req, res);
+  if (!tenantId) return;
+  try {
+    const current = await loadTenantSubscription(tenantId);
+    const updated = applyReactivate(current, { by: subscriptionActor(req).email });
+    await persistTenantSubscription(tenantId, updated, subscriptionActor(req), {
+      action: 'subscription.reactivate',
+      details: 'تمت إعادة تنشيط اشتراك المدرسة',
+      detailsEn: 'School subscription reactivated',
+    });
+    res.json({ success: true, tenantId, subscription: updated, summary: subscriptionSummary(updated) });
+  } catch (err: any) {
+    console.error('[SUBSCRIPTION-REACTIVATE-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to reactivate the subscription.' });
+  }
+});
+
+app.post('/api/tenants/:tenantId/subscription/renew', requirePlatformOwner, async (req, res) => {
+  const tenantId = resolveSubscriptionTenantId(req, res);
+  if (!tenantId) return;
+  try {
+    const current = await loadTenantSubscription(tenantId);
+    const body = req.body || {};
+    const cycle = body.cycle === 'monthly' || body.cycle === 'annual' ? body.cycle : undefined;
+    const months = typeof body.months === 'number' && body.months > 0 ? Math.min(Math.floor(body.months), 60) : undefined;
+    const periodEnd = typeof body.periodEnd === 'string' && !Number.isNaN(new Date(body.periodEnd).getTime())
+      ? body.periodEnd
+      : undefined;
+    const updated = applyRenewal(current, {
+      cycle,
+      months,
+      periodEnd,
+      amount: typeof body.amount === 'number' ? body.amount : undefined,
+      currency: typeof body.currency === 'string' ? body.currency.slice(0, 8) : undefined,
+      updatedBy: subscriptionActor(req).email,
+    });
+    await persistTenantSubscription(tenantId, updated, subscriptionActor(req), {
+      action: 'subscription.renew',
+      details: `تم تجديد اشتراك المدرسة حتى ${updated.currentPeriodEnd}`,
+      detailsEn: `School subscription renewed until ${updated.currentPeriodEnd}`,
+    });
+    res.json({ success: true, tenantId, subscription: updated, summary: subscriptionSummary(updated) });
+  } catch (err: any) {
+    console.error('[SUBSCRIPTION-RENEW-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to renew the subscription.' });
+  }
+});
+
+app.patch('/api/tenants/:tenantId/subscription', requirePlatformOwner, async (req, res) => {
+  const tenantId = resolveSubscriptionTenantId(req, res);
+  if (!tenantId) return;
+  try {
+    const current = await loadTenantSubscription(tenantId);
+    const body = req.body || {};
+    const updated: TenantSubscription = { ...current };
+
+    if (typeof body.plan === 'string' && body.plan.trim()) updated.plan = body.plan.trim().slice(0, 40);
+    if (body.billingCycle === 'monthly' || body.billingCycle === 'annual') updated.billingCycle = body.billingCycle;
+    if (typeof body.gracePeriodDays === 'number' && body.gracePeriodDays >= 0) {
+      updated.gracePeriodDays = Math.min(Math.floor(body.gracePeriodDays), 365);
+    }
+    if (typeof body.autoRenew === 'boolean') updated.autoRenew = body.autoRenew;
+    if (typeof body.currentPeriodEnd === 'string') {
+      updated.currentPeriodEnd =
+        body.currentPeriodEnd === '' ? null : body.currentPeriodEnd;
+    }
+    if (typeof body.amount === 'number') updated.amount = body.amount;
+    if (typeof body.currency === 'string') updated.currency = body.currency.slice(0, 8);
+    if (typeof body.notes === 'string') updated.notes = body.notes.slice(0, 500);
+    if (body.limits && typeof body.limits === 'object') {
+      updated.limits = {
+        maxStudents: typeof body.limits.maxStudents === 'number' ? body.limits.maxStudents : updated.limits?.maxStudents,
+        maxUsers: typeof body.limits.maxUsers === 'number' ? body.limits.maxUsers : updated.limits?.maxUsers,
+      };
+    }
+    updated.updatedAt = new Date().toISOString();
+    updated.updatedBy = subscriptionActor(req).email || null;
+    updated.accessUntilMs = computeAccessUntilMs(updated);
+
+    await persistTenantSubscription(tenantId, updated, subscriptionActor(req), {
+      action: 'subscription.update',
+      details: 'تم تحديث سياسة اشتراك المدرسة',
+      detailsEn: 'School subscription policy updated',
+    });
+    res.json({ success: true, tenantId, subscription: updated, summary: subscriptionSummary(updated) });
+  } catch (err: any) {
+    console.error('[SUBSCRIPTION-UPDATE-ERROR]', err);
+    res.status(500).json({ success: false, error: 'Failed to update the subscription.' });
   }
 });
 

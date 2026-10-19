@@ -79,6 +79,7 @@ describe('server.ts integration (real app, real routes)', () => {
           'nameEn',
           'primaryColor',
           'subdomain',
+          'subscription',
           'tenantId',
         ].sort()
       );
@@ -100,6 +101,14 @@ describe('server.ts integration (real app, real routes)', () => {
     expect((await request('/api/users', { method: 'POST' })).status).toBe(401);
     expect((await request('/api/users/some-uid', { method: 'PATCH' })).status).toBe(401);
     expect((await request('/api/users/some-uid', { method: 'DELETE' })).status).toBe(401);
+  });
+
+  it('protects the subscription control-plane endpoints', async () => {
+    expect((await request('/api/tenants/school-1/subscription')).status).toBe(401);
+    expect((await request('/api/tenants/school-1/subscription/suspend', { method: 'POST' })).status).toBe(401);
+    expect((await request('/api/tenants/school-1/subscription/reactivate', { method: 'POST' })).status).toBe(401);
+    expect((await request('/api/tenants/school-1/subscription/renew', { method: 'POST' })).status).toBe(401);
+    expect((await request('/api/tenants/school-1/subscription', { method: 'PATCH' })).status).toBe(401);
   });
 
   it('accepts an explicit ?tenant= selection on the public tenant resolver', async () => {

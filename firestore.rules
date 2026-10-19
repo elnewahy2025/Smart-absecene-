@@ -108,11 +108,33 @@ service cloud.firestore {
     }
 
     function isTenantUser(tenantId) {
-      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId));
+      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && tenantAccessAllowed(tenantId)));
     }
 
     function isTenantRole(tenantId, roles) {
-      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && getUserData().role in roles));
+      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && getUserData().role in roles && tenantAccessAllowed(tenantId)));
+    }
+
+    // --- SUBSCRIPTION / RENEWAL ENFORCEMENT (defense-in-depth) ---
+    // Mirrors the server middleware. A tenant with no subscription document is
+    // grandfathered as active. accessUntilMs is period end + grace in epoch ms
+    // (0 = never expires), denormalized by the server so rules need no date math.
+    function tenantSubscription(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)).data.get('subscription', null);
+    }
+
+    function tenantAccessAllowed(tenantId) {
+      return !exists(/databases/$(database)/documents/tenants/$(tenantId))
+        || tenantSubscription(tenantId) == null
+        || (
+          tenantSubscription(tenantId).get('manuallySuspended', false) == false
+          && tenantSubscription(tenantId).get('status', 'active') != 'suspended'
+          && tenantSubscription(tenantId).get('status', 'active') != 'expired'
+          && (
+            tenantSubscription(tenantId).get('accessUntilMs', 0) == 0
+            || request.time.toMillis() < tenantSubscription(tenantId).get('accessUntilMs', 0)
+          )
+        );
     }
 
     function isTeacherAssigned(data) {
@@ -139,11 +161,12 @@ service cloud.firestore {
     }
     // 2. Users Collection (Profile & Role Management)
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin() || (hasUserDoc() && getUserData().role in ['admin', 'registrar']));
-      allow list: if isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().role in ['admin', 'registrar']));
+      allow get: if isSignedIn() && (isAdmin() || (tenantAccessAllowed(existing().tenantId) && (request.auth.uid == userId || (hasUserDoc() && getUserData().role in ['admin', 'registrar']))));
+      allow list: if isSignedIn() && (isAdmin() || (hasUserDoc() && tenantAccessAllowed(getUserData().tenantId) && getUserData().role in ['admin', 'registrar']));
       // New user registration cannot self-grant 'admin' role unless platform admin
       allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
         isAdmin() || (
+          tenantAccessAllowed(incoming().tenantId) &&
           request.auth.uid == userId &&
           incoming().role == 'parent'
         )
@@ -151,6 +174,7 @@ service cloud.firestore {
       // Profile update cannot elevate role, change tenant, or rewrite verified contact fields
       allow update: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
         isAdmin() || (
+          tenantAccessAllowed(existing().tenantId) &&
           request.auth.uid == userId &&
           incoming().role == existing().role &&
           incoming().tenantId == existing().tenantId &&
@@ -166,7 +190,7 @@ service cloud.firestore {
       // Staff can read all tenant students; parents can only read their child
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             (getUserData().role == 'parent' && (
               ('guardianPhone' in resource.data && resource.data.guardianPhone == getUserData().phone) ||
@@ -188,7 +212,7 @@ service cloud.firestore {
     match /attendance_sessions/{sessionId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId &&
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) &&
           getUserData().role in ['admin', 'registrar', 'teacher']
         )
       );
@@ -210,7 +234,7 @@ service cloud.firestore {
     match /attendance_records/{recordId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             (getUserData().role == 'parent' && resource.data.guardianPhone == getUserData().phone)
           )
@@ -224,7 +248,7 @@ service cloud.firestore {
     match /justifications/{justificationId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && (
+          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             ('studentId' in resource.data && resource.data.studentId == request.auth.uid) ||
             (getUserData().role == 'parent' && 'guardianPhone' in resource.data && resource.data.guardianPhone == getUserData().phone)
@@ -260,7 +284,7 @@ service cloud.firestore {
     match /notification_outbox/{notificationId} {
       allow read: if isSignedIn() && (
         isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
-        (hasUserDoc() && resource.data.tenantId == getUserData().tenantId && getUserData().role == 'parent' &&
+        (hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && getUserData().role == 'parent' &&
           'recipientPhone' in resource.data && resource.data.recipientPhone == getUserData().phone)
       );
       allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
