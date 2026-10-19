@@ -381,7 +381,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
   const refreshSubscription = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tenant/resolve?tenant=${encodeURIComponent(tenantId)}`);
+      const res = await fetch(`/api/tenant/resolve?tenant=${encodeURIComponent(tenantId)}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (data && data.status === 'resolved' && data.config) {
@@ -394,6 +396,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
   useEffect(() => {
     void refreshSubscription();
+    // The owner can suspend a school from another session; re-check when the tab
+    // regains focus and periodically so the gate appears without a hard reload.
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSubscription();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const interval = window.setInterval(refreshWhenVisible, 60000);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.clearInterval(interval);
+    };
   }, [refreshSubscription]);
 
   const subscriptionAccess = useMemo(

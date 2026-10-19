@@ -121,16 +121,17 @@ export function normalizeSubscription(raw: unknown): TenantSubscription {
 
   const limits: SubscriptionLimits | undefined =
     value.limits && typeof value.limits === 'object'
-      ? {
-          maxStudents:
-            typeof (value.limits as any).maxStudents === 'number'
-              ? (value.limits as any).maxStudents
-              : undefined,
-          maxUsers:
-            typeof (value.limits as any).maxUsers === 'number'
-              ? (value.limits as any).maxUsers
-              : undefined,
-        }
+      ? (() => {
+          const parsed: SubscriptionLimits = {};
+          const rawLimits = value.limits as Record<string, unknown>;
+          if (typeof rawLimits.maxStudents === 'number') {
+            parsed.maxStudents = rawLimits.maxStudents;
+          }
+          if (typeof rawLimits.maxUsers === 'number') {
+            parsed.maxUsers = rawLimits.maxUsers;
+          }
+          return parsed;
+        })()
       : base.limits;
 
   return {
@@ -152,7 +153,9 @@ export function normalizeSubscription(raw: unknown): TenantSubscription {
     currency: typeof value.currency === 'string' ? value.currency : null,
     notes: typeof value.notes === 'string' ? value.notes : null,
     limits,
-    accessUntilMs: typeof value.accessUntilMs === 'number' ? value.accessUntilMs : undefined,
+    // Only include the denormalized boundary when it is actually a number:
+    // Firestore rejects documents containing `undefined` field values.
+    ...(typeof value.accessUntilMs === 'number' ? { accessUntilMs: value.accessUntilMs } : {}),
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
     updatedBy: typeof value.updatedBy === 'string' ? value.updatedBy : null,
   };

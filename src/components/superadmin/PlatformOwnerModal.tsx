@@ -72,6 +72,7 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
     students,
     users,
     lang,
+    refreshSubscription,
   } = useAttendance();
 
   const [activeTab, setActiveTab] = useState<'list' | 'provision'>('list');
@@ -249,6 +250,9 @@ export const PlatformOwnerModal: React.FC<Props> = ({ isOpen, onClose }) => {
       if (data.summary) {
         setSubscriptions((prev) => ({ ...prev, [tenantId]: data.summary }));
       }
+      // If the action targeted the currently open school, re-evaluate the gate
+      // immediately so the banner/suspended screen updates without a reload.
+      void refreshSubscription();
       const label =
         action === 'renew'
           ? 'تم تجديد اشتراك المدرسة بنجاح.'

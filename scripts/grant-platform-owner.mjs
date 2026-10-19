@@ -86,6 +86,17 @@ await db.collection('users').doc(user.uid).set(
   { merge: true }
 );
 
+// Firestore Security Rules treat `admins/{uid}` as the platform-level bypass
+// (see firestore.rules). Without this document the owner is still subject to the
+// per-tenant subscription gate for client-side reads/writes.
+await db.collection('admins').doc(user.uid).set(
+  {
+    email: user.email || email,
+    role: 'super_admin',
+  },
+  { merge: true }
+);
+
 await auth.setCustomUserClaims(user.uid, { role: 'super_admin', tenantId });
 await auth.revokeRefreshTokens(user.uid);
 

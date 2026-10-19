@@ -12,6 +12,20 @@ import {
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const day = 24 * 60 * 60 * 1000;
 
+/** Firestore rejects documents containing `undefined`, so the model must be clean. */
+function findUndefinedPaths(value: unknown, path = 'root'): string[] {
+  if (value === undefined) return [path];
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => findUndefinedPaths(item, `${path}[${index}]`));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, item]) =>
+      findUndefinedPaths(item, `${path}.${key}`)
+    );
+  }
+  return [];
+}
+
 describe('subscription model', () => {
   describe('normalizeSubscription', () => {
     it('returns a grandfathered, never-expiring default for junk input', () => {
@@ -21,6 +35,19 @@ describe('subscription model', () => {
       expect(sub.currentPeriodEnd).toBeNull();
       expect(sub.gracePeriodDays).toBe(7);
       expect(sub.manuallySuspended).toBe(false);
+    });
+
+    it('never emits undefined fields (Firestore-safe)', () => {
+      expect(findUndefinedPaths(normalizeSubscription(defaultSubscription()))).toEqual([]);
+      expect(findUndefinedPaths(normalizeSubscription({ limits: {} }))).toEqual([]);
+      expect(findUndefinedPaths(normalizeSubscription({ limits: { maxStudents: 50 } }))).toEqual([]);
+    });
+
+    it('keeps only the limits the owner actually set', () => {
+      expect(normalizeSubscription({ limits: {} }).limits).toEqual({});
+      const partial = normalizeSubscription({ limits: { maxStudents: 50 } });
+      expect(partial.limits).toEqual({ maxStudents: 50 });
+      expect(Object.prototype.hasOwnProperty.call(partial.limits, 'maxUsers')).toBe(false);
     });
 
     it('coerces unknown enums and clamps the grace window', () => {
@@ -138,6 +165,7 @@ describe('subscription model', () => {
 
     it('suspend then reactivate round-trips back to active', () => {
       const suspended = applySuspend(defaultSubscription(), { by: 'owner', reason: 'unpaid', now: NOW });
+      expect(findUndefinedPaths(suspended)).toEqual([]);
       expect(suspended.status).toBe('suspended');
       expect(suspended.manuallySuspended).toBe(true);
       expect(evaluateSubscription(suspended, NOW).accessEnabled).toBe(false);

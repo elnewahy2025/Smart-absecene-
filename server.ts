@@ -781,6 +781,22 @@ async function writeSubscriptionAudit(
   }
 }
 
+// Firestore rejects `undefined` anywhere in a document. Normalizers can leave
+// optional keys present but undefined, so strip them recursively before writing.
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefinedDeep(item)) as unknown as T;
+  }
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const clean: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (item !== undefined) clean[key] = stripUndefinedDeep(item);
+    }
+    return clean as T;
+  }
+  return value;
+}
+
 async function persistTenantSubscription(
   tenantId: string,
   subscription: TenantSubscription,
@@ -800,12 +816,12 @@ async function persistTenantSubscription(
     if (config) {
       const seed: Record<string, any> = { ...config };
       delete seed.subscription;
-      await docRef.set({ ...seed, tenantId, subscription }, { merge: true });
+      await docRef.set(stripUndefinedDeep({ ...seed, tenantId, subscription }), { merge: true });
     } else {
-      await docRef.set({ tenantId, subscription }, { merge: true });
+      await docRef.set(stripUndefinedDeep({ tenantId, subscription }), { merge: true });
     }
   } else {
-    await docRef.set({ subscription }, { merge: true });
+    await docRef.set(stripUndefinedDeep({ subscription }), { merge: true });
   }
   setTenantSubscriptionCache(tenantId, subscription);
   // Force the registry overlay to re-read so /api/tenant/resolve reflects the change.
@@ -1713,6 +1729,7 @@ app.get('/api/tenant/resolve', async (req, res) => {
   await refreshTenantDocs();
   const host = getRequestHostname(req);
   const resolution = resolveTenantFromHostname(host, req.originalUrl);
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.json(resolution);
 });
 
