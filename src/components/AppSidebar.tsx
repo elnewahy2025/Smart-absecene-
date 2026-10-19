@@ -62,6 +62,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const isAr = lang === 'ar';
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
+  const isRegistrar = currentUser.role === 'registrar';
 
   const pendingJustificationsCount = justifications.filter((j) => j.status === 'pending').length;
   const failedNotificationsCount = notifications.filter((n) => n.status === 'failed').length;
@@ -176,11 +177,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         };
       }
       if (isTeacher) {
+        // Teachers only work with the daily attendance sheets.
         return {
           ...sec,
-          items: sec.items.filter((i) =>
-            ['dashboard', 'sessions', 'students', 'communications', 'reports'].includes(i.id)
-          ),
+          items: sec.items.filter((i) => i.id === 'sessions'),
+        };
+      }
+      if (isRegistrar) {
+        // Registrars never see the audit log & institution policies screen.
+        return {
+          ...sec,
+          items: sec.items.filter((i) => i.id !== 'settings'),
         };
       }
       return sec;
@@ -360,7 +367,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             );
           })}
 
-          {/* AI Assistant Special Link */}
+          {/* AI Assistant Special Link (hidden for parents and teachers) */}
+          {!isParent && !isTeacher && (
           <div className="pt-2 border-t border-slate-100">
             <button
               onClick={() => handleSelect('chatbot')}
@@ -380,6 +388,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               {!isCollapsed && <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />}
             </button>
           </div>
+          )}
         </div>
 
         {/* Sidebar Footer */}

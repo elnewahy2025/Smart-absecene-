@@ -58,7 +58,10 @@ const MainAppContent: React.FC = () => {
   const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle, subscriptionAccess } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
-  const [activeTab, setActiveTab] = useState<ActiveTab>(isParent ? 'parent_portal' : 'dashboard');
+  const isRegistrar = currentUser.role === 'registrar';
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    isParent ? 'parent_portal' : isTeacher ? 'sessions' : 'dashboard'
+  );
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('connected');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -102,6 +105,8 @@ const MainAppContent: React.FC = () => {
     setUserRole(userProfile.role);
     if (userProfile.role === 'parent') {
       setActiveTab('parent_portal');
+    } else if (userProfile.role === 'teacher') {
+      setActiveTab('sessions');
     } else {
       setActiveTab('dashboard');
     }
@@ -121,31 +126,26 @@ const MainAppContent: React.FC = () => {
 
   // Strict RBAC: Guard unauthorized views based on role
   useEffect(() => {
-    if (
-      isParent &&
-      activeTab !== 'parent_portal' &&
-      activeTab !== 'justifications' &&
-      activeTab !== 'chatbot' &&
-      activeTab !== 'communications'
-    ) {
-      setActiveTab('parent_portal');
-    } else if (
-      isTeacher &&
-      ![
-        'dashboard',
-        'sessions',
-        'students',
-        'student_inquiry',
-        'communications',
-        'justifications',
-        'chatbot',
-        'emergency',
-        'reports',
-      ].includes(activeTab)
-    ) {
-      setActiveTab('dashboard');
+    if (isParent) {
+      if (
+        activeTab !== 'parent_portal' &&
+        activeTab !== 'justifications' &&
+        activeTab !== 'communications'
+      ) {
+        setActiveTab('parent_portal');
+      }
+    } else if (isTeacher) {
+      // Teachers are limited to the daily attendance sheets.
+      if (activeTab !== 'sessions') {
+        setActiveTab('sessions');
+      }
+    } else if (isRegistrar) {
+      // Registrars never see the audit log & institution policies screen.
+      if (activeTab === 'settings') {
+        setActiveTab('dashboard');
+      }
     }
-  }, [isParent, isTeacher, activeTab]);
+  }, [isParent, isTeacher, isRegistrar, activeTab]);
 
   // If not authenticated, render the school-specific LoginPage
   if (!isAuthenticated) {
@@ -247,7 +247,6 @@ const MainAppContent: React.FC = () => {
                   {(activeTab === 'justifications' || activeTab === 'communications') && (
                     <CommunicationsView initialTab="justifications" />
                   )}
-                  {activeTab === 'chatbot' && <GeminiChatbotView />}
                 </>
               ) : (
                 <>
