@@ -17,6 +17,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "seed:auth": "tsx scripts/seed-firebase-auth.ts",
+    "seed:tenant": "node scripts/seed-tenant-demo.mjs",
     "probe:security": "node scripts/security-probes.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-smart-school \"node scripts/test-firestore-rules.mjs\"",
     "audit": "node scripts/ci-security-audit.mjs",
