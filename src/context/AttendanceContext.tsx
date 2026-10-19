@@ -339,9 +339,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   });
   const [authenticatedPhone, setAuthenticatedPhone] = useState('');
 
-  // An explicit ?tenant=/?school= selection in the URL. It is honoured for
-  // visitors and for the platform owner (who may inspect any school); ordinary
-  // school accounts always stay pinned to their own claim tenant.
+  // An explicit ?tenant=/?school= selection in the URL. It is honoured for the
+  // platform owner (who may inspect any school); ordinary school accounts always
+  // stay pinned to their own claim tenant without ever being signed out.
   const requestedTenantId = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const search = window.location.search;
@@ -673,26 +673,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       if (user) {
         const userEmail = (user.email || '').toLowerCase();
 
-        // Honour the explicit ?tenant= selection for the platform owner. For any
-        // other account, a link that asks for a different school must not render
-        // that school under the wrong identity: drop the session instead.
+        // Honour the explicit ?tenant= selection for the platform owner only.
+        // School accounts are always pinned to their own tenant: a link asking
+        // for another school is ignored instead of ending the session, so
+        // opening other schools (in other tabs, browsers, or devices) can never
+        // sign out or disturb the session that is already running here.
         const applyAccountTenant = (role: UserRole, accountTenantId?: string) => {
           if (role === 'super_admin') {
             if (requestedTenantId) setTenantId(requestedTenantId);
-            return;
-          }
-          if (
-            requestedTenantId &&
-            accountTenantId &&
-            accountTenantId !== 'platform' &&
-            requestedTenantId !== accountTenantId
-          ) {
-            if (typeof localStorage !== 'undefined') {
-              localStorage.removeItem('school_user_authenticated');
-            }
-            void signOut(auth).then(() => {
-              if (typeof window !== 'undefined') window.location.reload();
-            });
             return;
           }
           if (accountTenantId && accountTenantId !== 'platform') {
