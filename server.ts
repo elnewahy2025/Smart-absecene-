@@ -5,6 +5,12 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import {
+  accountPatchDenial,
+  accountRoleChangeDenial,
+  accountUpsertDenial,
+  isPlatformOwnerClaim,
+} from './src/utils/accountAccess';
 
 dotenv.config();
 
@@ -21,10 +27,6 @@ const ALLOW_DEV_AUTH = process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE
 const DEV_AUTH_ROLE = process.env.DEV_AUTH_ROLE || 'teacher';
 const DEV_AUTH_TENANT = process.env.DEV_AUTH_TENANT || '';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || '';
-const PLATFORM_OWNER_EMAILS = (process.env.PLATFORM_OWNER_EMAILS || '')
-  .split(',')
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean);
 
 app.use(express.json({ limit: '25mb' }));
 
@@ -500,23 +502,33 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const generateTemporaryPassword = (): string => `Sm!${crypto.randomBytes(9).toString('base64url')}7`;
 
+const accountOperationError = (message: string, statusCode: number) =>
+  Object.assign(new Error(message), { statusCode });
+
 /**
  * Create or refresh a login for a tenant member: Firebase Auth account,
  * server-set claims, and the Firestore profile keyed by the auth UID (which is
  * what firestore.rules and the API both read).
+ *
+ * Firebase Auth email addresses are global. This function therefore refuses to
+ * touch an existing login unless the caller explicitly opts in, the login does
+ * not belong to the platform owner, and the profile tenant matches the target.
  */
-const upsertManagedAccount = async (input: {
-  tenantId: string;
-  email: string;
-  name?: string;
-  role: string;
-  phone?: string;
-  jobTitle?: string;
-  status?: string;
-  assignedClasses?: string[];
-  assignedSubjects?: string[];
-  password?: string;
-}): Promise<{ uid: string; password: string; created: boolean }> => {
+const upsertManagedAccount = async (
+  input: {
+    tenantId: string;
+    email: string;
+    name?: string;
+    role: string;
+    phone?: string;
+    jobTitle?: string;
+    status?: string;
+    assignedClasses?: string[];
+    assignedSubjects?: string[];
+    password?: string;
+  },
+  options: { allowExisting?: boolean; resetPassword?: boolean } = {}
+): Promise<{ uid: string; password: string; created: boolean }> => {
   if (!firebaseAdminReady) {
     throw new Error('Firebase Admin is not configured on this server.');
   }
@@ -524,29 +536,57 @@ const upsertManagedAccount = async (input: {
   const temporaryPassword =
     input.password && input.password.length >= 8 ? input.password : generateTemporaryPassword();
   const status = input.status === 'inactive' ? 'inactive' : 'active';
+  const resetPassword = options.resetPassword === true;
 
-  let user: any;
+  let user: any = null;
   let created = false;
+  let existingProfile: Record<string, any> | null = null;
+
   try {
     user = await admin.auth().getUserByEmail(input.email);
-    await admin.auth().updateUser(user.uid, {
-      password: temporaryPassword,
+  } catch (lookupError: any) {
+    if (lookupError?.code !== 'auth/user-not-found') throw lookupError;
+  }
+
+  if (user) {
+    const [profileSnap, adminSnap] = await Promise.all([
+      admin.firestore().doc(`users/${user.uid}`).get(),
+      admin.firestore().doc(`admins/${user.uid}`).get(),
+    ]);
+    existingProfile = profileSnap.exists ? (profileSnap.data() as Record<string, any>) : null;
+
+    const denial = accountUpsertDenial(
+      { exists: true, profile: existingProfile, isPlatformAdminDoc: adminSnap.exists },
+      input.tenantId,
+      options.allowExisting === true
+    );
+    if (denial) {
+      throw accountOperationError(denial, denial.includes('protected') ? 403 : 409);
+    }
+
+    const authUpdates: Record<string, any> = {
       emailVerified: true,
       disabled: status === 'inactive',
       ...(input.name ? { displayName: input.name } : {}),
-    });
-  } catch (lookupError: any) {
-    if (lookupError?.code === 'auth/user-not-found') {
-      user = await admin.auth().createUser({
-        email: input.email,
-        password: temporaryPassword,
-        emailVerified: true,
-        ...(input.name ? { displayName: input.name } : {}),
-      });
-      created = true;
-    } else {
-      throw lookupError;
+    };
+    if (resetPassword) authUpdates.password = temporaryPassword;
+    await admin.auth().updateUser(user.uid, authUpdates);
+
+    const roleOrTenantChanged =
+      !existingProfile ||
+      existingProfile.role !== input.role ||
+      existingProfile.tenantId !== input.tenantId;
+    if (resetPassword || roleOrTenantChanged) {
+      await admin.auth().revokeRefreshTokens(user.uid).catch(() => {});
     }
+  } else {
+    user = await admin.auth().createUser({
+      email: input.email,
+      password: temporaryPassword,
+      emailVerified: true,
+      ...(input.name ? { displayName: input.name } : {}),
+    });
+    created = true;
   }
 
   await admin.auth().setCustomUserClaims(user.uid, { role: input.role, tenantId: input.tenantId });
@@ -569,17 +609,17 @@ const upsertManagedAccount = async (input: {
 
   await admin.firestore().doc(`users/${user.uid}`).set(profile, { merge: true });
 
-  return { uid: user.uid, password: temporaryPassword, created };
+  return {
+    uid: user.uid,
+    password: created || resetPassword ? temporaryPassword : '',
+    created,
+  };
 };
 
-const isPlatformOwner = (user: any): boolean =>
-  Boolean(
-    user &&
-      (user.role === 'super_admin' ||
-        (user.email_verified === true &&
-          typeof user.email === 'string' &&
-          PLATFORM_OWNER_EMAILS.includes(user.email.toLowerCase())))
-  );
+// The owner is identified by the Admin-SDK-set claim only. The previous email
+// fallback meant that anyone who could recreate/reset the owner's login could
+// inherit owner privileges; claims are the single source of truth server-side.
+const isPlatformOwner = (user: any): boolean => isPlatformOwnerClaim(user);
 
 const resolveServerIdentity = (
   decoded: any
@@ -650,7 +690,9 @@ const authenticateRequest = async (req: express.Request, res: express.Response, 
   }
 
   try {
-    const decoded = await admin.auth().verifyIdToken(bearerValue);
+    // checkRevoked=true makes disabled accounts and role changes take effect
+    // immediately instead of waiting for the ID token to expire.
+    const decoded = await admin.auth().verifyIdToken(bearerValue, true);
     const identity = resolveServerIdentity(decoded);
 
     if (!identity) {
@@ -737,6 +779,24 @@ const requireTenant = (req: express.Request, res: express.Response, next: expres
 const TENANT_SUB_CACHE = new Map<string, { sub: TenantSubscription; at: number }>();
 const TENANT_SUB_TTL_MS = 15000;
 const TENANT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,31}$/;
+
+// School staff operate strictly inside their claim tenant. The platform owner
+// may act on another school by passing its tenantId (body) or tenant query.
+const resolveTargetTenantId = (req: express.Request, fallback = DEFAULT_TENANT_ID): string => {
+  const user = (req as any).user;
+  const requested =
+    typeof req.body?.tenantId === 'string'
+      ? req.body.tenantId.trim().toLowerCase()
+      : typeof req.query?.tenantId === 'string'
+      ? req.query.tenantId.trim().toLowerCase()
+      : typeof req.query?.tenant === 'string'
+      ? String(req.query.tenant).trim().toLowerCase()
+      : '';
+  if (isPlatformOwner(user) && requested && TENANT_ID_PATTERN.test(requested)) {
+    return requested;
+  }
+  return (user?.tenantId || (req as any).hostTenant?.tenantId || fallback || '').toLowerCase();
+};
 
 function setTenantSubscriptionCache(tenantId: string, sub: TenantSubscription): void {
   TENANT_SUB_CACHE.set(tenantId, { sub, at: Date.now() });
@@ -1080,7 +1140,7 @@ app.post('/api/chat', async (req, res) => {
       parts: [{ text: m.content }],
     }));
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
 
     // Attempt Live Gemini call if API key exists (Tenant key takes priority, then system key)
     const liveResult = await callGeminiWithFallback(
@@ -1178,7 +1238,7 @@ app.post('/api/analyze-image', async (req, res) => {
       'gemini-3.5-flash-lite',
     ];
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
 
     const liveResult = await callGeminiWithFallback(
       modelCandidates,
@@ -1280,7 +1340,7 @@ ${highRiskSummary}
 }
 `;
 
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
 
     const result = await callGeminiWithFallback(
       ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'],
@@ -1345,7 +1405,7 @@ ${highRiskSummary}
 app.post('/api/daily-digest/dispatch', requireRole(['admin', 'registrar']), requireTenant, async (req, res) => {
   try {
     const { recipients = [], subject, htmlContent, scheduledTime = '06:45' } = req.body;
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
 
     const validRecipients = Array.isArray(recipients)
       ? recipients.filter((r) => typeof r === 'string' && r.includes('@')).slice(0, 50)
@@ -1437,7 +1497,15 @@ app.post(
   async (req, res) => {
     try {
       const user = (req as any).user;
-      const tenantId = user?.tenantId || (req as any).hostTenant?.tenantId || req.body?.tenantId || DEFAULT_TENANT_ID;
+      const requestedTenant =
+        typeof req.body?.tenantId === 'string' ? req.body.tenantId.trim().toLowerCase() : '';
+      if (isPlatformOwner(user) && requestedTenant && !TENANT_ID_PATTERN.test(requestedTenant)) {
+        return res.status(400).json({ success: false, error: 'Invalid tenantId.' });
+      }
+      const tenantId =
+        isPlatformOwner(user) && requestedTenant
+          ? requestedTenant
+          : user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
       const { notifications: rawList, channel = 'WhatsApp' } = req.body;
 
       if (!rawList || !Array.isArray(rawList) || rawList.length === 0) {
@@ -1447,15 +1515,13 @@ app.post(
         });
       }
 
-      // Enforce multi-tenant safety: Ensure all notifications belong to the user's school (unless super_admin)
-      if (user.role !== 'super_admin') {
-        const invalidTenantItem = rawList.find((n: any) => n.tenantId && n.tenantId !== tenantId);
-        if (invalidTenantItem) {
-          return res.status(403).json({
-            success: false,
-            error: `Cross-tenant dispatch forbidden. Item belongs to '${invalidTenantItem.tenantId}', but authenticated user belongs to '${tenantId}'.`,
-          });
-        }
+      // Every notification must belong to the tenant being dispatched for.
+      const invalidTenantItem = rawList.find((n: any) => n.tenantId && n.tenantId !== tenantId);
+      if (invalidTenantItem) {
+        return res.status(403).json({
+          success: false,
+          error: `Cross-tenant dispatch forbidden. Item belongs to '${invalidTenantItem.tenantId}', but this dispatch targets '${tenantId}'.`,
+        });
       }
 
       const gateway = await loadMessagingGatewayConfig(tenantId);
@@ -1545,6 +1611,37 @@ app.post(
         .filter((r) => r.status === 'sent')
         .map((r) => ({ id: r.id, gatewayReceiptId: r.gatewayReceiptId, gatewayProvider: r.gatewayProvider, sentAt: r.sentAt }));
 
+      // Persist the gateway outcome so the outbox state survives a reload and is
+      // consistent across staff devices. Admin SDK writes own a validated tenant.
+      if (firebaseAdminReady && results.length > 0) {
+        try {
+          const batch = admin.firestore().batch();
+          for (const result of results) {
+            const ref = admin.firestore().doc(`notification_outbox/${result.id}`);
+            const storedSnap = await ref.get();
+            if (!storedSnap.exists) continue;
+            const stored = storedSnap.data() || {};
+            if (stored.tenantId !== tenantId) continue;
+            batch.set(
+              ref,
+              {
+                status: result.status === 'sent' ? 'sent' : result.status === 'failed' ? 'failed' : 'pending',
+                retryCount: admin.firestore.FieldValue.increment(1),
+                errorReason: result.errorReason || null,
+                sentAt: result.sentAt || null,
+                gatewayReceiptId: result.gatewayReceiptId || null,
+                gatewayProvider: result.gatewayProvider || null,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+          }
+          await batch.commit();
+        } catch (persistError: any) {
+          console.warn('[NOTIFICATIONS] Could not persist dispatch results:', persistError?.message || persistError);
+        }
+      }
+
       return res.status(200).json({
         success: true,
         gatewayConfigured: true,
@@ -1569,7 +1666,7 @@ app.post(
 // GET /api/tenant/ai-config - Returns sanitized metadata and masked key for the current school
 app.get('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
     const config = getTenantAIConfig(tenantId);
     res.json({
       success: true,
@@ -1585,7 +1682,7 @@ app.get('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, re
 // POST /api/tenant/ai-config - Saves/encrypts school's custom Gemini API key with AES-256-GCM
 app.post('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
     const { apiKey: newKey, preferredModel } = req.body;
 
     if (!newKey || typeof newKey !== 'string' || newKey.trim().length < 8) {
@@ -1609,7 +1706,7 @@ app.post('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (
 // DELETE /api/tenant/ai-config - Clears custom key (reverts to system trial key / fallback)
 app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
     removeTenantApiKey(tenantId);
     console.log(`[TENANT-AI:${tenantId}] Custom Gemini API key removed.`);
 
@@ -1627,7 +1724,7 @@ app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req,
 // POST /api/tenant/ai-config/test - Actively verifies connectivity to Google Gemini API
 app.post('/api/tenant/ai-config/test', requireRole(['admin']), requireTenant, async (req, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId || (req as any).hostTenant?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = resolveTargetTenantId(req);
     const { testKey } = req.body;
 
     let keyToTest = (testKey && typeof testKey === 'string' && testKey.trim().length > 8)
@@ -1813,6 +1910,25 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
 
     let sanitizedWithPrincipal: { uid: string; email: string; temporaryPassword: string } | null = null;
 
+    // Re-provisioning an existing school must never silently reset its
+    // subscription (and thus un-suspend it) or flip it back to active.
+    let existingTenant: Record<string, any> | null = null;
+    if (firebaseAdminReady) {
+      try {
+        const existingSnap = await admin.firestore().doc(`tenants/${tenantId}`).get();
+        if (existingSnap.exists) existingTenant = (existingSnap.data() as Record<string, any>) || null;
+      } catch (error: any) {
+        console.warn('[TENANTS] Could not read the existing tenant document:', error?.message || error);
+      }
+    }
+    const subscriptionForTenant = existingTenant?.subscription || defaultSubscription();
+    const isActiveForTenant =
+      typeof payload.isActive === 'boolean'
+        ? payload.isActive
+        : existingTenant
+        ? existingTenant.isActive !== false
+        : true;
+
     const sanitized = {
       tenantId,
       subdomain,
@@ -1827,8 +1943,8 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
       schoolType: typeof payload.schoolType === 'string' ? payload.schoolType.trim().slice(0, 20) : 'mixed',
       primaryColor: /^#[0-9a-fA-F]{6}$/.test(String(payload.primaryColor)) ? String(payload.primaryColor) : '#059669',
       logoText: typeof payload.logoText === 'string' ? payload.logoText.slice(0, 8) : '',
-      isActive: payload.isActive !== false,
-      subscription: defaultSubscription(),
+      isActive: isActiveForTenant,
+      subscription: subscriptionForTenant,
     };
 
     const dynamicPath = process.env.DYNAMIC_TENANTS_PATH || path.resolve(__dirname, 'src/config/dynamicTenants.json');
@@ -1881,22 +1997,26 @@ app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
     // Create the principal's login so the school is usable the moment it exists.
     if (principalInput) {
       try {
-        const account = await upsertManagedAccount({
-          tenantId: sanitized.tenantId,
-          email: principalEmail,
-          name:
-            typeof principalInput.name === 'string' && principalInput.name.trim()
-              ? principalInput.name.trim().slice(0, 120)
-              : principalEmail,
-          role: 'admin',
-          phone: typeof principalInput.phone === 'string' ? principalInput.phone.trim().slice(0, 30) : '',
-          jobTitle: 'مدير المدرسة (School Principal)',
-          password: typeof principalInput.password === 'string' ? principalInput.password : undefined,
-        });
+        const account = await upsertManagedAccount(
+          {
+            tenantId: sanitized.tenantId,
+            email: principalEmail,
+            name:
+              typeof principalInput.name === 'string' && principalInput.name.trim()
+                ? principalInput.name.trim().slice(0, 120)
+                : principalEmail,
+            role: 'admin',
+            phone: typeof principalInput.phone === 'string' ? principalInput.phone.trim().slice(0, 30) : '',
+            jobTitle: 'مدير المدرسة (School Principal)',
+            password: typeof principalInput.password === 'string' ? principalInput.password : undefined,
+          },
+          { allowExisting: true, resetPassword: true }
+        );
         sanitizedWithPrincipal = { uid: account.uid, email: principalEmail, temporaryPassword: account.password };
       } catch (error: any) {
         console.error('[TENANTS] Could not create the principal account:', error?.message || error);
-        return res.status(502).json({
+        const status = typeof error?.statusCode === 'number' ? error.statusCode : 502;
+        return res.status(status).json({
           success: false,
           error: `المدرسة سُجلت، لكن إنشاء حساب المدير فشل: ${error?.message || 'unknown error'}`,
           tenant: sanitized,
@@ -2104,6 +2224,9 @@ app.post('/api/users', requireRole(['admin', 'registrar']), async (req, res) => 
     if (!EMAIL_PATTERN.test(email)) {
       return res.status(400).json({ success: false, error: 'A valid email address is required.' });
     }
+    if (!TENANT_ID_PATTERN.test(tenantId)) {
+      return res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+    }
     if (!name) {
       return res.status(400).json({ success: false, error: 'name is required.' });
     }
@@ -2147,7 +2270,8 @@ app.post('/api/users', requireRole(['admin', 'registrar']), async (req, res) => 
     });
   } catch (err: any) {
     console.error('[USERS-CREATE-ERROR]', err?.message || err);
-    return res.status(500).json({ success: false, error: `Could not create the account: ${err?.message || 'unknown error'}` });
+    const status = typeof err?.statusCode === 'number' ? err.statusCode : 500;
+    return res.status(status).json({ success: false, error: err?.message || 'Could not create the account.' });
   }
 });
 
@@ -2167,11 +2291,16 @@ app.patch('/api/users/:uid', requireRole(['admin', 'registrar']), async (req, re
       return res.status(404).json({ success: false, error: 'No managed account exists for this member.', code: 'ACCOUNT_NOT_FOUND' });
     }
     const existing = snapshot.data() || {};
-    if (!isPlatformOwner(actor) && existing.tenantId !== actor.tenantId) {
-      return res.status(403).json({ success: false, error: 'Forbidden: the account belongs to another school.' });
+    const patchDenial = accountPatchDenial(actor, existing);
+    if (patchDenial) {
+      return res.status(403).json({ success: false, error: patchDenial });
     }
-    if (existing.role === 'super_admin' && !isPlatformOwner(actor)) {
-      return res.status(403).json({ success: false, error: 'Forbidden: platform owner accounts are protected.' });
+    if (
+      uid === actor.uid &&
+      (body.status === 'inactive' ||
+        (typeof body.role === 'string' && body.role !== existing.role))
+    ) {
+      return res.status(400).json({ success: false, error: 'You cannot demote or deactivate your own account.' });
     }
 
     const updates: Record<string, any> = {};
@@ -2184,11 +2313,10 @@ app.patch('/api/users/:uid', requireRole(['admin', 'registrar']), async (req, re
 
     let roleChanged = false;
     if (typeof body.role === 'string' && body.role !== existing.role) {
-      if (!VALID_ROLES.has(body.role) || body.role === 'super_admin') {
-        return res.status(400).json({ success: false, error: 'role must be one of admin, registrar, teacher, parent.' });
-      }
-      if (!isPlatformOwner(actor) && actor.role !== 'admin' && body.role === 'admin') {
-        return res.status(403).json({ success: false, error: 'Only an administrator can promote a member to administrator.' });
+      const roleDenial = accountRoleChangeDenial(actor, existing, body.role);
+      if (roleDenial) {
+        const status = roleDenial.startsWith('role must be') ? 400 : 403;
+        return res.status(status).json({ success: false, error: roleDenial });
       }
       updates.role = body.role;
       roleChanged = true;
@@ -2200,6 +2328,7 @@ app.patch('/api/users/:uid', requireRole(['admin', 'registrar']), async (req, re
     const nextRole = updates.role || existing.role;
     if (roleChanged) {
       await admin.auth().setCustomUserClaims(uid, { role: nextRole, tenantId: existing.tenantId });
+      await admin.auth().revokeRefreshTokens(uid).catch(() => {});
     }
     if (updates.status === 'inactive') {
       await admin.auth().updateUser(uid, { disabled: true }).catch(() => {});

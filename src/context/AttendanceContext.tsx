@@ -923,6 +923,35 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     };
   }, [firebaseUser, tenantId, currentUserRole, allUsers, authenticatedPhone]);
 
+  // Staff directory: keep the tenant's user list in sync with Firestore so new
+  // accounts appear on every device instead of only in the creating session.
+  useEffect(() => {
+    if (!firebaseUser) return;
+    if (!['admin', 'registrar', 'super_admin'].includes(currentUserRole)) return;
+
+    const usersQuery = query(collection(db, 'users'), where('tenantId', '==', tenantId));
+    const unsubUsers = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const rows: UserProfile[] = [];
+        snapshot.forEach((docSnap) => rows.push({ ...(docSnap.data() as UserProfile), id: docSnap.id }));
+        setAllUsers((prev) => {
+          const ids = new Set(rows.map((u) => u.id));
+          const localOnly = prev.filter(
+            (u) => u.tenantId === tenantId && u.role !== 'super_admin' && !ids.has(u.id)
+          );
+          const fallback = INITIAL_USERS.filter(
+            (u) => u.tenantId === tenantId && !ids.has(u.id) && !localOnly.some((l) => l.id === u.id)
+          );
+          return [...rows, ...localOnly, ...fallback];
+        });
+      },
+      (error) => console.error('[USERS] Could not load staff directory:', error?.code)
+    );
+
+    return () => unsubUsers();
+  }, [firebaseUser, tenantId, currentUserRole]);
+
   const signInWithGoogle = async (useRedirect = false): Promise<UserCredential | undefined> => {
     try {
       if (useRedirect) {
@@ -2170,6 +2199,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       )
     );
 
+    // Persist the decision so it survives a reload and syncs across devices.
+    if (firebaseUser) {
+      void setDoc(
+        doc(db, 'justifications', justificationId),
+        toFirestoreData({
+          tenantId: just.tenantId || tenantId,
+          status,
+          reviewerNotes: notes,
+          reviewedBy: currentUser.name,
+          reviewedAt: now,
+          updatedAt: now,
+        }),
+        { merge: true }
+      ).catch((error) => console.error('[JUSTIFICATIONS] Could not persist review decision:', error));
+    }
+
     // Update affected attendance records
     setAllSessions((prev) =>
       prev.map((sess) => {
@@ -2956,12 +3001,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const deleteStudent = (studentId: string): { success: boolean; message: string } => {
     const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
     if (!target) {
+      return { success: false, message: 'الطالب غير موجود' };
+    }
+
     if (firebaseUser) {
       void deleteDoc(doc(db, 'students', studentId)).catch((error) =>
         console.error('[STUDENTS] Could not delete student:', error)
       );
-    }
-      return { success: false, message: 'الطالب غير موجود' };
     }
 
     setAllStudents((prev) => {

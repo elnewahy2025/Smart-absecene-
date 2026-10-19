@@ -21,8 +21,11 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 
 const testEnv = await initializeTestEnvironment({
@@ -103,6 +106,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     email: 't2@example.com',
     role: 'teacher',
     phone: '+966500000041',
+    assignedClasses: ['class-2a'],
     status: 'active',
   });
   await setDoc(doc(db, 'users', 'parent3'), {
@@ -237,6 +241,32 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     sessionType: 'daily',
     classId: 'class-1b',
     className: '10 / ب',
+    status: 'present',
+    updatedAt: '2026-10-10T08:00:00.000Z',
+  });
+
+  // school-2 mirrors, split across two classes to prove teacher class scope.
+  await setDoc(doc(db, 'attendance_records', 'record4'), {
+    tenantId: 'school-2',
+    sessionId: 'draft2',
+    studentId: 'student3',
+    guardianPhone: '+966500000003',
+    date: '2026-10-10',
+    sessionType: 'daily',
+    classId: 'class-2a',
+    className: '11 / أ',
+    status: 'present',
+    updatedAt: '2026-10-10T08:00:00.000Z',
+  });
+  await setDoc(doc(db, 'attendance_records', 'record5'), {
+    tenantId: 'school-2',
+    sessionId: 'draft2',
+    studentId: 'student4',
+    guardianPhone: '+966500000004',
+    date: '2026-10-10',
+    sessionType: 'daily',
+    classId: 'class-2b',
+    className: '11 / ب',
     status: 'present',
     updatedAt: '2026-10-10T08:00:00.000Z',
   });
@@ -445,6 +475,29 @@ await expectDenied('school-2 teacher cannot read school-1 data', getDoc(doc(teac
 await expectDenied('school-2 parent cannot read school-1 child', getDoc(doc(parent3Db, 'students', 'student1')));
 await expectAllowed('school-2 teacher reads own school', getDoc(doc(teacher2Db, 'students', 'student3')));
 await expectAllowed('school-2 parent reads own child', getDoc(doc(parent3Db, 'students', 'student3')));
+
+// --- User directory is tenant-scoped (global collection, per-school reads) ---
+await expectDenied('school-1 admin cannot read a school-2 user', getDoc(doc(adminDb, 'users', 'parent3')));
+await expectDenied('school-1 registrar cannot read a school-2 user', getDoc(doc(registrarDb, 'users', 'parent3')));
+await expectAllowed('school-1 admin can read a same-school user', getDoc(doc(adminDb, 'users', 'teacher1')));
+await expectDenied('school-1 admin cannot list school-2 users', getDocs(query(collection(adminDb, 'users'), where('tenantId', '==', 'school-2'))));
+await expectAllowed('school-1 admin can list same-school users', getDocs(query(collection(adminDb, 'users'), where('tenantId', '==', 'school-1'))));
+await expectAllowed('platform owner can read any user', getDoc(doc(ownerDb, 'users', 'parent3')));
+
+// --- Teacher writes to per-student mirrors stay inside assigned classes ------
+await expectDenied('teacher cannot write a record for another class', updateDoc(doc(teacher2Db, 'attendance_records', 'record5'), { status: 'absent' }));
+await expectAllowed('teacher can write a record for their own class', updateDoc(doc(teacher2Db, 'attendance_records', 'record4'), { status: 'late' }));
+await expectAllowed('admin can write any school record', updateDoc(doc(admin2Db, 'attendance_records', 'record5'), { status: 'absent' }));
+
+// --- Parents may only file excuses for their own children --------------------
+await expectDenied('parent cannot submit an excuse for another child', addDoc(collection(parentDb, 'justifications'), {
+  tenantId: 'school-1',
+  studentId: 'student2',
+  absenceDate: '2026-10-12',
+  reasonType: 'medical',
+  guardianExplanation: 'Not my child.',
+  status: 'pending',
+}));
 
 // --- Platform owner bypass uses admins/{uid} with role super_admin ----------
 await expectAllowed('platform owner reads any school', getDoc(doc(ownerDb, 'students', 'student3')));

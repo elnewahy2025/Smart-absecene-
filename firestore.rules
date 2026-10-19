@@ -149,6 +149,19 @@ service cloud.firestore {
         ));
     }
 
+    // A parent may only file an excuse for a student who is actually their
+    // child in the same tenant (phone or email on the student record).
+    function isGuardianOfStudentInTenant(studentId, tenantId) {
+      return exists(/databases/$(database)/documents/students/$(studentId))
+        && get(/databases/$(database)/documents/students/$(studentId)).data.tenantId == tenantId
+        && (
+          (get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianPhone', '') != ''
+            && get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianPhone', '') == getUserData().get('phone', ''))
+          || (get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianEmail', '') != ''
+            && get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianEmail', '') == getUserData().get('email', ''))
+        );
+    }
+
     // --- COLLECTION RULES ---
 
     // 1. Admins Collection (Platform Super-Admins)
@@ -164,9 +177,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     // 2. Users Collection (Profile & Role Management)
+    // Reads are always tenant-scoped: a school admin/registrar can never list or
+    // fetch staff from another school, even though the collection is global.
     match /users/{userId} {
-      allow get: if isSignedIn() && (isAdmin() || (tenantAccessAllowed(existing().tenantId) && (request.auth.uid == userId || (hasUserDoc() && getUserData().role in ['admin', 'registrar']))));
-      allow list: if isSignedIn() && (isAdmin() || (hasUserDoc() && tenantAccessAllowed(getUserData().tenantId) && getUserData().role in ['admin', 'registrar']));
+      allow get: if isSignedIn() && (
+        isAdmin() ||
+        request.auth.uid == userId ||
+        (hasUserDoc() && getUserData().role in ['admin', 'registrar'] &&
+          existing().tenantId == getUserData().tenantId &&
+          tenantAccessAllowed(existing().tenantId))
+      );
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        (hasUserDoc() && getUserData().role in ['admin', 'registrar'] &&
+          resource.data.tenantId == getUserData().tenantId &&
+          tenantAccessAllowed(resource.data.tenantId))
+      );
       // New user registration cannot self-grant 'admin' role unless platform admin
       allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
         isAdmin() || (
@@ -245,8 +271,8 @@ service cloud.firestore {
           )
         )
       );
-      allow create: if isSignedIn() && isTenantRole(request.resource.data.tenantId, ['admin', 'registrar', 'teacher']);
-      allow update: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin', 'registrar', 'teacher']);
+      allow create: if isSignedIn() && isTeacherAssigned(request.resource.data);
+      allow update: if isSignedIn() && isTeacherAssigned(resource.data) && isTeacherAssigned(request.resource.data);
       allow delete: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin']);
     }
     // 5. Justifications & Medical Excuses Collection
@@ -260,12 +286,16 @@ service cloud.firestore {
           )
         )
       );
-      // Parents and teachers may only submit a pending excuse; approval is staff-only
+      // Parents and teachers may only submit a pending excuse; approval is staff-only.
+      // A parent must be the guardian of the referenced student in this tenant.
       allow create: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
                     isTenantUser(incoming().tenantId) &&
                     (
                       isTenantRole(incoming().tenantId, ['admin', 'registrar']) ||
-                      incoming().status == 'pending'
+                      (incoming().status == 'pending' && (
+                        isTenantRole(incoming().tenantId, ['teacher']) ||
+                        (getUserData().role == 'parent' && isGuardianOfStudentInTenant(incoming().studentId, incoming().tenantId))
+                      ))
                     );
       // Reviewing (status change to approved/rejected): ONLY Admin and Registrar!
       allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
