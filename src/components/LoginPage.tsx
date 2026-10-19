@@ -4,7 +4,6 @@ import { useAttendance } from '../context/AttendanceContext';
 import {
   Lock,
   Mail,
-  Building2,
   AlertCircle,
   LogIn,
 } from 'lucide-react';
@@ -86,17 +85,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <span>·</span>
             <span>{displayTenant.academicYear}</span>
           </div>
-        </div>
-
-        {/* Security Notice: Automatic Domain Resolution Badge */}
-        <div className="mt-4 mx-4 sm:mx-0 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs text-slate-300">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-400" />
-            <span>بوابة معزولة ومخصصة للمدرسة</span>
-          </div>
-          <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono">
-            {displayTenant.id}
-          </span>
         </div>
       </div>
 
