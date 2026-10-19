@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   normalizeHostname,
   resolveTenantFromHostname,
+  findTenantByAlias,
+  getActiveTenantRegistry,
   TENANT_REGISTRY,
 } from '../config/tenantRegistry';
 
@@ -142,6 +144,63 @@ describe('Tenant Domain Resolution Service', () => {
         const result = resolveTenantFromHostname('andalus.smartschool.com', '?tenant=does-not-exist');
         expect(result.status).toBe('resolved');
         expect(result.tenantId).toBe('school-1');
+      });
+
+      it('accepts friendly aliases such as school-ANDALUS, andalus, school-falah and MAJD-301', () => {
+        expect(resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=school-ANDALUS').tenantId).toBe('school-1');
+        expect(resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=andalus').tenantId).toBe('school-1');
+        expect(resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=school-falah').tenantId).toBe('school-2');
+        expect(resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=MAJD-301').tenantId).toBe('school-majd');
+        expect(resolveTenantFromHostname('smart-absecene-drul.vercel.app', '?tenant=school-majd').tenantId).toBe('school-majd');
+      });
+    });
+
+    describe('tenant aliases and cached registry safety', () => {
+      it('findTenantByAlias tolerates case and a redundant school- prefix', () => {
+        const registry = getActiveTenantRegistry();
+        expect(findTenantByAlias(registry, 'school-ANDALUS')?.tenantId).toBe('school-1');
+        expect(findTenantByAlias(registry, 'SCHOOL-FALAH')?.tenantId).toBe('school-2');
+        expect(findTenantByAlias(registry, 'majd')?.tenantId).toBe('school-majd');
+        expect(findTenantByAlias(registry, 'nope')).toBeUndefined();
+      });
+
+      it('does not let a stale cached tenant erase a verified custom domain', () => {
+        const store = new Map<string, string>([
+          [
+            'school_dynamic_tenants',
+            JSON.stringify([
+              {
+                tenantId: 'school-1',
+                subdomain: 'andalus',
+                nameAr: 'x',
+                nameEn: 'x',
+                code: 'x',
+                cityAr: '',
+                cityEn: '',
+                academicYear: '',
+                currentTerm: '',
+                schoolType: 'boys',
+                primaryColor: '#000000',
+                logoText: '',
+                isActive: true,
+                customDomains: ['andalus.localhost'],
+              },
+            ]),
+          ],
+        ]);
+        vi.stubGlobal('localStorage', {
+          getItem: (key: string) => store.get(key) ?? null,
+          setItem: (key: string, value: string) => store.set(key, value),
+          removeItem: (key: string) => store.delete(key),
+        });
+
+        try {
+          const result = resolveTenantFromHostname('smart-absecene-drul.vercel.app');
+          expect(result.status).toBe('resolved');
+          expect(result.tenantId).toBe('school-1');
+        } finally {
+          vi.unstubAllGlobals();
+        }
       });
     });
   });

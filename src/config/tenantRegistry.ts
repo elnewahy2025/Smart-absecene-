@@ -122,14 +122,27 @@ export function getActiveTenantRegistry(): Record<string, TenantDomainConfig> {
       }
     });
   }
-  // 2. Merge browser localStorage if available on current origin
+  // 2. Merge browser localStorage if available on current origin. Stale cached
+  // entries must never remove a verified domain from a school, otherwise the
+  // primary Vercel host could resolve to the wrong tenant.
   if (typeof localStorage !== 'undefined') {
     try {
       const saved = localStorage.getItem('school_dynamic_tenants');
       if (saved) {
         const dynamicList: TenantDomainConfig[] = JSON.parse(saved);
         dynamicList.forEach((dt) => {
-          registry[dt.tenantId] = dt;
+          if (!dt || !dt.tenantId) return;
+          const base = registry[dt.tenantId];
+          registry[dt.tenantId] = {
+            ...(base || {}),
+            ...dt,
+            customDomains: Array.from(
+              new Set([
+                ...(Array.isArray(base?.customDomains) ? base.customDomains : []),
+                ...(Array.isArray(dt.customDomains) ? dt.customDomains : []),
+              ])
+            ),
+          };
         });
       }
     } catch (e) {
@@ -137,6 +150,44 @@ export function getActiveTenantRegistry(): Record<string, TenantDomainConfig> {
     }
   }
   return registry;
+}
+
+/**
+ * Resolves a human-entered tenant alias (`andalus`, `school-ANDALUS`,
+ * `school-1`, `majd`, `MAJD-301`, ...) against the active registry.
+ * Matching is case-insensitive and tolerant of a redundant `school-` prefix.
+ */
+export function findTenantByAlias(
+  registry: Record<string, TenantDomainConfig>,
+  rawAlias: string | null | undefined
+): TenantDomainConfig | undefined {
+  if (!rawAlias) return undefined;
+  const normalized = rawAlias.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  const candidates = new Set<string>([normalized]);
+  if (normalized.startsWith('school-')) candidates.add(normalized.slice('school-'.length));
+  if (normalized.endsWith('-school')) candidates.add(normalized.slice(0, -'-school'.length));
+
+  const tenants = Object.values(registry);
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const direct = registry[candidate];
+    if (direct) return direct;
+
+    const match = tenants.find(
+      (tenant) =>
+        tenant.tenantId.toLowerCase() === candidate ||
+        tenant.subdomain.toLowerCase() === candidate ||
+        (tenant.code || '').toLowerCase() === candidate ||
+        tenant.nameEn
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') === candidate
+    );
+    if (match) return match;
+  }
+  return undefined;
 }
 
 export type TenantResolutionStatus =
@@ -299,14 +350,7 @@ export function resolveTenantFromHostname(
 
   const queryTenant = extractQueryTenant(search);
   if (queryTenant) {
-    const normalizedQuery = queryTenant.trim().toLowerCase();
-    const matched =
-      activeRegistry[normalizedQuery] ||
-      Object.values(activeRegistry).find(
-        (t) =>
-          t.tenantId.toLowerCase() === normalizedQuery ||
-          t.subdomain.toLowerCase() === normalizedQuery
-      );
+    const matched = findTenantByAlias(activeRegistry, queryTenant);
 
     if (matched) {
       if (isLocalDevHost && typeof localStorage !== 'undefined') {
@@ -331,14 +375,7 @@ export function resolveTenantFromHostname(
   if (isLocalDevHost) {
     const legacyDevTenant = extractQueryTenant(search, 'school');
     if (legacyDevTenant) {
-      const normalizedLegacy = legacyDevTenant.trim().toLowerCase();
-      const legacyMatch =
-        activeRegistry[normalizedLegacy] ||
-        Object.values(activeRegistry).find(
-          (t) =>
-            t.tenantId.toLowerCase() === normalizedLegacy ||
-            t.subdomain.toLowerCase() === normalizedLegacy
-        );
+      const legacyMatch = findTenantByAlias(activeRegistry, legacyDevTenant);
       if (legacyMatch) {
         if (typeof localStorage !== 'undefined') {
           try {

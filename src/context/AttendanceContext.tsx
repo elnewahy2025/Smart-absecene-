@@ -68,6 +68,7 @@ import {
   TenantDomainConfig,
   resolveTenantFromHostname,
   getActiveTenantRegistry,
+  extractQueryTenant,
 } from '../config/tenantRegistry';
 
 import {
@@ -337,6 +338,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     return (typeof localCache !== 'undefined' && localCache.getItem('school_current_tenant_id')) || 'school-1';
   });
   const [authenticatedPhone, setAuthenticatedPhone] = useState('');
+
+  // An explicit ?tenant=/?school= selection in the URL. It is honoured for
+  // visitors and for the platform owner (who may inspect any school); ordinary
+  // school accounts always stay pinned to their own claim tenant.
+  const requestedTenantId = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const search = window.location.search;
+    if (!extractQueryTenant(search) && !extractQueryTenant(search, 'school')) return null;
+    const resolution = resolveTenantFromHostname(window.location.hostname, search);
+    return resolution.status === 'resolved' && resolution.tenantId ? resolution.tenantId : null;
+  }, []);
 
   // Tell the API client which school this session belongs to. The server still
   // authorises every call from the account's own claims, so this only routes
@@ -661,9 +673,37 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       if (user) {
         const userEmail = (user.email || '').toLowerCase();
 
+        // Honour the explicit ?tenant= selection for the platform owner. For any
+        // other account, a link that asks for a different school must not render
+        // that school under the wrong identity: drop the session instead.
+        const applyAccountTenant = (role: UserRole, accountTenantId?: string) => {
+          if (role === 'super_admin') {
+            if (requestedTenantId) setTenantId(requestedTenantId);
+            return;
+          }
+          if (
+            requestedTenantId &&
+            accountTenantId &&
+            accountTenantId !== 'platform' &&
+            requestedTenantId !== accountTenantId
+          ) {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('school_user_authenticated');
+            }
+            void signOut(auth).then(() => {
+              if (typeof window !== 'undefined') window.location.reload();
+            });
+            return;
+          }
+          if (accountTenantId && accountTenantId !== 'platform') {
+            setTenantId(accountTenantId);
+          }
+        };
+
         // 1. If user is the Platform Owner
         if (PLATFORM_OWNER_EMAILS.includes(userEmail)) {
           setUserRole('super_admin');
+          applyAccountTenant('super_admin');
           return;
         }
 
@@ -674,9 +714,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           if (matchedLocalUser.role) {
             setUserRole(matchedLocalUser.role);
           }
-          if (matchedLocalUser.tenantId && matchedLocalUser.tenantId !== 'platform') {
-            setTenantId(matchedLocalUser.tenantId);
-          }
+          applyAccountTenant(matchedLocalUser.role || currentUserRole, matchedLocalUser.tenantId);
           return;
         }
 
@@ -685,12 +723,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           const userSnap = await getDoc(userProfileRef);
           if (userSnap.exists()) {
             const data = userSnap.data();
-            if (data.tenantId) {
-              setTenantId(data.tenantId);
-            }
             if (data.role) {
               setUserRole(data.role as UserRole);
             }
+            applyAccountTenant((data.role as UserRole) || currentUserRole, data.tenantId);
             setAuthenticatedPhone(data.phone || '');
             setAllUsers((prev) => {
               const profile = {
@@ -728,7 +764,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [requestedTenantId]);
 
   // Sync all entities from Firestore in real-time when authenticated
   useEffect(() => {
