@@ -1,6 +1,6 @@
 import React from 'react';
 import { TenantSchoolProfile } from '../../types/attendance';
-import { MapPin, Phone, Mail, Globe, AlertTriangle, Flag, Sparkles } from 'lucide-react';
+import { MapPin, Phone, Mail, Globe, AlertTriangle, Flag } from 'lucide-react';
 import {
   COUNTRIES_LIST,
   findCountryByName,
@@ -16,19 +16,6 @@ interface Props {
   onChange: (updates: Partial<TenantSchoolProfile>) => void;
   disabled?: boolean;
 }
-
-const QUICK_COUNTRIES = [
-  { name: 'السعودية', dial: '+966', flag: '🇸🇦' },
-  { name: 'مصر', dial: '+20', flag: '🇪🇬' },
-  { name: 'الإمارات', dial: '+971', flag: '🇦🇪' },
-  { name: 'الكويت', dial: '+965', flag: '🇰🇼' },
-  { name: 'قطر', dial: '+974', flag: '🇶🇦' },
-  { name: 'عمان', dial: '+968', flag: '🇴🇲' },
-  { name: 'البحرين', dial: '+973', flag: '🇧🇭' },
-  { name: 'الأردن', dial: '+962', flag: '🇯🇴' },
-  { name: 'العراق', dial: '+964', flag: '🇮🇶' },
-  { name: 'المغرب', dial: '+212', flag: '🇲🇦' },
-];
 
 export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const { lang } = useAttendance();
@@ -150,61 +137,19 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
             </div>
           </div>
         </div>
-
-        {/* Quick Country Presets */}
-        <div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1 font-medium">
-            <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-            <span>{lang === 'ar' ? 'اختيار سريع للدول الشائعة:' : 'Quick select for common countries:'}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {QUICK_COUNTRIES.map((qc) => {
-              const isSelected =
-                currentCountry.includes(qc.name) ||
-                (matchedCountry && matchedCountry.nameAr.includes(qc.name));
-              return (
-                <button
-                  key={qc.dial}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => {
-                    const fullMatch = COUNTRIES_LIST.find((c) => c.dialCode === qc.dial);
-                    if (fullMatch) {
-                      handleCountryChange(fullMatch.nameAr);
-                    } else {
-                      handleCountryChange(qc.name);
-                      handleDialCodeChange(qc.dial);
-                    }
-                  }}
-                  className={`px-2 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs font-bold'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <span>{qc.flag}</span>
-                  <span>{qc.name}</span>
-                  <span className="font-mono text-[10px] opacity-80" dir="ltr">
-                    {qc.dial}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       {/* Address Details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{preset.regionLabelAr}</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.regionLabelAr : 'Administrative Region:'}</label>
           <input
             type="text"
             disabled={disabled}
             value={address.region || ''}
             onChange={(e) => handleAddressChange('region', e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={preset.regionPlaceholderAr}
+            placeholder={lang === 'ar' ? preset.regionPlaceholderAr : 'Region / governorate / province'}
           />
         </div>
 
@@ -216,7 +161,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
             value={address.city || ''}
             onChange={(e) => handleAddressChange('city', e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={preset.cityPlaceholderAr}
+            placeholder={lang === 'ar' ? preset.cityPlaceholderAr : 'City / town'}
           />
         </div>
 
@@ -228,7 +173,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
             value={address.district || ''}
             onChange={(e) => handleAddressChange('district', e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={preset.districtPlaceholderAr}
+            placeholder={lang === 'ar' ? preset.districtPlaceholderAr : 'District / neighborhood'}
           />
         </div>
 

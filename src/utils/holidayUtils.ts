@@ -242,6 +242,16 @@ export const countActiveSchoolDays = (
   return count;
 };
 
+export const getHolidayDisplayName = (holiday: OfficialHoliday, lang: 'ar' | 'en' = 'ar'): string => {
+  if (lang === 'en') return holiday.nameEn?.trim() || holiday.nameAr;
+  return holiday.nameAr;
+};
+
+export const getHolidaySecondaryName = (holiday: OfficialHoliday, lang: 'ar' | 'en' = 'ar'): string | undefined => {
+  if (lang === 'en') return holiday.nameAr || undefined;
+  return holiday.nameEn?.trim() || undefined;
+};
+
 export const getHolidayTypeLabel = (type: HolidayType, lang: 'ar' | 'en' = 'ar'): string => {
   switch (type) {
     case 'national':

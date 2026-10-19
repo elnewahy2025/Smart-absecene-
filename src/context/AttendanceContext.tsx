@@ -1477,6 +1477,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `تم إنشاء حساب مستخدم جديد (${userData.name}) بدور [${userData.role}] وتعيين الصلاحيات`,
+      detailsEn: `A new user account (${userData.name}) was created with the role [${userData.role}] and permissions were assigned`,
     });
 
     return {
@@ -1533,6 +1534,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `تم تعديل بيانات المستخدم وصلاحياته (${updates.name || userId})`,
+      detailsEn: `User data and permissions were updated (${updates.name || userId})`,
     });
 
     if (serverError) {
@@ -1581,6 +1583,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `تم حذف حساب المستخدم (${target.name}) [${target.role}] من المدرسة`,
+      detailsEn: `User account (${target.name}) [${target.role}] was deleted from the school`,
     });
 
     return { success: true, message: 'تم حذف حساب المستخدم بنجاح' };
@@ -1614,6 +1617,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `تم تدوين واقعة سلوكية (${incident.type === 'positive' ? 'إيجابية' : 'مخالفة'}): ${incident.title} للطالب ${incident.studentName}`,
+      detailsEn: `A behaviour incident was recorded (${incident.type === 'positive' ? 'Positive' : 'Violation'}): ${incident.title} for student ${incident.studentName}`,
     });
 
     return newIncident;
@@ -1777,6 +1781,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         studentIds && studentIds.length > 0
           ? `التحضير السريع (Quick Mark): تم تعيين ${studentIds.length} طالب كمجموعة إلى حالة 'حاضر' افتراضياً.`
           : `التحضير السريع (Quick Mark): تم تعيين جميع طلاب الكشف كـ 'حاضر' لتسريع الرصد وحصر الغياب يدوياً.`,
+      detailsEn:
+        studentIds && studentIds.length > 0
+          ? `Quick Mark: ${studentIds.length} students were assigned to the 'Present' status as a group by default.`
+          : `Quick Mark: All students in the roster were set to 'Present' to speed up marking and limit absences to manual entry.`,
     });
 
     return {
@@ -1870,6 +1878,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `تم اعتماد وإرسال كشف الحضور (${targetSession.subject || 'حضور يومي'}) للصف ${targetSession.className} وتوليد ${newNotifications.length} إشعار ولي أمر تلقائي.`,
+      detailsEn: `The attendance sheet (${targetSession.subject || 'Daily Attendance'}) for class ${targetSession.className} was approved and submitted, and ${newNotifications.length} automatic guardian notifications were generated.`,
     });
 
     return {
@@ -1913,6 +1922,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `إعادة فتح كشف معتمد (${targetSession.className} - ${targetSession.subject || 'حضور يومي'}). سبب الإعادة: "${reason}"`,
+      detailsEn: `Reopening an approved attendance sheet (${targetSession.className} - ${targetSession.subject || 'Daily Attendance'}). Reopening reason: "${reason}"`,
       previousValue: 'معتمد (Submitted)',
       newValue: 'مُعاد فتحه (Reopened)',
     });
@@ -1973,6 +1983,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `إنشاء كشف جديد (مسودة): ${newSession.subject} للصف ${className}`,
+      detailsEn: `Creating a new attendance sheet (draft): ${newSession.subject} for class ${className}`,
     });
 
     return newSession;
@@ -2079,6 +2090,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `تقديم عذر غياب جديد للطالب ${student?.fullName} بتاريخ ${absenceDate}`,
+      detailsEn: `Submitting a new absence excuse for student ${student?.fullName} dated ${absenceDate}`,
     });
 
     return newJust;
@@ -2142,6 +2154,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `اعتماد قرار العذر للطالب ${just.studentName}: ${status === 'approved' ? 'موافقة وقبول العذر' : 'رفض العذر'}. ملاحظات: ${notes}`,
+      detailsEn: `Excuse decision for student ${just.studentName}: ${status === 'approved' ? 'Excuse approved and accepted' : 'Excuse rejected'}. Notes: ${notes}`,
       previousValue: 'قيد المراجعة',
       newValue: status === 'approved' ? 'معتمد' : 'مرفوض',
     });
@@ -2298,6 +2311,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `إعادة إرسال إشعار ولي الأمر عبر (${target.channel}) للطالب (${target.studentName}) - رقم الإيصال: ${receipt?.gatewayReceiptId || 'بدون إيصال'}.`,
+        detailsEn: `Resending the guardian notification via (${target.channel}) for student (${target.studentName}) - Receipt number: ${receipt?.gatewayReceiptId || 'No receipt'}.`,
       });
 
       return true;
@@ -2396,6 +2410,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `إعادة محاولة إرسال الإشعارات المتعثرة (${failedItems.length} إشعار): تم إرسال ${sentCount} بنجاح عبر بوابة المشغل.`,
+        detailsEn: `Retrying failed notifications (${failedItems.length} notifications): ${sentCount} sent successfully via the operator gateway.`,
       });
     } catch (err) {
       console.error('Bulk notification retry failed:', err);
@@ -2563,6 +2578,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `إرسال وبث رسائل مخصصة لأولياء الأمور: تم إدراج ${newItems.length} رسالة في الطابور عبر (${params.channel}).`,
+        detailsEn: `Sending and broadcasting custom messages to guardians: ${newItems.length} messages were queued via (${params.channel}).`,
       });
     }
 
@@ -2632,6 +2648,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `إرسال إنذار غياب تراكمي لولي أمر الطالب ${std.fullName}: ${tierLabel}.`,
+      detailsEn: `Sending a cumulative absence warning to the guardian of student ${std.fullName}: ${tierLabel}.`,
     });
 
     return true;
@@ -2737,6 +2754,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `استيراد معتمد لقائمة الطلاب: نجح استيراد ${imported} طالب جديد، وتم استبعاد ${duplicates} سجل مكرر لمنع ازدواجية البيانات.`,
+        detailsEn: `Approved student list import: ${imported} new students imported successfully, and ${duplicates} duplicate records were excluded to prevent data duplication.`,
       });
     }
 
@@ -2775,6 +2793,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `إضافة قيد طالب جديد (${newStudent.fullName} - فصل ${newStudent.className}) بدون الحاجة لإعادة رفع القوائم.`,
+      detailsEn: `Adding a new student record (${newStudent.fullName} - Class ${newStudent.className}) without needing to re-upload the lists.`,
     });
 
     return newStudent;
@@ -2800,6 +2819,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `تحديث بيانات الطالب (${updates.fullName || studentId}) في السجل المدرسي`,
+      detailsEn: `Updating student data (${updates.fullName || studentId}) in the school record`,
     });
   };
 
@@ -2843,6 +2863,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `نقل رسمي للطالب (${target.fullName}) إلى (${details.destinationSchool}). تم إخفاء الطالب من كشوف الحضور اليومية مع حفظ بياناته في أرشيف النقل.`,
+      detailsEn: `Official transfer of student (${target.fullName}) to (${details.destinationSchool}). The student was hidden from daily attendance sheets while their data was preserved in the transfer archive.`,
     });
   };
 
@@ -2882,6 +2903,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `إلغاء إجراء النقل واستعادة قيد الطالب (${target.fullName}) إلى مقاعد الدراسة النشطة.`,
+      detailsEn: `Cancelling the transfer and restoring student (${target.fullName}) to active enrollment.`,
     });
   };
 
@@ -2912,6 +2934,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerRole: currentUserRole,
       performerName: currentUser.name,
       details: `حذف نهائي لسجل الطالب (${target.fullName} - سجل مدني ${target.nationalId}) من المدرسة.`,
+      detailsEn: `Permanent deletion of the student record (${target.fullName} - Civil ID ${target.nationalId}) from the school.`,
     });
 
     return { success: true, message: 'تم حذف سجل الطالب نهائياً' };
@@ -2944,6 +2967,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: 'تحديث قواعد وإعدادات المدرسة (حدود الغياب والتأخر وإشعارات الرسائل).',
+      detailsEn: 'Updating school rules and settings (absence and late thresholds and message notifications).',
     });
   };
 
@@ -3013,6 +3037,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: 'تحديث بيانات المدرسة الرسمية، القيادة المدرسية، التقويم الدراسي، ونقاط التجمع للطوارئ.',
+      detailsEn: 'Updating official school data, school leadership, academic calendar, and emergency assembly points.',
     });
   };
 
@@ -3097,6 +3122,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerName: currentUser.name,
       performerRole: currentUser.role,
       details: `تحديث بيانات وبوابات المراسلة والواتساب (رقم الواتساب: ${updatedGateway.whatsappPhoneNumber}، وضع الخدمة: ${updatedGateway.whatsappServiceMode}، مزود SMS: ${updatedGateway.smsProvider}) بواسطة مالك المنصة.`,
+      detailsEn: `Updating messaging and WhatsApp gateway data (WhatsApp number: ${updatedGateway.whatsappPhoneNumber}, service mode: ${updatedGateway.whatsappServiceMode}, SMS provider: ${updatedGateway.smsProvider}) by the platform owner.`,
     });
 
     return {
@@ -3116,6 +3142,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `تحديث إعدادات النشرة الصباحية اليومية (وقت الإرسال: ${updated.scheduledTime} ص، حالة التفعيل: ${updated.enabled ? 'مفعلة' : 'معطلة'}، عدد المستلمين: ${updated.recipients.length}).`,
+        detailsEn: `Updating daily morning digest settings (send time: ${updated.scheduledTime} AM, activation status: ${updated.enabled ? 'Enabled' : 'Disabled'}, number of recipients: ${updated.recipients.length}).`,
       });
       return updated;
     });
@@ -3222,6 +3249,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           performerName: currentUser.name,
           performerRole: currentUser.role,
           details: `فشل إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم): ${reason}`,
+          detailsEn: `Failed to send the daily morning digest to school leadership (${effectiveRecipients.length} recipients): ${reason}`,
         });
         return { success: false, message: reason, digestItem: failedDigest };
       }
@@ -3248,6 +3276,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم) متضمنة ${digest.anomaliesCount} شذوذات و${digest.pendingJustificationsCount} أعذار معلقة و${digest.highRiskStudentsCount} طلاب في النطاق الحرج.`,
+        detailsEn: `Sending the daily morning digest to school leadership (${effectiveRecipients.length} recipients) including ${digest.anomaliesCount} anomalies, ${digest.pendingJustificationsCount} pending excuses, and ${digest.highRiskStudentsCount} students in the critical range.`,
       });
 
       return {
@@ -3274,6 +3303,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `فشل إرسال النشرة الصباحية اليومية إلى قيادات المدرسة (${effectiveRecipients.length} مستلم): ${reason}`,
+        detailsEn: `Failed to send the daily morning digest to school leadership (${effectiveRecipients.length} recipients): ${reason}`,
       });
 
       return {
@@ -3473,6 +3503,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         performerName: currentUser.name,
         performerRole: currentUser.role,
         details: `تأسيس مدرسة جديدة بالمنصة: ${input.nameAr} (${input.code}) بنطاق فرعي (${trimmedSubdomain}). تم إنشاء حساب المدير: ${input.principalEmail}`,
+        detailsEn: `Establishing a new school on the platform: ${input.nameAr} (${input.code}) with subdomain (${trimmedSubdomain}). Principal account created: ${input.principalEmail}`,
       });
 
       const accessUrl =

@@ -17,6 +17,8 @@ import {
 import {
   DEFAULT_WEEKEND_DAYS,
   DEFAULT_OFFICIAL_HOLIDAYS,
+  getHolidayDisplayName,
+  getHolidaySecondaryName,
   getHolidayTypeLabel,
 } from '../../utils/holidayUtils';
 import { SmartHolidayImportModal } from './SmartHolidayImportModal';
@@ -481,9 +483,11 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                   return (
                     <tr key={holiday.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2.5 px-3">
-                        <div className="font-bold text-slate-900 dark:text-slate-100">{holiday.nameAr}</div>
-                        {holiday.nameEn && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-sans">{holiday.nameEn}</span>
+                        <div className="font-bold text-slate-900 dark:text-slate-100">{getHolidayDisplayName(holiday, lang)}</div>
+                        {getHolidaySecondaryName(holiday, lang) && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-sans" dir={lang === 'en' ? 'rtl' : 'ltr'}>
+                            {getHolidaySecondaryName(holiday, lang)}
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">

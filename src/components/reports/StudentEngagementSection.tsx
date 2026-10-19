@@ -14,6 +14,7 @@ interface StudentEngagementMetrics {
   streakDays: number;
   badgeLevel: 'diamond' | 'gold' | 'silver' | 'bronze' | 'starter';
   badgeTitleAr: string;
+  badgeTitleEn: string;
   badgeColor: string;
   points: number;
 }
@@ -50,23 +51,28 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
 
     let badgeLevel: StudentEngagementMetrics['badgeLevel'] = 'starter';
     let badgeTitleAr = 'بداية الالتزام';
+    let badgeTitleEn = 'Commitment Start';
     let badgeColor = 'bg-slate-100 text-slate-700 border-slate-300';
 
     if (std.totalAbsences === 0 && std.totalLates === 0 && std.attendanceRate >= 99) {
       badgeLevel = 'diamond';
       badgeTitleAr = 'وسام المثالية الماسية';
+      badgeTitleEn = 'Diamond Excellence Badge';
       badgeColor = 'bg-cyan-50 text-cyan-800 border-cyan-300';
     } else if (std.attendanceRate >= 95 && std.totalAbsences <= 1) {
       badgeLevel = 'gold';
       badgeTitleAr = 'وسام الانضباط الذهبي';
+      badgeTitleEn = 'Gold Discipline Badge';
       badgeColor = 'bg-amber-50 text-amber-800 border-amber-300';
     } else if (std.attendanceRate >= 90 && std.totalAbsences <= 2) {
       badgeLevel = 'silver';
       badgeTitleAr = 'وسام المواظبة الفضي';
+      badgeTitleEn = 'Silver Attendance Badge';
       badgeColor = 'bg-slate-100 text-slate-800 border-slate-300';
     } else if (std.attendanceRate >= 85) {
       badgeLevel = 'bronze';
       badgeTitleAr = 'وسام الالتزام البرونزي';
+      badgeTitleEn = 'Bronze Commitment Badge';
       badgeColor = 'bg-orange-50 text-orange-800 border-orange-300';
     }
 
@@ -75,6 +81,7 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
       streakDays,
       badgeLevel,
       badgeTitleAr,
+      badgeTitleEn,
       badgeColor,
       points,
     };
@@ -141,8 +148,10 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
             <Medal className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-cyan-800 font-semibold block">سلسلة مثالية (20+ يوم)</span>
-            <span className="text-xl font-bold text-cyan-950 font-mono">{perfectStreakCount} طالب</span>
+            <span className="text-[11px] text-cyan-800 font-semibold block">{lang === 'ar' ? 'سلسلة مثالية (20+ يوم)' : 'Perfect streak (20+ days)'}</span>
+            <span className="text-xl font-bold text-cyan-950 font-mono">
+              {perfectStreakCount} {lang === 'ar' ? 'طالب' : perfectStreakCount === 1 ? 'student' : 'students'}
+            </span>
           </div>
         </div>
 
@@ -151,8 +160,10 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
             <Trophy className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-amber-800 font-semibold block">الحاصلون على وسام التميز</span>
-            <span className="text-xl font-bold text-amber-950 font-mono">{diamondCount + goldCount} طالب</span>
+            <span className="text-[11px] text-amber-800 font-semibold block">{lang === 'ar' ? 'الحاصلون على وسام التميز' : 'Excellence badge holders'}</span>
+            <span className="text-xl font-bold text-amber-950 font-mono">
+              {diamondCount + goldCount} {lang === 'ar' ? 'طالب' : diamondCount + goldCount === 1 ? 'student' : 'students'}
+            </span>
           </div>
         </div>
 
@@ -161,7 +172,7 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
             <Star className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-primary font-semibold block">نقاط التحفيز المكتسبة</span>
+            <span className="text-[11px] text-primary font-semibold block">{lang === 'ar' ? 'نقاط التحفيز المكتسبة' : 'Motivation points earned'}</span>
             <span className="text-xl font-bold text-primary font-mono">
               {engagementList.reduce((acc, i) => acc + i.points, 0).toLocaleString()}
             </span>
@@ -171,7 +182,9 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
 
       {/* Roster Streaks & Progress Bars */}
       <div className="space-y-2">
-        <h4 className="font-bold text-xs text-slate-800">قائمة المتصدرين في سلاسل الحضور المتصل:</h4>
+        <h4 className="font-bold text-xs text-slate-800">
+          {lang === 'ar' ? 'قائمة المتصدرين في سلاسل الحضور المتصل:' : 'Leaderboard of continuous attendance streaks:'}
+        </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
           {filteredList
             .sort((a, b) => b.streakDays - a.streakDays)
@@ -184,12 +197,12 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
                   <div>
                     <span className="font-bold text-slate-900 text-xs block">{item.student.fullName}</span>
                     <span className="text-[11px] text-slate-500">
-                      {item.student.className} · رقم {item.student.studentNumber}
+                      {item.student.className} · {lang === 'ar' ? 'رقم' : 'No.'} {item.student.studentNumber}
                     </span>
                   </div>
 
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${item.badgeColor}`}>
-                    {item.badgeTitleAr}
+                    {lang === 'ar' ? item.badgeTitleAr : item.badgeTitleEn}
                   </span>
                 </div>
 
@@ -198,9 +211,14 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="flex items-center gap-1 text-slate-600 font-medium">
                       <Zap className="w-3 h-3 text-amber-500" />
-                      <span>سلسلة الحضور: <strong className="text-slate-900 font-mono">{item.streakDays}</strong> يوم</span>
+                      <span>
+                        {lang === 'ar' ? 'سلسلة الحضور:' : 'Attendance streak:'}{' '}
+                        <strong className="text-slate-900 font-mono">{item.streakDays}</strong> {lang === 'ar' ? 'يوم' : item.streakDays === 1 ? 'day' : 'days'}
+                      </span>
                     </span>
-                    <span className="font-mono text-primary font-bold">{item.points} نقطة</span>
+                    <span className="font-mono text-primary font-bold">
+                      {item.points} {lang === 'ar' ? 'نقطة' : 'pts'}
+                    </span>
                   </div>
 
                   <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">

@@ -23,6 +23,29 @@ interface ChatMessage {
   modelUsed?: string;
 }
 
+const formatChatTime = (lang: 'ar' | 'en') =>
+  new Date().toLocaleTimeString(lang === 'ar' ? 'ar-SA' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+
+const buildWelcomeMessage = (lang: 'ar' | 'en', tenantName: string): string =>
+  lang === 'ar'
+    ? `أهلاً بك في المساعد الذكي لنظام الحضور المدرسي (${tenantName})! أنا جاهز لمساعدتك في:
+• صياغة رسائل وإشعارات أولياء الأمور وحلول الغياب المتكرر.
+• تحليل لوائح السلوك والمواظبة الوزارية ونسب الحرمان.
+• خطط تشجيعية لتحسين نسبة حضور الفصول الدراسية.
+
+كيف يمكنني خدمتك اليوم؟`
+    : `Welcome to the smart assistant for the school attendance system (${tenantName})! I'm ready to help you with:
+• Drafting guardian messages and notifications, and solutions for chronic absence.
+• Analyzing ministry behavior and attendance regulations and denial rates.
+• Encouragement plans to improve classroom attendance rates.
+
+How can I help you today?`;
+
+const buildResetMessage = (lang: 'ar' | 'en', title: { titleAr: string; titleEn: string }): string =>
+  lang === 'ar'
+    ? `تم بدء محادثة جديدة مع ${title.titleAr}. كيف أساعدك؟`
+    : `A new conversation with ${title.titleEn} has started. How can I help you?`;
+
 export const GeminiChatbotView: React.FC = () => {
   const { lang, currentTenant } = useAttendance();
 
@@ -34,13 +57,8 @@ export const GeminiChatbotView: React.FC = () => {
     {
       id: 'welcome-1',
       role: 'assistant',
-      content: `أهلاً بك في المساعد الذكي لنظام الحضور المدرسي (${currentTenant.name})! أنا جاهز لمساعدتك في:
-• صياغة رسائل وإشعارات أولياء الأمور وحلول الغياب المتكرر.
-• تحليل لوائح السلوك والمواظبة الوزارية ونسب الحرمان.
-• خطط تشجيعية لتحسين نسبة حضور الفصول الدراسية.
-
-كيف يمكنني خدمتك اليوم؟`,
-      timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+      content: buildWelcomeMessage(lang, currentTenant.name),
+      timestamp: formatChatTime(lang),
       modelUsed: 'gemini-2.5-flash',
     },
   ]);
@@ -59,6 +77,20 @@ export const GeminiChatbotView: React.FC = () => {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  // Keep the intro assistant message in sync with the active language while no user turn exists yet.
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0].role !== 'assistant') return prev;
+      const isReset = prev[0].id.startsWith('reset-');
+      const content = isReset
+        ? buildResetMessage(lang, roleConfigs[activeRole])
+        : buildWelcomeMessage(lang, currentTenant.name);
+      if (prev[0].content === content) return prev;
+      return [{ ...prev[0], content, timestamp: formatChatTime(lang) }];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+
   // Model preference mapped per role:
   // - gemini-2.5-pro for complex policy analysis and strategic planning
   // - gemini-2.5-flash for general counselor tasks
@@ -76,10 +108,16 @@ export const GeminiChatbotView: React.FC = () => {
       modelName: 'gemini-2.5-flash',
       icon: <BookOpen className="w-4 h-4 text-emerald-600" />,
       descAr: 'استشارات تربوية، حلول الغياب المتكرر، وشراكة الأسرة مع المدرسة',
+      descEn: 'Educational counseling, chronic absence solutions, and family-school partnership',
       quickPrompts: [
         'كيف نتعامل مع طالب تجاوز 6 أيام غياب متفرقة دون مبرر؟',
         'صياغة خطاب رسمي ودّي لولي أمر طالب متكرر التأخر الصباحي',
         'ما هي خطوات إحالة الطالب للموجه الطلابي حسب لائحة السلوك والمواظبة؟',
+      ],
+      quickPromptsEn: [
+        'How do we handle a student who exceeded 6 scattered unjustified absence days?',
+        'Draft a formal, friendly letter to the guardian of a student with repeated morning tardiness',
+        'What are the steps to refer a student to the counselor per the behavior and attendance bylaw?',
       ],
     },
     teacher_fast: {
@@ -88,10 +126,16 @@ export const GeminiChatbotView: React.FC = () => {
       modelName: 'gemini-2.5-flash',
       icon: <Zap className="w-4 h-4 text-amber-500" />,
       descAr: 'صياغة رسائل SMS سريعة، ملخصات الحصة، نصائح إدارة الوقت',
+      descEn: 'Draft quick SMS messages, lesson summaries, and time-management tips',
       quickPrompts: [
         'صغ رسالة SMS موجزة لولي أمر تفيد بغياب الطالب عن الحصة الأولى',
         'رسالة تذكير قصيرة لأولياء الأمور بأهمية حضور الطابور الصباحي غدًا',
         'طريقة سريعة لتفقد الحضور في بداية الحصة خلال دقيقتين فقط',
+      ],
+      quickPromptsEn: [
+        'Write a concise SMS to a guardian noting the student missed the first period',
+        'A short reminder to guardians about attending tomorrow morning assembly',
+        'A quick way to check attendance at the start of a period in just two minutes',
       ],
     },
     policy_analyst: {
@@ -100,10 +144,16 @@ export const GeminiChatbotView: React.FC = () => {
       modelName: 'gemini-2.5-pro',
       icon: <Brain className="w-4 h-4 text-indigo-600" />,
       descAr: 'تحليل أعمق لاتجاهات الغياب، أيام ما قبل الإجازات، ومبادرات التحفيز',
+      descEn: 'Deeper analysis of absence trends, pre-holiday days, and motivation initiatives',
       quickPrompts: [
         'خطة متكاملة لمكافحة ظاهرة الغياب الجماعي في الأسبوع الميت قبل الإجازات',
         'تحليل إحصائي مقترح لقياس ارتباط الحضور بالمستوى التحصيلي للطلاب',
         'تصميم مسابقة الحضور المثالي الشهرية بين فصول المدرسة ومعاييرها',
+      ],
+      quickPromptsEn: [
+        'A comprehensive plan to combat mass absence during the dead week before holidays',
+        'A proposed statistical analysis to measure the link between attendance and achievement',
+        'Design a monthly perfect-attendance competition between school classes and its criteria',
       ],
     },
   };
@@ -116,7 +166,7 @@ export const GeminiChatbotView: React.FC = () => {
       id: `msg-${Date.now()}`,
       role: 'user',
       content: textToSend.trim(),
-      timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: formatChatTime(lang),
     };
 
     // Optimistically add user message
@@ -138,7 +188,7 @@ export const GeminiChatbotView: React.FC = () => {
       });
 
       if (!res.ok) {
-        throw new Error(`خطأ من الخادم: ${res.status}`);
+        throw new Error(lang === 'ar' ? `خطأ من الخادم: ${res.status}` : `Server error: ${res.status}`);
       }
 
       const data = await res.json();
@@ -146,8 +196,8 @@ export const GeminiChatbotView: React.FC = () => {
       const assistantMessage: ChatMessage = {
         id: `msg-reply-${Date.now()}`,
         role: 'assistant',
-        content: data.reply || 'تمت معالجة الطلب بنجاح.',
-        timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        content: data.reply || (lang === 'ar' ? 'تمت معالجة الطلب بنجاح.' : 'The request was processed successfully.'),
+        timestamp: formatChatTime(lang),
         modelUsed: data.modelUsed || preferredModel,
       };
 
@@ -157,8 +207,11 @@ export const GeminiChatbotView: React.FC = () => {
       const errorMessage: ChatMessage = {
         id: `msg-err-${Date.now()}`,
         role: 'assistant',
-        content: 'عذراً، حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.',
-        timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        content:
+          lang === 'ar'
+            ? 'عذراً، حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.'
+            : 'Sorry, an error occurred while connecting to the AI service. Please try again.',
+        timestamp: formatChatTime(lang),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -177,8 +230,8 @@ export const GeminiChatbotView: React.FC = () => {
       {
         id: `reset-${Date.now()}`,
         role: 'assistant',
-        content: `تم بدء محادثة جديدة مع ${roleConfigs[activeRole].titleAr}. كيف أساعدك؟`,
-        timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        content: buildResetMessage(lang, roleConfigs[activeRole]),
+        timestamp: formatChatTime(lang),
         modelUsed: roleConfigs[activeRole].modelName,
       },
     ]);
@@ -199,7 +252,7 @@ export const GeminiChatbotView: React.FC = () => {
               {lang === 'ar' ? 'المساعد المدرسي الذكي المدعوم بـ Gemini' : 'Gemini School Assistant'}
             </h3>
             <p className="text-[11px] text-slate-500">
-              {currentRoleCfg.descAr}
+              {lang === 'ar' ? currentRoleCfg.descAr : currentRoleCfg.descEn}
             </p>
           </div>
         </div>
@@ -220,7 +273,11 @@ export const GeminiChatbotView: React.FC = () => {
                 }`}
               >
                 {cfg.icon}
-                <span className="hidden sm:inline">{cfg.titleAr.split(' ')[0]} {cfg.titleAr.split(' ')[1]}</span>
+                <span className="hidden sm:inline">
+                  {lang === 'ar'
+                    ? `${cfg.titleAr.split(' ')[0]} ${cfg.titleAr.split(' ')[1]}`
+                    : cfg.titleEn.split(' ').slice(0, 2).join(' ')}
+                </span>
                 <span className="text-[10px] font-mono text-slate-400">({cfg.modelName.replace('gemini-', '')})</span>
               </button>
             );
@@ -242,7 +299,7 @@ export const GeminiChatbotView: React.FC = () => {
           <Sparkles className="w-3 h-3 text-emerald-600" />
           {lang === 'ar' ? 'اقتراحات سريعة:' : 'Quick:'}
         </span>
-        {currentRoleCfg.quickPrompts.map((prompt, i) => (
+        {(lang === 'ar' ? currentRoleCfg.quickPrompts : currentRoleCfg.quickPromptsEn).map((prompt, i) => (
           <button
             key={i}
             onClick={() => handleSendMessage(prompt)}
@@ -264,7 +321,7 @@ export const GeminiChatbotView: React.FC = () => {
             >
               {isAssistant && (
                 <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 text-xs font-bold shadow-xs">
-                  ج
+                  {lang === 'ar' ? 'ج' : 'G'}
                 </div>
               )}
 
@@ -278,7 +335,7 @@ export const GeminiChatbotView: React.FC = () => {
                 {/* Message Header info */}
                 <div className="flex items-center justify-between gap-4 mb-1.5 pb-1 border-b border-slate-100/30 text-[10px] opacity-75">
                   <span className="font-semibold">
-                    {isAssistant ? currentRoleCfg.titleAr : lang === 'ar' ? 'المستخدم' : 'You'}
+                    {isAssistant ? (lang === 'ar' ? currentRoleCfg.titleAr : currentRoleCfg.titleEn) : lang === 'ar' ? 'المستخدم' : 'You'}
                   </span>
                   <div className="flex items-center gap-1.5 font-mono">
                     {msg.modelUsed && (
@@ -328,7 +385,7 @@ export const GeminiChatbotView: React.FC = () => {
         {isLoading && (
           <div className="flex items-start gap-3 justify-start">
             <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 text-xs font-bold animate-pulse">
-              ج
+              {lang === 'ar' ? 'ج' : 'G'}
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl rounded-tr-xs p-3 text-xs text-slate-500 shadow-xs flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-bounce" />

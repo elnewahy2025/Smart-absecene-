@@ -415,6 +415,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       performerName: currentUser?.name || 'النظام',
       performerRole: currentUser?.role || 'admin',
       details: `تسجيل حضور بدون لمس عبر مسح الباركود / QR للطالب (${student.fullName}) في كشف (${activeSession.subject || 'حضور اليوم'}) في تمام الساعة ${nowTime}.`,
+      detailsEn: `Touchless check-in via barcode / QR scan for student (${student.fullName}) in session (${activeSession.subject || 'Daily Attendance'}) at exactly ${nowTime}.`,
       previousValue: qrModeActive ? 'بانتظار مسح الـ QR' : 'غير مؤكد',
       newValue: `حاضر (${nowTime})`,
     });
@@ -471,6 +472,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       performerName: currentUser?.name || 'المعلم',
       performerRole: currentUser?.role || 'admin',
       details: `بدء وضع مسح الـ QR الذكي لكشف (${activeSession.subject || 'حضور اليوم'} - ${activeSession.className}). تعيين حالة الطلاب إلى «بانتظار مسح الـ QR» وتأجيل اعتماد الغياب حتى اكتمال الجلسة.`,
+      detailsEn: `Started smart QR scan mode for session (${activeSession.subject || 'Daily Attendance'} - ${activeSession.className}). Student status set to "Pending QR Scan" and absence confirmation deferred until session completion.`,
       previousValue: 'حاضر للكل',
       newValue: 'بانتظار مسح الـ QR (جلسة نشطة)',
     });
@@ -567,6 +569,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       performerName: currentUser?.name || 'المعلم',
       performerRole: currentUser?.role || 'admin',
       details: `إنهاء جلسة مسح الـ QR واعتماد الكشف النهائي لفصل (${activeSession.className}): تم اعتماد ${presentScannedCount} حاضر، و ${lateCount} متأخر، و ${absentCount} غائب.`,
+      detailsEn: `Finalized QR scan session and confirmed the final roster for class (${activeSession.className}): ${presentScannedCount} present, ${lateCount} late, and ${absentCount} absent confirmed.`,
       previousValue: 'جلسة QR نشطة',
       newValue: 'كشف معتمد نهائياً',
     });
@@ -598,6 +601,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       performerName: currentUser?.name || 'المعلم',
       performerRole: currentUser?.role || 'admin',
       details: `إعادة تعيين كامل الفصل (${activeSession.className}) كـ حاضر افتراضياً (التحضير اليدوي).`,
+      detailsEn: `Reset the entire class (${activeSession.className}) to present by default (manual attendance).`,
       previousValue: 'وضع QR / غائب',
       newValue: 'التحضير اليدوي (حاضر للكل)',
     });

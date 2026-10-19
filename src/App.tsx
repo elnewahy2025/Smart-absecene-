@@ -273,16 +273,16 @@ const MainAppContent: React.FC = () => {
 
         {/* Footer */}
         <footer className="bg-white border-t border-slate-200 mt-auto py-5 text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
+          <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center ${lang === 'ar' ? 'sm:text-right' : 'sm:text-left'}`}>
             <div>
               <span className="font-bold text-slate-800">{currentTenant.name}</span>
               <span className="mx-2">·</span>
-              <span>نظام الحضور والغياب المدرسي الذكي والتدقيق الإلزامي</span>
+              <span>{lang === 'ar' ? 'نظام الحضور والغياب المدرسي الذكي والتدقيق الإلزامي' : 'Smart school attendance & absence system with mandatory auditing'}</span>
             </div>
             <div className="flex items-center gap-4 text-slate-400">
-              <span>مدعوم بنماذج Google Gemini للذكاء الاصطناعي</span>
+              <span>{lang === 'ar' ? 'مدعوم بنماذج Google Gemini للذكاء الاصطناعي' : 'Powered by Google Gemini AI models'}</span>
               <span>·</span>
-              <span>الإصدار 2.4.0 (2026)</span>
+              <span>{lang === 'ar' ? 'الإصدار 2.4.0 (2026)' : 'Version 2.4.0 (2026)'}</span>
             </div>
           </div>
         </footer>

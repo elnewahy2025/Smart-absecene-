@@ -251,6 +251,7 @@ export interface AuditLog {
   performerName: string;
   performerRole: UserRole;
   details: string;
+  detailsEn?: string;
   previousValue?: string;
   newValue?: string;
   timestamp: string;

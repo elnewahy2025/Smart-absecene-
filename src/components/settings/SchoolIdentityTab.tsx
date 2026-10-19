@@ -68,26 +68,26 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{preset.directorateLabelAr}</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.directorateLabelAr : 'Affiliated Education Directorate:'}</label>
           <input
             type="text"
             disabled={disabled}
             value={profile.directorateAr}
             onChange={(e) => onChange({ directorateAr: e.target.value })}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={preset.directoratePlaceholderAr}
+            placeholder={lang === 'ar' ? preset.directoratePlaceholderAr : 'Name of the education directorate'}
           />
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{preset.officeLabelAr}</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.officeLabelAr : 'Affiliated Education Office:'}</label>
           <input
             type="text"
             disabled={disabled}
             value={profile.officeAr}
             onChange={(e) => onChange({ officeAr: e.target.value })}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={preset.officePlaceholderAr}
+            placeholder={lang === 'ar' ? preset.officePlaceholderAr : 'Name of the education office'}
           />
         </div>
 

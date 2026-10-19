@@ -28,6 +28,13 @@ import { UserManagementTab } from './settings/UserManagementTab';
 import { SchoolAIGeminiTab } from './settings/SchoolAIGeminiTab';
 import { HolidaysAndWeekendsCard } from './settings/HolidaysAndWeekendsCard';
 import { SchoolMessagingGatewaysTab } from './settings/SchoolMessagingGatewaysTab';
+import {
+  getAuditDetails,
+  getAuditSearchHaystack,
+  translateAuditAction,
+  translateAuditRole,
+  translateAuditValue,
+} from '../utils/auditLogI18n';
 
 export const AuditSettingsView: React.FC = () => {
   const {
@@ -73,11 +80,7 @@ export const AuditSettingsView: React.FC = () => {
     if (auditFilter !== 'all' && log.entityType !== auditFilter) return false;
     if (searchAudit) {
       const q = searchAudit.toLowerCase();
-      return (
-        log.performerName.toLowerCase().includes(q) ||
-        log.details.toLowerCase().includes(q) ||
-        log.action.toLowerCase().includes(q)
-      );
+      return getAuditSearchHaystack(log).includes(q);
     }
     return true;
   });
@@ -479,14 +482,14 @@ export const AuditSettingsView: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
-            <table className="w-full text-right text-xs">
+            <table className={`w-full text-xs ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
               <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
                 <tr>
-                  <th className="py-2.5 px-3">{lang === 'ar' ? 'التوقيت والتاريخ' : 'Timestamp'}</th>
-                  <th className="py-2.5 px-3">{lang === 'ar' ? 'المنفّذ / الدور' : 'Performer / Role'}</th>
-                  <th className="py-2.5 px-3">{lang === 'ar' ? 'نوع العملية' : 'Action Type'}</th>
-                  <th className="py-2.5 px-3">{lang === 'ar' ? 'تفاصيل الإجراء' : 'Action Details'}</th>
-                  <th className="py-2.5 px-3">{lang === 'ar' ? 'التغيير (السابق / الجديد)' : 'Change (Before / After)'}</th>
+                  <th className="py-2.5 px-3 align-middle whitespace-nowrap">{lang === 'ar' ? 'التوقيت والتاريخ' : 'Timestamp'}</th>
+                  <th className="py-2.5 px-3 align-middle">{lang === 'ar' ? 'المنفّذ / الدور' : 'Performer / Role'}</th>
+                  <th className="py-2.5 px-3 align-middle text-center">{lang === 'ar' ? 'نوع العملية' : 'Action Type'}</th>
+                  <th className="py-2.5 px-3 align-middle">{lang === 'ar' ? 'تفاصيل الإجراء' : 'Action Details'}</th>
+                  <th className="py-2.5 px-3 align-middle text-center">{lang === 'ar' ? 'التغيير (السابق / الجديد)' : 'Change (Before / After)'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -499,38 +502,32 @@ export const AuditSettingsView: React.FC = () => {
                 ) : (
                   filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                      <td className="py-2.5 px-3 align-middle font-mono text-[11px] text-slate-600 whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 align-middle">
                         <div className="font-semibold text-slate-900">{log.performerName}</div>
                         <span className="text-[10px] text-slate-500 font-mono">
-                          ({log.performerRole === 'admin'
-                            ? lang === 'ar' ? 'مدير' : 'Admin'
-                            : log.performerRole === 'registrar'
-                            ? lang === 'ar' ? 'شؤون طلبة' : 'Registrar'
-                            : log.performerRole === 'teacher'
-                            ? lang === 'ar' ? 'معلم' : 'Teacher'
-                            : lang === 'ar' ? 'ولي أمر' : 'Parent'})
+                          ({translateAuditRole(log.performerRole, lang)})
                         </span>
                       </td>
-                      <td className="py-2.5 px-3">
-                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                          {log.action}
+                      <td className="py-2.5 px-3 align-middle text-center">
+                        <span className="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">
+                          {translateAuditAction(log.action, lang)}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-slate-800 leading-relaxed max-w-md">
-                        {log.details}
+                      <td className="py-2.5 px-3 align-middle text-slate-800 leading-relaxed min-w-[16rem] max-w-md">
+                        {getAuditDetails(log, lang)}
                       </td>
-                      <td className="py-2.5 px-3 text-[11px]">
+                      <td className="py-2.5 px-3 align-middle text-[11px]">
                         {log.previousValue || log.newValue ? (
-                          <div className="flex items-center gap-1 font-mono">
-                            <span className="line-through text-slate-400">{log.previousValue || '---'}</span>
+                          <div className="flex items-center justify-center gap-1.5 font-mono whitespace-nowrap">
+                            <span className="line-through text-slate-400">{translateAuditValue(log.previousValue, lang) || '---'}</span>
                             <span>→</span>
-                            <span className="text-emerald-700 font-bold">{log.newValue || '---'}</span>
+                            <span className="text-emerald-700 font-bold">{translateAuditValue(log.newValue, lang) || '---'}</span>
                           </div>
                         ) : (
-                          <span className="text-slate-400">---</span>
+                          <span className="block text-center text-slate-400">---</span>
                         )}
                       </td>
                     </tr>

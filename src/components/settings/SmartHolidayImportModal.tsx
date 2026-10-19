@@ -19,7 +19,7 @@ import {
 import { getCountryPreset, COUNTRY_PRESETS } from '../../config/countryPresets';
 import { COUNTRIES_LIST } from '../../config/countryCodes';
 import { authenticatedFetch } from '../../lib/api';
-import { getHolidayTypeLabel } from '../../utils/holidayUtils';
+import { getHolidayDisplayName, getHolidaySecondaryName, getHolidayTypeLabel } from '../../utils/holidayUtils';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import { useAttendance } from '../../context/AttendanceContext';
 
@@ -205,7 +205,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   return (
       <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Import official holidays"
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
-      dir="rtl"
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
     >
       <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/60 rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[92vh]">
         {/* Top Exclusive Owner Header Banner */}
@@ -449,15 +449,15 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
-                              {h.nameAr}
+                              {getHolidayDisplayName(h, lang)}
                             </span>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               {getHolidayTypeLabel(h.type, lang)}
                             </span>
                           </div>
-                          {h.nameEn && (
-                            <p className="text-[10px] text-slate-500 font-sans" dir="ltr">
-                              {h.nameEn}
+                          {getHolidaySecondaryName(h, lang) && (
+                            <p className="text-[10px] text-slate-500 font-sans" dir={lang === 'en' ? 'rtl' : 'ltr'}>
+                              {getHolidaySecondaryName(h, lang)}
                             </p>
                           )}
                           <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-400 font-mono flex-wrap">

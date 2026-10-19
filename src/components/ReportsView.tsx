@@ -370,7 +370,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-primary">%{averageAttendanceRate}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({totalStudents} طالب نشط)</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({totalStudents} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
             <span>{lang === 'ar' ? 'من المستهدف الوزاري 95%' : 'From 95% Target'}</span>
@@ -425,7 +425,7 @@ export const ReportsView: React.FC = () => {
             <span className="text-3xl font-black font-mono text-amber-600 dark:text-amber-400">
               %{totalStudents > 0 ? ((tier5Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
             </span>
-            <span className="text-xs text-amber-700 dark:text-amber-300 font-semibold">({tier5Plus.length} طالب)</span>
+            <span className="text-xs text-amber-700 dark:text-amber-300 font-semibold">({tier5Plus.length} {lang === 'ar' ? 'طالب' : 'students'})</span>
           </div>
           <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium mt-2 flex items-center justify-between">
             <span>{lang === 'ar' ? 'بحاجة لإنذار خطي' : 'Requires written warning'}</span>
@@ -459,7 +459,7 @@ export const ReportsView: React.FC = () => {
             <span className="text-3xl font-black font-mono text-rose-600 dark:text-rose-400">
               %{totalStudents > 0 ? ((tier8Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
             </span>
-            <span className="text-xs text-rose-700 dark:text-rose-300 font-semibold">({tier8Plus.length} طالب)</span>
+            <span className="text-xs text-rose-700 dark:text-rose-300 font-semibold">({tier8Plus.length} {lang === 'ar' ? 'طالب' : 'students'})</span>
           </div>
           <p className="text-[11px] text-rose-700 dark:text-rose-400 font-medium mt-2 flex items-center justify-between">
             <span>{lang === 'ar' ? 'تحويل مباشر للمرشد الطلابي' : 'Counselor intervention'}</span>
@@ -510,7 +510,7 @@ export const ReportsView: React.FC = () => {
                   <span className="font-bold" style={{ color: 'var(--app-text-main)' }}>{cName}</span>
                   <div className="space-x-2 space-x-reverse">
                     <span className="font-mono font-bold" style={{ color: 'var(--app-text-main)' }}>{data.avgRate}%</span>
-                    <span className="text-slate-400">({data.total} طلاب)</span>
+                    <span className="text-slate-400">({data.total} {lang === 'ar' ? 'طلاب' : 'students'})</span>
                   </div>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
@@ -541,7 +541,7 @@ export const ReportsView: React.FC = () => {
                 <AlertTriangle className="w-4 h-4 text-rose-600" />
                 <span>{lang === 'ar' ? 'سجل متابعة الغياب المتكرر والإنذارات' : 'Chronic Absence Interventions'}</span>
               </h3>
-              <p className="text-[11px] text-slate-500">حسب لائحة المواظبة وقواعد الإشعار الرسمية</p>
+              <p className="text-[11px] text-slate-500">{lang === 'ar' ? 'حسب لائحة المواظبة وقواعد الإشعار الرسمية' : 'Per the attendance bylaw and official notification rules'}</p>
             </div>
 
             {students.filter((s) => s.totalAbsences >= 3).length > 0 && (
@@ -549,11 +549,15 @@ export const ReportsView: React.FC = () => {
                 type="button"
                 onClick={() => {
                   const count = sendAllChronicWarningNotifications(3);
-                  setBatchWarningAlert(`تم بنجاح إرسال وبث ${count} إنذار رسمي لجميع أولياء الأمور المستحقين وتوثيقها في طابور الرسائل.`);
+                  setBatchWarningAlert(
+                    lang === 'ar'
+                      ? `تم بنجاح إرسال وبث ${count} إنذار رسمي لجميع أولياء الأمور المستحقين وتوثيقها في طابور الرسائل.`
+                      : `Successfully sent and broadcast ${count} official warnings to all eligible guardians and logged them in the message queue.`
+                  );
                   setTimeout(() => setBatchWarningAlert(null), 5000);
                 }}
                 className="flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
-                title="إرسال رسائل إنذار فورية لجميع الطلاب الذين لديهم 3 أيام غياب فأكثر"
+                title={lang === 'ar' ? 'إرسال رسائل إنذار فورية لجميع الطلاب الذين لديهم 3 أيام غياب فأكثر' : 'Send instant warning messages to all students with 3 or more absence days'}
               >
                 <Send className="w-3 h-3" />
                 <span>{lang === 'ar' ? 'إرسال إنذارات للجميع' : 'Broadcast All Warnings'}</span>
@@ -583,7 +587,7 @@ export const ReportsView: React.FC = () => {
                     <div className="space-y-0.5">
                       <div className="font-bold text-slate-900">{s.fullName}</div>
                       <div className="text-[11px] text-slate-500">
-                        {s.className} · ولي الأمر: {s.guardianName} ({s.guardianPhone})
+                        {s.className} · {lang === 'ar' ? 'ولي الأمر:' : 'Guardian:'} {s.guardianName} ({s.guardianPhone})
                       </div>
                     </div>
 
@@ -602,10 +606,10 @@ export const ReportsView: React.FC = () => {
                         </span>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                           {isCritical
-                            ? 'إنذار نهائي وحرمان'
+                            ? (lang === 'ar' ? 'إنذار نهائي وحرمان' : 'Final warning & denial')
                             : isWarning
-                            ? 'إنذار خطي ثانٍ'
-                            : 'إنذار أولي'}
+                            ? (lang === 'ar' ? 'إنذار خطي ثانٍ' : 'Second written warning')
+                            : (lang === 'ar' ? 'إنذار أولي' : 'First warning')}
                         </div>
                       </div>
 
@@ -625,7 +629,7 @@ export const ReportsView: React.FC = () => {
                         {isAlreadySent ? (
                           <>
                             <Check className="w-3.5 h-3.5 text-primary" />
-                            <span className="text-[11px]">تم الإرسال</span>
+                            <span className="text-[11px]">{lang === 'ar' ? 'تم الإرسال' : 'Sent'}</span>
                           </>
                         ) : (
                           <>
