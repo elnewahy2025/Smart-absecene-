@@ -1074,7 +1074,7 @@ async function callGeminiWithFallback(
 }
 
 // 1. Multi-turn Chat Endpoint
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireRole(['admin', 'registrar', 'super_admin']), requireTenant, async (req, res) => {
   try {
     const { messages, role = 'counselor', modelPreference = 'gemini-3.5-flash' } = req.body;
 
