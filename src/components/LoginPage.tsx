@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
-import { UserRole, UserProfile } from '../types/attendance';
+import { UserProfile } from '../types/attendance';
 import { useAttendance } from '../context/AttendanceContext';
 import {
-  ShieldCheck,
   Lock,
   Mail,
-  UserCheck,
   Building2,
   AlertCircle,
-  GraduationCap,
-  Users2,
-  Flame,
   LogIn,
 } from 'lucide-react';
 
@@ -18,6 +13,7 @@ import {
   isLocalDevelopmentHost,
   getDevTestTenants,
   switchDevTestTenant,
+  resolveTenantFromHostname,
 } from '../config/tenantRegistry';
 
 interface LoginPageProps {
@@ -25,59 +21,31 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const { currentTenant, tenantDomainConfig, signInWithGoogle, signInWithCredentials, users } = useAttendance();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
+  const { currentTenant, tenantDomainConfig, signInWithCredentials } = useAttendance();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
-  const platformOwnerEmail = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAIL || '').toLowerCase();
 
-  // [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION]
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const search = typeof window !== 'undefined' ? window.location.search : '';
   const isDevHost = isLocalDevelopmentHost(host);
   const devTenants = isDevHost ? getDevTestTenants() : [];
 
-  // Filter valid users belonging STRICTLY to currentTenant (includes dynamically created staff from Settings)
-  const tenantUsers = (users || []).filter((u) => u.tenantId === currentTenant.id);
-
-  const roleLabels: Record<UserRole, { ar: string; en: string; descAr: string; icon: any }> = {
-    super_admin: {
-      ar: 'مالك المنصة',
-      en: 'Platform Owner',
-      descAr: 'صلاحيات الإشراف الشاملة وتأسيس المدارس على مستوى المنصة السحابية',
-      icon: <ShieldCheck className="w-4 h-4 text-amber-500" />,
-    },
-    admin: {
-      ar: 'مدير النظام',
-      en: 'System Admin',
-      descAr: 'صلاحيات إدارية كاملة، إعدادات السياسات والنشرات الصباحية',
-      icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />,
-    },
-    registrar: {
-      ar: 'شؤون الطلاب',
-      en: 'Student Registrar',
-      descAr: 'إدارة الطلاب، اعتماد الأعذار، وإعادة فتح الجلسات',
-      icon: <Users2 className="w-4 h-4 text-blue-600" />,
-    },
-    teacher: {
-      ar: 'معلم الفصل',
-      en: 'Teacher',
-      descAr: 'تحضير الفصول المسندة ورصد الحضور اليومي والحصص',
-      icon: <GraduationCap className="w-4 h-4 text-indigo-600" />,
-    },
-    parent: {
-      ar: 'ولي أمر',
-      en: 'Parent / Guardian',
-      descAr: 'متابعة سجل غياب الأبناء وتقديم الأعذار الطبية',
-      icon: <UserCheck className="w-4 h-4 text-amber-600" />,
-    },
-  };
-
-  const handleRoleSelect = (role: UserRole) => {
-    setSelectedRole(role);
-    setErrorMsg(null);
-  };
+  // The login screen always reflects the school requested by the address bar
+  // (?tenant=... / ?school=... or the hostname), never a previous session.
+  const resolution = resolveTenantFromHostname(host, search);
+  const addressBarConfig = resolution.status === 'resolved' ? resolution.config : undefined;
+  const activeConfig = addressBarConfig || tenantDomainConfig;
+  const displayTenant = addressBarConfig
+    ? {
+        id: addressBarConfig.tenantId,
+        name: addressBarConfig.nameAr,
+        code: addressBarConfig.code,
+        city: addressBarConfig.cityAr,
+        academicYear: addressBarConfig.academicYear,
+      }
+    : currentTenant;
 
   // Perform Login using Firebase Credentials with Hybrid Fallback
   const handleAuthenticate = async (targetEmail: string, targetPass: string) => {
@@ -104,19 +72,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div className="text-center">
           <div
             className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-xl mb-4"
-            style={{ backgroundColor: tenantDomainConfig?.primaryColor || '#059669' }}
+            style={{ backgroundColor: activeConfig?.primaryColor || '#059669' }}
           >
-            {tenantDomainConfig?.logoText || currentTenant.name.charAt(0)}
+            {activeConfig?.logoText || displayTenant.name.charAt(0)}
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">
-            {currentTenant.name}
+            {displayTenant.name}
           </h2>
           <div className="mt-1 flex items-center justify-center gap-2 text-xs text-slate-400">
-            <span>{currentTenant.city}</span>
+            <span>{displayTenant.city}</span>
             <span>·</span>
-            <span className="font-mono text-emerald-400">{currentTenant.code}</span>
+            <span className="font-mono text-emerald-400">{displayTenant.code}</span>
             <span>·</span>
-            <span>{currentTenant.academicYear}</span>
+            <span>{displayTenant.academicYear}</span>
           </div>
         </div>
 
@@ -127,7 +95,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <span>بوابة معزولة ومخصصة للمدرسة</span>
           </div>
           <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono">
-            {currentTenant.id}
+            {displayTenant.id}
           </span>
         </div>
       </div>
@@ -161,20 +129,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   ))}
                 </select>
               </div>
-
-              {/* Quick 1-tap fill for Platform Owner on Mobile */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!platformOwnerEmail) return;
-                  setEmail(platformOwnerEmail);
-                  setSelectedRole('super_admin');
-                }}
-                className="text-[11px] bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer text-center shrink-0"
-                title="تعبئة بيانات مالك المنصة لتسريع التجربة على الموبايل"
-              >
-                👑 مالك المنصة (Owner)
-              </button>
             </div>
             <p className="text-[10px] text-amber-400/80 mt-2 leading-relaxed">
               * مخصص للتجربة واختبار الموبايل فقط، ويتم حذفه تلقائياً عند النشر السحابي الفعلي.
@@ -185,44 +139,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-slate-800/90 border border-slate-700/90 py-8 px-6 sm:px-10 shadow-2xl rounded-2xl backdrop-blur-md">
-          {/* Role Tabs */}
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              اختر دورك لتسجيل الدخول:
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {((isDevHost ? ['admin', 'registrar', 'teacher', 'parent', 'super_admin'] : ['admin', 'registrar', 'teacher', 'parent']) as UserRole[]).map((r) => {
-                const isSelected = selectedRole === r;
-                const isSpanFull = r === 'super_admin';
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => handleRoleSelect(r)}
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-right ${
-                      isSpanFull ? 'col-span-2' : ''
-                    } ${
-                      isSelected
-                        ? 'bg-slate-700/90 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500'
-                        : 'bg-slate-900/50 border-slate-700/70 text-slate-400 hover:text-white hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="p-1 rounded-lg bg-slate-800 shrink-0">
-                      {roleLabels[r].icon}
-                    </div>
-                    <div className="truncate">
-                      <div className="leading-tight">{roleLabels[r].ar}</div>
-                      <div className="text-[10px] text-slate-400 font-normal truncate">{roleLabels[r].en}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2 px-1">
-              {roleLabels[selectedRole].descAr}
-            </p>
-          </div>
-
           {/* Error Message Alert */}
           {errorMsg && (
             <div className="mb-4 bg-red-950/80 border border-red-800/80 rounded-xl p-3 text-xs text-red-200 flex items-start gap-2.5 animate-shake">
@@ -238,6 +154,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               handleAuthenticate(email, password);
             }}
             className="space-y-4"
+            autoComplete="off"
           >
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
@@ -250,9 +167,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <input
                   type="email"
                   required
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={`user@${currentTenant.id === 'school-1' ? 'andalus' : 'falah'}-school.edu.sa`}
+                  placeholder={`user@${activeConfig?.subdomain || 'school'}.edu.sa`}
                   className="block w-full pr-10 pl-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
@@ -269,6 +187,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <input
                   type="password"
                   required
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pr-10 pl-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -289,91 +208,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <span>{authLoading ? 'جاري التحقق...' : 'تسجيل الدخول إلى البوابة'}</span>
             </button>
           </form>
-
-          {/* Google / Firebase SSO Option */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700/80" />
-            </div>
-            <div className="relative flex justify-center text-[11px]">
-              <span className="bg-slate-800 px-2 text-slate-400">أو عبر الحساب السحابي المعتمد</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            disabled={authLoading}
-            onClick={async () => {
-              setAuthLoading(true);
-              setErrorMsg(null);
-              try {
-                const cred = await signInWithGoogle();
-                if (cred?.user) {
-                  const googleEmail = cred.user.email?.toLowerCase();
-
-                  // Check if Platform Owner
-                  if (platformOwnerEmail && googleEmail === platformOwnerEmail) {
-                    const ownerUser: UserProfile = {
-                      id: cred.user.uid,
-                      tenantId: 'platform',
-                      name: cred.user.displayName || '',
-                      role: 'super_admin' as UserRole,
-                      phone: cred.user.phoneNumber || '',
-                      email: platformOwnerEmail,
-                      status: 'active',
-                    };
-                    onLoginSuccess(ownerUser);
-                    return;
-                  }
-
-                  const matchedUser =
-                    tenantUsers.find((u) => u.email.toLowerCase() === googleEmail) ||
-                    tenantUsers.find((u) => u.role === selectedRole) ||
-                    tenantUsers[0] ||
-                    ({
-                      id: cred.user.uid,
-                      tenantId: currentTenant.id,
-                      name: cred.user.displayName || cred.user.email?.split('@')[0] || 'مستخدم معتمد',
-                      role: selectedRole,
-                      phone: cred.user.phoneNumber || '',
-                      email: cred.user.email || '',
-                      status: 'active',
-                    } as UserProfile);
-
-                  onLoginSuccess(matchedUser);
-                }
-              } catch (err: any) {
-                const code = err?.code || '';
-                const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-                if (code === 'auth/unauthorized-domain') {
-                  setErrorMsg(
-                    `تم رفض النطاق (${currentHost}): يرجى إضافة هذا النطاق السحابي إلى قائمة النطاقات المصرح بها في كونسول Firebase (Authentication > Settings > Authorized domains).`
-                  );
-                } else if (code === 'auth/popup-blocked') {
-                  setErrorMsg('المتصفح قام بحظر النافذة المنبثقة. جاري التحويل إلى تسجيل الدخول السحابي عبر إعادة التوجيه...');
-                  try {
-                    await signInWithGoogle(true);
-                  } catch (redirectErr: any) {
-                    setErrorMsg('تعذر الدخول السحابي: ' + (redirectErr?.message || 'يرجى المحاولة مجدداً'));
-                  }
-                } else if (code === 'auth/popup-closed-by-user') {
-                  setErrorMsg('تم إغلاق نافذة الدخول قبل اختيار حساب Google. يمكنك المحاولة مرة أخرى.');
-                } else if (code === 'auth/operation-not-allowed') {
-                  setErrorMsg('مزود Google غير مفعّل في كونسول Firebase (Authentication > Sign-in method > Google).');
-                } else {
-                  setErrorMsg(
-                    `تعذر الدخول السحابي (${code || 'خطأ غير معروف'}): ${err?.message || 'يرجى مراجعة إعدادات Firebase Console.'}`
-                  );
-                }
-              } finally {
-                setAuthLoading(false);
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-700/90 rounded-xl bg-slate-900/60 hover:bg-slate-900 text-xs font-semibold text-slate-200 hover:text-white hover:border-slate-600 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <Flame className="w-4 h-4 text-amber-500" />
-            <span>الدخول الموحد بحساب Google / Firebase السحابي</span>
-          </button>
         </div>
       </div>
     </div>
