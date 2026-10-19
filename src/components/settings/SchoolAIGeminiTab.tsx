@@ -123,7 +123,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
     } catch (err: any) {
       setActionMessage({
         type: 'error',
-        text: err.message || 'حدث خطأ أثناء حفظ المفتاح.',
+        text: err.message || (lang === 'ar' ? 'حدث خطأ أثناء حفظ المفتاح.' : 'An error occurred while saving the key.'),
       });
     } finally {
       setIsSaving(false);
@@ -154,13 +154,13 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
       } else {
         setTestResult({
           success: false,
-          message: data.error || data.details || 'فشل التحقق من المفتاح.',
+          message: data.error || data.details || (lang === 'ar' ? 'فشل التحقق من المفتاح.' : 'Key verification failed.'),
         });
       }
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message || 'تعذر الاتصال بخدمة التحقق.',
+        message: err.message || (lang === 'ar' ? 'تعذر الاتصال بخدمة التحقق.' : 'Could not connect to the verification service.'),
       });
     } finally {
       setIsTesting(false);
@@ -191,7 +191,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
     } catch (err: any) {
       setActionMessage({
         type: 'error',
-        text: err.message || 'حدث خطأ أثناء إزالة المفتاح.',
+        text: err.message || (lang === 'ar' ? 'حدث خطأ أثناء إزالة المفتاح.' : 'An error occurred while removing the key.'),
       });
     } finally {
       setIsSaving(false);
@@ -202,7 +202,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 flex items-center justify-center gap-3 text-slate-500 text-xs">
         <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-        <span>جاري تحميل إعدادات الذكاء الاصطناعي للمدرسة...</span>
+        <span>{lang === 'ar' ? 'جاري تحميل إعدادات الذكاء الاصطناعي للمدرسة...' : 'Loading school AI settings...'}</span>
       </div>
     );
   }
@@ -304,7 +304,9 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
                 : 'No custom key set for this school yet.'}
             </span>
             <span className="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">
-              {systemHasFallback ? 'مفتاح النظام العام' : 'غير مهيأ'}
+              {systemHasFallback
+                ? (lang === 'ar' ? 'مفتاح النظام العام' : 'System Key')
+                : (lang === 'ar' ? 'غير مهيأ' : 'Not Configured')}
             </span>
           </div>
         )}
@@ -323,7 +325,7 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
               <input
                 type={showKey ? 'text' : 'password'}
                 dir="ltr"
-                placeholder="AIzaSy... أو AQ.Ab8R..."
+                placeholder={lang === 'ar' ? 'AIzaSy... أو AQ.Ab8R...' : 'AIzaSy... or AQ.Ab8R...'}
                 value={inputKey}
                 onChange={(e) => setInputKey(e.target.value)}
                 className="w-full bg-white border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg px-3 py-2.5 text-xs font-mono text-slate-900 pr-10"
@@ -353,10 +355,10 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
                 onChange={(e) => setPreferredModel(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-mono"
               >
-                <option value="gemini-3.5-flash">gemini-3.5-flash (موصى به - متوازن وفائق السرعة)</option>
-                <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (اقتصادي جداً للحصص السريعة)</option>
-                <option value="gemini-3.7-flash">gemini-3.7-flash (جيل متقدم للتحليل والتخطيط)</option>
-                <option value="gemini-3.8-flash">gemini-3.8-flash (أحدث إصدار معتمد)</option>
+                <option value="gemini-3.5-flash">{lang === 'ar' ? 'gemini-3.5-flash (موصى به - متوازن وفائق السرعة)' : 'gemini-3.5-flash (Recommended - balanced & fast)'}</option>
+                <option value="gemini-3.5-flash-lite">{lang === 'ar' ? 'gemini-3.5-flash-lite (اقتصادي جداً للحصص السريعة)' : 'gemini-3.5-flash-lite (Very economical for quick quotas)'}</option>
+                <option value="gemini-3.7-flash">{lang === 'ar' ? 'gemini-3.7-flash (جيل متقدم للتحليل والتخطيط)' : 'gemini-3.7-flash (Advanced generation for analysis & planning)'}</option>
+                <option value="gemini-3.8-flash">{lang === 'ar' ? 'gemini-3.8-flash (أحدث إصدار معتمد)' : 'gemini-3.8-flash (Latest approved release)'}</option>
               </select>
             </div>
 

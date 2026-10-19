@@ -4,6 +4,7 @@ import { School, GraduationCap, BookOpen } from 'lucide-react';
 import { GradeLevelsCard } from './GradeLevelsCard';
 import { ClassesManagementCard } from './ClassesManagementCard';
 import { SubjectsManagementCard } from './SubjectsManagementCard';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -18,6 +19,7 @@ export const GradesAndClassesTab: React.FC<Props> = ({
   onAutoSave,
   disabled,
 }) => {
+  const { lang } = useAttendance();
   const educationalGrades = profile.educationalGrades || [];
   const classes = profile.classes || [];
   const subjects = profile.subjects || [];
@@ -61,17 +63,17 @@ export const GradesAndClassesTab: React.FC<Props> = ({
       <div className="settings-group-header flex items-center justify-between p-3 rounded-xl border font-bold shadow-2xs">
         <div className="flex items-center gap-2.5">
           <GraduationCap className="w-4 h-4 shrink-0 text-indigo-600" />
-          <span className="text-sm">المراحل، الصفوف والفصول الدراسية والمواد المعتمدة</span>
+          <span className="text-sm">{lang === 'ar' ? 'المراحل، الصفوف والفصول الدراسية والمواد المعتمدة' : 'Approved grade levels, classes, and subjects'}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
-            {educationalGrades.length} مراحل
+            {lang === 'ar' ? `${educationalGrades.length} مراحل` : `${educationalGrades.length} grades`}
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-            {classes.length} فصول
+            {lang === 'ar' ? `${classes.length} فصول` : `${classes.length} classes`}
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-mono">
-            {subjects.length} مواد
+            {lang === 'ar' ? `${subjects.length} مواد` : `${subjects.length} subjects`}
           </span>
         </div>
       </div>

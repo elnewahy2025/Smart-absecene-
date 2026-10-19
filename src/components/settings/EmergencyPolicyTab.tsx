@@ -1,6 +1,7 @@
 import React from 'react';
 import { TenantSchoolProfile, AssemblyPointConfig } from '../../types/attendance';
 import { ShieldAlert, Plus, Trash2, FileCheck } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
+  const { lang } = useAttendance();
   const assemblyPoints = profile.assemblyPoints || [];
 
   const handlePointChange = (id: string, field: keyof AssemblyPointConfig, value: any) => {
@@ -41,10 +43,10 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
       <div className="settings-group-header flex items-center justify-between p-3 rounded-xl border font-bold shadow-2xs">
         <div className="flex items-center gap-2.5">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          <span className="text-sm">سياسات الطوارئ، نقاط الإخلاء، وهوامش التقارير الرسمية</span>
+          <span className="text-sm">{lang === 'ar' ? 'سياسات الطوارئ، نقاط الإخلاء، وهوامش التقارير الرسمية' : 'Emergency policies, evacuation points, and official report footers'}</span>
         </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/40 border border-current font-mono">
-          {assemblyPoints.length} نقاط إخلاء
+          {assemblyPoints.length} {lang === 'ar' ? 'نقاط إخلاء' : 'evacuation points'}
         </span>
       </div>
 
@@ -52,7 +54,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-bold text-slate-800">
-            نقاط التجمع والإخلاء المعتمدة في كشف الطوارئ ({assemblyPoints.length} نقاط):
+            {lang === 'ar' ? `نقاط التجمع والإخلاء المعتمدة في كشف الطوارئ (${assemblyPoints.length} نقاط):` : `Approved assembly and evacuation points in the emergency sheet (${assemblyPoints.length} points):`}
           </h4>
           {!disabled && (
             <button
@@ -61,7 +63,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
               className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-semibold cursor-pointer text-[11px]"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>إضافة نقطة تجمع</span>
+              <span>{lang === 'ar' ? 'إضافة نقطة تجمع' : 'Add assembly point'}</span>
             </button>
           )}
         </div>
@@ -70,7 +72,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
           {assemblyPoints.map((point) => (
             <div key={point.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">اسم نقطة التجمع:</label>
+                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'اسم نقطة التجمع:' : 'Assembly point name:'}</label>
                 <input
                   type="text"
                   disabled={disabled}
@@ -80,7 +82,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
                 />
               </div>
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">المنطقة الجغرافية (Zone):</label>
+                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'المنطقة الجغرافية (Zone):' : 'Geographic zone (Zone):'}</label>
                 <input
                   type="text"
                   disabled={disabled}
@@ -90,7 +92,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
                 />
               </div>
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">الطاقة الاستيعابية (طالب):</label>
+                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'الطاقة الاستيعابية (طالب):' : 'Capacity (students):'}</label>
                 <input
                   type="number"
                   disabled={disabled}
@@ -105,7 +107,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
                     type="button"
                     onClick={() => handleDeletePoint(point.id)}
                     className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer"
-                    title="حذف"
+                    title={lang === 'ar' ? 'حذف' : 'Delete'}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -120,7 +122,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
         <div className="flex items-center gap-1.5 font-bold text-slate-800">
           <FileCheck className="w-4 h-4 text-emerald-600" />
-          <span>هامش وملاحظة الاعتماد في أسفل التقارير الرسمية (PDF Footer Note):</span>
+          <span>{lang === 'ar' ? 'هامش وملاحظة الاعتماد في أسفل التقارير الرسمية (PDF Footer Note):' : 'Footer note for official reports (PDF Footer Note):'}</span>
         </div>
         <textarea
           rows={2}
@@ -128,7 +130,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
           value={profile.officialReportFooterNote}
           onChange={(e) => onChange({ officialReportFooterNote: e.target.value })}
           className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-slate-900"
-          placeholder="وثيقة رسمية صادرة آلياً وموثقة برمز الاستجابة السريعة (QR)..."
+          placeholder={lang === 'ar' ? 'وثيقة رسمية صادرة آلياً وموثقة برمز الاستجابة السريعة (QR)...' : 'Official document issued automatically and verified with a QR code...'}
         />
       </div>
     </div>

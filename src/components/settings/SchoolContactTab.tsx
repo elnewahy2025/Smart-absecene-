@@ -9,6 +9,7 @@ import {
   CountryInfo,
 } from '../../config/countryCodes';
 import { getCountryPreset } from '../../config/countryPresets';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -30,6 +31,7 @@ const QUICK_COUNTRIES = [
 ];
 
 export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
+  const { lang } = useAttendance();
   const address = profile.address || ({} as Partial<TenantSchoolProfile['address']>);
   const currentCountry = address.country || profile.address?.country || 'المملكة العربية السعودية';
   const preset = getCountryPreset(currentCountry);
@@ -81,10 +83,10 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
       <div className="settings-group-header flex items-center justify-between p-3 rounded-xl border font-bold shadow-2xs">
         <div className="flex items-center gap-2.5">
           <MapPin className="w-4 h-4 shrink-0" />
-          <span className="text-sm">العنوان الجغرافي، الدولة، وقنوات الاتصال الرسمية</span>
+          <span className="text-sm">{lang === 'ar' ? 'العنوان الجغرافي، الدولة، وقنوات الاتصال الرسمية' : 'Geographic Address, Country & Official Contact Channels'}</span>
         </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/40 border border-current">
-          صالح لجميع الدول العربية والعالمية
+          {lang === 'ar' ? 'صالح لجميع الدول العربية والعالمية' : 'Valid for all Arab and international countries'}
         </span>
       </div>
 
@@ -93,7 +95,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold">
             <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>بيانات الدولة ومفتاح الاتصال الدولي (International Country & Dial Code)</span>
+            <span>{lang === 'ar' ? 'بيانات الدولة ومفتاح الاتصال الدولي (International Country & Dial Code)' : 'Country Data & International Dial Code'}</span>
           </div>
           {matchedCountry && (
             <span className="text-sm flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
@@ -107,7 +109,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
           {/* Country Name */}
           <div className="lg:col-span-2">
             <label className="font-semibold text-slate-700 dark:text-slate-200 block mb-1">
-              اسم الدولة (قابلة للاختيار أو الكتابة الحرة لأي دولة):
+              {lang === 'ar' ? 'اسم الدولة (قابلة للاختيار أو الكتابة الحرة لأي دولة):' : 'Country Name (select or type freely for any country):'}
             </label>
             <div className="relative">
               <input
@@ -117,7 +119,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
                 value={address.country || ''}
                 onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                placeholder="اختر أو اكتب اسم الدولة (مثال: المملكة العربية السعودية، مصر، الإمارات...)"
+                placeholder={lang === 'ar' ? 'اختر أو اكتب اسم الدولة (مثال: المملكة العربية السعودية، مصر، الإمارات...)' : 'Select or type the country name (e.g., Saudi Arabia, Egypt, UAE...)'}
               />
               <datalist id="countries-datalist">
                 {COUNTRIES_LIST.map((c) => (
@@ -132,8 +134,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
           {/* International Dial Code */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-200 block mb-1 flex items-center justify-between">
-              <span>الكود الدولي للاتصال:</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">قابل للتعديل</span>
+              <span>{lang === 'ar' ? 'الكود الدولي للاتصال:' : 'International Dial Code:'}</span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">{lang === 'ar' ? 'قابل للتعديل' : 'Editable'}</span>
             </label>
             <div className="flex items-center gap-1.5">
               <input
@@ -153,7 +155,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         <div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1 font-medium">
             <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-            <span>اختيار سريع للدول الشائعة:</span>
+            <span>{lang === 'ar' ? 'اختيار سريع للدول الشائعة:' : 'Quick select for common countries:'}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {QUICK_COUNTRIES.map((qc) => {
@@ -207,7 +209,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">المدينة:</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المدينة:' : 'City:'}</label>
           <input
             type="text"
             disabled={disabled}
@@ -219,7 +221,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">الحي / المنطقة السكنية:</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الحي / المنطقة السكنية:' : 'District / Residential Area:'}</label>
           <input
             type="text"
             disabled={disabled}
@@ -231,19 +233,19 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div className="md:col-span-2">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">الشارع والوصف التفصيلي:</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الشارع والوصف التفصيلي:' : 'Street & Detailed Description:'}</label>
           <input
             type="text"
             disabled={disabled}
             value={address.streetAddress || ''}
             onChange={(e) => handleAddressChange('streetAddress', e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder="اسم الشارع، رقم المبنى، والمعلم المجاور"
+            placeholder={lang === 'ar' ? 'اسم الشارع، رقم المبنى، والمعلم المجاور' : 'Street name, building number, and nearby landmark'}
           />
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">الرمز البريدي (Postal Code):</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الرمز البريدي (Postal Code):' : 'Postal Code:'}</label>
           <input
             type="text"
             disabled={disabled}
@@ -257,9 +259,9 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         {/* General School Phone */}
         <div>
           <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
-            <span>هاتف المدرسة العام:</span>
+            <span>{lang === 'ar' ? 'هاتف المدرسة العام:' : 'General School Phone:'}</span>
             <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
-              كود الدولة: {currentDialCode}
+              {lang === 'ar' ? `كود الدولة: ${currentDialCode}` : `Country code: ${currentDialCode}`}
             </span>
           </label>
           <div className="relative flex items-center">
@@ -282,7 +284,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
           <label className="font-semibold text-rose-700 dark:text-rose-400 block mb-1 flex items-center gap-1 justify-between">
             <span className="flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5" />
-              <span>خط طوارئ الإخلاء والسلامة:</span>
+              <span>{lang === 'ar' ? 'خط طوارئ الإخلاء والسلامة:' : 'Evacuation & Safety Emergency Line:'}</span>
             </span>
             <span className="font-mono text-[10px] text-rose-500 dark:text-rose-400 font-normal" dir="ltr">
               {currentDialCode}
@@ -305,7 +307,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* Official Email */}
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">البريد الإلكتروني الرسمي:</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني الرسمي:' : 'Official Email:'}</label>
           <input
             type="email"
             disabled={disabled}
@@ -318,7 +320,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* Website URL */}
         <div className="md:col-span-3">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">الموقع الإلكتروني الرسمي للمدرسة:</label>
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الموقع الإلكتروني الرسمي للمدرسة:' : 'Official School Website:'}</label>
           <input
             type="url"
             disabled={disabled}

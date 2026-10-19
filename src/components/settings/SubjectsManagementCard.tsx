@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SchoolSubjectConfig } from '../../types/attendance';
 import { BookOpen, Plus, Trash2, Edit2, Check, X, Tag, CheckCircle2 } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   subjects: SchoolSubjectConfig[];
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, onAutoSave, disabled }) => {
+  const { lang } = useAttendance();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [codeInput, setCodeInput] = useState('');
@@ -59,7 +61,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
         : s
     );
     setEditingId(null);
-    await triggerAutoSave(updated, `تم حفظ تعديلات المادة (${nameInput.trim()}) بنجاح ✓`);
+    await triggerAutoSave(updated, lang === 'ar' ? `تم حفظ تعديلات المادة (${nameInput.trim()}) بنجاح ✓` : `Subject (${nameInput.trim()}) changes were saved successfully ✓`);
   };
 
   const cancelEdit = () => {
@@ -72,7 +74,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
     const updated = subjects.filter((s) => s.id !== id);
     await triggerAutoSave(
       updated,
-      target ? `تم حذف المادة (${target.name}) وحفظ التعديلات بنجاح ✓` : 'تم حذف المادة بنجاح ✓'
+      target ? (lang === 'ar' ? `تم حذف المادة (${target.name}) وحفظ التعديلات بنجاح ✓` : `Subject (${target.name}) was deleted and changes saved successfully ✓`) : (lang === 'ar' ? 'تم حذف المادة بنجاح ✓' : 'Subject deleted successfully ✓')
     );
   };
 
@@ -89,7 +91,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
     setNewCode('');
     setNewDept('');
     setIsAdding(false);
-    await triggerAutoSave(updated, `تمت إضافة المادة (${newSubjectItem.name}) وحفظها بنجاح ✓`);
+    await triggerAutoSave(updated, lang === 'ar' ? `تمت إضافة المادة (${newSubjectItem.name}) وحفظها بنجاح ✓` : `Subject (${newSubjectItem.name}) was added and saved successfully ✓`);
   };
 
   return (
@@ -104,7 +106,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
       <div className="flex items-center justify-between pb-1 border-b border-slate-100">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <BookOpen className="w-4 h-4 text-blue-600" />
-          <span>المواد الدراسية والمناهج المعتمدة ({subjects.length} مواد):</span>
+          <span>{lang === 'ar' ? `المواد الدراسية والمناهج المعتمدة (${subjects.length} مواد):` : `Approved subjects and curricula (${subjects.length} subjects):`}</span>
         </div>
         {!disabled && (
           <button
@@ -113,7 +115,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
             className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>إضافة مادة جديدة</span>
+            <span>{lang === 'ar' ? 'إضافة مادة جديدة' : 'Add new subject'}</span>
           </button>
         )}
       </div>
@@ -123,37 +125,37 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
         <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-xl space-y-3 animate-in fade-in duration-200">
           <div className="font-bold text-blue-900 text-xs flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5 text-blue-600" />
-            <span>تعريف مادة دراسية جديدة</span>
+            <span>{lang === 'ar' ? 'تعريف مادة دراسية جديدة' : 'Define a new subject'}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
             <div>
-              <label className="text-slate-600 block mb-1">اسم المادة *</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم المادة *' : 'Subject name *'}</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="مثال: علم البيئة أو التاريخ"
+                placeholder={lang === 'ar' ? 'مثال: علم البيئة أو التاريخ' : 'Example: Environmental Science or History'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 font-semibold"
                 autoFocus
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">رمز المادة (Course Code)</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'رمز المادة (Course Code)' : 'Course code'}</label>
               <input
                 type="text"
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
-                placeholder="مثال: BIO-102"
+                placeholder={lang === 'ar' ? 'مثال: BIO-102' : 'Example: BIO-102'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">القسم الأكاديمي</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'القسم الأكاديمي' : 'Academic department'}</label>
               <input
                 type="text"
                 value={newDept}
                 onChange={(e) => setNewDept(e.target.value)}
-                placeholder="مثال: قسم العلوم الطبيعية"
+                placeholder={lang === 'ar' ? 'مثال: قسم العلوم الطبيعية' : 'Example: Natural Sciences Department'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
               />
             </div>
@@ -164,7 +166,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
               onClick={() => setIsAdding(false)}
               className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-100 text-xs cursor-pointer"
             >
-              إلغاء
+              {lang === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
             <button
               type="button"
@@ -172,7 +174,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
               disabled={!newName.trim()}
               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold cursor-pointer"
             >
-              حفظ المادة
+              {lang === 'ar' ? 'حفظ المادة' : 'Save subject'}
             </button>
           </div>
         </div>
@@ -190,21 +192,21 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-900"
-                  placeholder="اسم المادة"
+                  placeholder={lang === 'ar' ? 'اسم المادة' : 'Subject name'}
                 />
                 <input
                   type="text"
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-mono text-slate-900"
-                  placeholder="الرمز"
+                  placeholder={lang === 'ar' ? 'الرمز' : 'Code'}
                 />
                 <input
                   type="text"
                   value={deptInput}
                   onChange={(e) => setDeptInput(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-900"
-                  placeholder="القسم"
+                  placeholder={lang === 'ar' ? 'القسم' : 'Department'}
                 />
                 <div className="flex items-center justify-end gap-1">
                   <button
@@ -251,7 +253,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
                     type="button"
                     onClick={() => startEdit(subj)}
                     className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
-                    title="تعديل"
+                    title={lang === 'ar' ? 'تعديل' : 'Edit'}
                   >
                     <Edit2 className="w-3 h-3" />
                   </button>
@@ -259,7 +261,7 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
                     type="button"
                     onClick={() => handleDelete(subj.id)}
                     className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                    title="حذف"
+                    title={lang === 'ar' ? 'حذف' : 'Delete'}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>

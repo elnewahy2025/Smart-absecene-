@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TenantSchoolProfile, TimetablePeriod } from '../../types/attendance';
 import { Clock, Plus, Trash2, CheckCircle2, ShieldCheck, Sun, Coffee } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -15,6 +16,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
   onAutoSave,
   disabled,
 }) => {
+  const { lang } = useAttendance();
   const timetablePeriods = profile.timetablePeriods || [];
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
@@ -40,7 +42,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
   };
 
   const handlePeriodBlur = async () => {
-    await triggerAutoSave(timetablePeriods, 'تم حفظ تعديلات توقيت الحصص بنجاح ✓');
+    await triggerAutoSave(timetablePeriods, lang === 'ar' ? 'تم حفظ تعديلات توقيت الحصص بنجاح ✓' : 'Timetable period changes saved successfully ✓');
   };
 
   const handleAddPeriod = async () => {
@@ -54,7 +56,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
       type: 'lesson',
     };
     const updatedPeriods = [...timetablePeriods, newPeriod];
-    await triggerAutoSave(updatedPeriods, `تمت إضافة الفترة (${newPeriod.nameAr}) بنجاح ✓`);
+    await triggerAutoSave(updatedPeriods, lang === 'ar' ? `تمت إضافة الفترة (${newPeriod.nameAr}) بنجاح ✓` : `Period (${newPeriod.nameAr}) added successfully ✓`);
   };
 
   const handleDeletePeriod = async (id: string) => {
@@ -62,7 +64,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
     const updatedPeriods = timetablePeriods.filter((p) => p.id !== id);
     await triggerAutoSave(
       updatedPeriods,
-      target ? `تم حذف (${target.nameAr}) وحفظ التعديلات بنجاح ✓` : 'تم حذف الفترة بنجاح ✓'
+      target ? (lang === 'ar' ? `تم حذف (${target.nameAr}) وحفظ التعديلات بنجاح ✓` : `(${target.nameAr}) deleted and changes saved successfully ✓`) : (lang === 'ar' ? 'تم حذف الفترة بنجاح ✓' : 'Period deleted successfully ✓')
     );
   };
 
@@ -77,25 +79,25 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
       <div className="settings-group-header flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border font-bold shadow-2xs gap-2">
         <div className="flex items-center gap-2.5">
           <Clock className="w-4 h-4 shrink-0 text-purple-600" />
-          <span className="text-sm">توقيت الحصص اليومية والجدول الزمني المدرسي</span>
+          <span className="text-sm">{lang === 'ar' ? 'توقيت الحصص اليومية والجدول الزمني المدرسي' : 'Daily lesson times and school timetable'}</span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
           <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-            {lessonCount} حصص دراسية
+            {lessonCount} {lang === 'ar' ? 'حصص دراسية' : 'lessons'}
           </span>
           {assemblyCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-              {assemblyCount} اصطفاف
+              {assemblyCount} {lang === 'ar' ? 'اصطفاف' : 'assembly'}
             </span>
           )}
           {recessCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {recessCount} فسح
+              {recessCount} {lang === 'ar' ? 'فسح' : 'recesses'}
             </span>
           )}
           {prayerCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              {prayerCount} صلاة
+              {prayerCount} {lang === 'ar' ? 'صلاة' : 'prayers'}
             </span>
           )}
         </div>
@@ -113,7 +115,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
         <div className="flex items-center justify-between pb-1 border-b border-slate-100">
           <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
             <Clock className="w-4 h-4 text-purple-600" />
-            <span>جدول الفترات والحصص اليومية المعتمدة ({timetablePeriods.length} فترات):</span>
+            <span>{lang === 'ar' ? `جدول الفترات والحصص اليومية المعتمدة (${timetablePeriods.length} فترات):` : `Approved daily periods and lessons schedule (${timetablePeriods.length} periods):`}</span>
           </h4>
           {!disabled && (
             <button
@@ -122,7 +124,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
               className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>إضافة حصة / فترة جديدة</span>
+              <span>{lang === 'ar' ? 'إضافة حصة / فترة جديدة' : 'Add new lesson / period'}</span>
             </button>
           )}
         </div>
@@ -131,19 +133,19 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[11px]">
-                <th className="p-2.5 text-center w-12">الرقم</th>
-                <th className="p-2.5">اسم الحصة / الفترة</th>
-                <th className="p-2.5">النوع والتصنيف</th>
-                <th className="p-2.5">وقت البدء</th>
-                <th className="p-2.5">وقت الانتهاء</th>
-                {!disabled && <th className="p-2.5 text-center w-14">إجراء</th>}
+                <th className="p-2.5 text-center w-12">{lang === 'ar' ? 'الرقم' : 'No.'}</th>
+                <th className="p-2.5">{lang === 'ar' ? 'اسم الحصة / الفترة' : 'Lesson / period name'}</th>
+                <th className="p-2.5">{lang === 'ar' ? 'النوع والتصنيف' : 'Type and category'}</th>
+                <th className="p-2.5">{lang === 'ar' ? 'وقت البدء' : 'Start time'}</th>
+                <th className="p-2.5">{lang === 'ar' ? 'وقت الانتهاء' : 'End time'}</th>
+                {!disabled && <th className="p-2.5 text-center w-14">{lang === 'ar' ? 'إجراء' : 'Action'}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {timetablePeriods.length === 0 ? (
                 <tr>
                   <td colSpan={disabled ? 5 : 6} className="p-6 text-center text-slate-400">
-                    لم يتم تسجيل فترات زمنية أو حصص بعد. انقر على "إضافة حصة / فترة جديدة" للبدء.
+                    {lang === 'ar' ? 'لم يتم تسجيل فترات زمنية أو حصص بعد. انقر على "إضافة حصة / فترة جديدة" للبدء.' : 'No time periods or lessons recorded yet. Click "Add new lesson / period" to start.'}
                   </td>
                 </tr>
               ) : (
@@ -170,10 +172,10 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                         onBlur={handlePeriodBlur}
                         className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-800 focus:bg-white"
                       >
-                        <option value="assembly">اصطفاف صباحي</option>
-                        <option value="lesson">حصة دراسية</option>
-                        <option value="recess">فسحة مدرسية</option>
-                        <option value="prayer">صلاة الظهر</option>
+                        <option value="assembly">{lang === 'ar' ? 'اصطفاف صباحي' : 'Morning assembly'}</option>
+                        <option value="lesson">{lang === 'ar' ? 'حصة دراسية' : 'Lesson'}</option>
+                        <option value="recess">{lang === 'ar' ? 'فسحة مدرسية' : 'School recess'}</option>
+                        <option value="prayer">{lang === 'ar' ? 'صلاة الظهر' : 'Dhuhr prayer'}</option>
                       </select>
                     </td>
                     <td className="p-2 w-28">
@@ -202,7 +204,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                           type="button"
                           onClick={() => handleDeletePeriod(period.id)}
                           className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition-colors"
-                          title="حذف الفترة"
+                          title={lang === 'ar' ? 'حذف الفترة' : 'Delete period'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { TenantSchoolProfile } from '../../types/attendance';
 import { Users, UserCheck, ShieldAlert, HeartHandshake } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
+  const { lang } = useAttendance();
   const leadership = profile.leadership || ({} as Partial<TenantSchoolProfile['leadership']>);
   const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+966';
 
@@ -26,10 +28,10 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
       <div className="settings-group-header flex items-center justify-between p-3 rounded-xl border font-bold shadow-2xs">
         <div className="flex items-center gap-2.5">
           <Users className="w-4 h-4 shrink-0" />
-          <span className="text-sm">الهيئة القيادية والإشرافية المعتمدة (توقيعات التقارير الرسمية)</span>
+          <span className="text-sm">{lang === 'ar' ? 'الهيئة القيادية والإشرافية المعتمدة (توقيعات التقارير الرسمية)' : 'Approved Leadership & Supervisory Body (Official Report Signatures)'}</span>
         </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/40 border border-current">
-          الاعتماد والمسؤولية
+          {lang === 'ar' ? 'الاعتماد والمسؤولية' : 'Accreditation & Responsibility'}
         </span>
       </div>
 
@@ -38,23 +40,23 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <UserCheck className="w-4 h-4 text-slate-700" />
-            <span>مدير / مديرة المدرسة</span>
+            <span>{lang === 'ar' ? 'مدير / مديرة المدرسة' : 'School Principal'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">الاسم الكامل:</label>
+            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.principalName || ''}
               onChange={(e) => handleLeadershipChange('principalName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder="أ. عبد الرحمن السعدي"
+              placeholder={lang === 'ar' ? 'أ. عبد الرحمن السعدي' : 'Mr. Abdulrahman Al-Saadi'}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-slate-600 block mb-1 flex items-center justify-between">
-                <span>رقم الجوال:</span>
+                <span>{lang === 'ar' ? 'رقم الجوال:' : 'Mobile Number:'}</span>
                 <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
               </label>
               <input
@@ -67,7 +69,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">البريد الإلكتروني:</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
               <input
                 type="email"
                 disabled={disabled}
@@ -84,22 +86,22 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <ShieldAlert className="w-4 h-4 text-indigo-600" />
-            <span>وكيل شؤون الطلاب (المسؤول المباشر عن الغياب والانضباط)</span>
+            <span>{lang === 'ar' ? 'وكيل شؤون الطلاب (المسؤول المباشر عن الغياب والانضباط)' : 'Vice Principal for Student Affairs (Directly responsible for attendance & discipline)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">الاسم الكامل:</label>
+            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalStudentAffairsName || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalStudentAffairsName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder="أ. فهد بن إبراهيم المنصور"
+              placeholder={lang === 'ar' ? 'أ. فهد بن إبراهيم المنصور' : 'Mr. Fahd bin Ibrahim Al-Mansour'}
             />
           </div>
           <div>
             <label className="text-slate-600 block mb-1 flex items-center justify-between">
-              <span>رقم الجوال / التحويلة:</span>
+              <span>{lang === 'ar' ? 'رقم الجوال / التحويلة:' : 'Mobile Number / Extension:'}</span>
               <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
             </label>
             <input
@@ -117,22 +119,22 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <UserCheck className="w-4 h-4 text-emerald-600" />
-            <span>وكيل الشؤون التعليمية والمدرسية (الجداول والحصص)</span>
+            <span>{lang === 'ar' ? 'وكيل الشؤون التعليمية والمدرسية (الجداول والحصص)' : 'Vice Principal for Academic & School Affairs (Timetables & Classes)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">الاسم الكامل:</label>
+            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalAcademicAffairsName || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalAcademicAffairsName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder="أ. سلطان بن خالد القحطاني"
+              placeholder={lang === 'ar' ? 'أ. سلطان بن خالد القحطاني' : 'Mr. Sultan bin Khalid Al-Qahtani'}
             />
           </div>
           <div>
             <label className="text-slate-600 block mb-1 flex items-center justify-between">
-              <span>رقم الجوال / التحويلة:</span>
+              <span>{lang === 'ar' ? 'رقم الجوال / التحويلة:' : 'Mobile Number / Extension:'}</span>
               <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
             </label>
             <input
@@ -150,23 +152,23 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <HeartHandshake className="w-4 h-4 text-rose-600" />
-            <span>الموجه الطلابي / الأخصائي الاجتماعي (متابعة الأعذار ورعاية الطلاب)</span>
+            <span>{lang === 'ar' ? 'الموجه الطلابي / الأخصائي الاجتماعي (متابعة الأعذار ورعاية الطلاب)' : 'Student Counselor / Social Worker (Excuse follow-up & student care)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">الاسم الكامل:</label>
+            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
             <input
               type="text"
               disabled={disabled}
               value={leadership.socialWorkerName || ''}
               onChange={(e) => handleLeadershipChange('socialWorkerName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder="أ. ماجد بن عبد العزيز التميمي"
+              placeholder={lang === 'ar' ? 'أ. ماجد بن عبد العزيز التميمي' : 'Mr. Majed bin Abdulaziz Al-Tamimi'}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-slate-600 block mb-1 flex items-center justify-between">
-                <span>رقم الجوال:</span>
+                <span>{lang === 'ar' ? 'رقم الجوال:' : 'Mobile Number:'}</span>
                 <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
               </label>
               <input
@@ -179,7 +181,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">البريد الإلكتروني:</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
               <input
                 type="email"
                 disabled={disabled}

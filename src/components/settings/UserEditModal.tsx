@@ -140,7 +140,7 @@ export const UserEditModal: React.FC<Props> = ({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="أ. محمد أحمد الغامدي"
+                placeholder={lang === 'ar' ? 'أ. محمد أحمد الغامدي' : 'Mr. Mohammed Ahmed Al-Ghamdi'}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>
@@ -151,7 +151,7 @@ export const UserEditModal: React.FC<Props> = ({
                 type="text"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="معلم أول / موجه طلابي"
+                placeholder={lang === 'ar' ? 'معلم أول / موجه طلابي' : 'Senior Teacher / Student Counselor'}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>
@@ -193,10 +193,10 @@ export const UserEditModal: React.FC<Props> = ({
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               >
-                <option value="admin">مدير المدرسة (Admin - صلاحيات كاملة)</option>
-                <option value="registrar">شؤون الطلاب (Registrar - إدارة الطلاب والأعذار)</option>
-                <option value="teacher">معلم (Teacher - تحضير الفصول المسندة فقط)</option>
-                <option value="parent">ولي أمر (Parent - متابعة الأبناء فقط)</option>
+                <option value="admin">{lang === 'ar' ? 'مدير المدرسة (Admin - صلاحيات كاملة)' : 'School Principal (Admin - full permissions)'}</option>
+                <option value="registrar">{lang === 'ar' ? 'شؤون الطلاب (Registrar - إدارة الطلاب والأعذار)' : 'Student Affairs (Registrar - students & excuses)'}</option>
+                <option value="teacher">{lang === 'ar' ? 'معلم (Teacher - تحضير الفصول المسندة فقط)' : 'Teacher (attendance for assigned classes only)'}</option>
+                <option value="parent">{lang === 'ar' ? 'ولي أمر (Parent - متابعة الأبناء فقط)' : 'Parent (follow up on children only)'}</option>
               </select>
             </div>
 
@@ -207,8 +207,8 @@ export const UserEditModal: React.FC<Props> = ({
                 onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               >
-                <option value="active">نشط (مسموح له بالدخول)</option>
-                <option value="inactive">معطل (موقوف مؤقتاً)</option>
+                <option value="active">{lang === 'ar' ? 'نشط (مسموح له بالدخول)' : 'Active (allowed to sign in)'}</option>
+                <option value="inactive">{lang === 'ar' ? 'معطل (موقوف مؤقتاً)' : 'Inactive (temporarily suspended)'}</option>
               </select>
             </div>
           </div>

@@ -271,7 +271,7 @@ export const UserManagementTab: React.FC<Props> = ({
                               ))}
                             </div>
                           ) : (
-                            <span className="text-slate-400 text-[11px]">لا توجد فصول مسندة</span>
+                            <span className="text-slate-400 text-[11px]">{lang === 'ar' ? 'لا توجد فصول مسندة' : 'No classes assigned'}</span>
                           )}
 
                           {u.assignedSubjects && u.assignedSubjects.length > 0 && (
@@ -287,7 +287,9 @@ export const UserManagementTab: React.FC<Props> = ({
                         </div>
                       ) : (
                         <span className="text-slate-400 text-[11px]">
-                          {u.role === 'parent' ? 'صلاحية أبناء فقط' : 'صلاحية مدرسية شاملة'}
+                          {u.role === 'parent'
+                            ? (lang === 'ar' ? 'صلاحية أبناء فقط' : 'Children only access')
+                            : (lang === 'ar' ? 'صلاحية مدرسية شاملة' : 'Full school access')}
                         </span>
                       )}
                     </td>
@@ -307,7 +309,7 @@ export const UserManagementTab: React.FC<Props> = ({
                           onClick={() => handleOpenEdit(u)}
                           disabled={!canManageUsers}
                           className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors cursor-pointer disabled:opacity-40"
-                          title="تعديل المستخدم والصلاحيات"
+                          title={lang === 'ar' ? 'تعديل المستخدم والصلاحيات' : 'Edit user and permissions'}
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -316,7 +318,7 @@ export const UserManagementTab: React.FC<Props> = ({
                           onClick={() => handleDelete(u)}
                           disabled={!canManageUsers}
                           className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer disabled:opacity-40"
-                          title="حذف المستخدم"
+                          title={lang === 'ar' ? 'حذف المستخدم' : 'Delete user'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

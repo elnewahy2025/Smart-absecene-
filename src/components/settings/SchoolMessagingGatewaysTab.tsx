@@ -29,6 +29,7 @@ import {
   buildWhatsAppWebUrl,
   openWhatsAppDirect,
 } from '../../utils/whatsappUtils';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   gatewayConfig: SchoolMessagingGatewayConfig;
@@ -45,6 +46,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
   schoolName,
   defaultCallingCode = '+966',
 }) => {
+  const { lang } = useAttendance();
   const [form, setForm] = useState<SchoolMessagingGatewayConfig>(gatewayConfig);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
@@ -82,7 +84,9 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
     if (!isSuperAdmin) {
       setSaveStatus({
         type: 'error',
-        text: 'عذراً، صلاحية تعديل وحفظ بوابات المراسلة وبيانات الواتساب وSMS محصورة بمالك المنصة (The Owner) فقط.',
+        text: lang === 'ar'
+          ? 'عذراً، صلاحية تعديل وحفظ بوابات المراسلة وبيانات الواتساب وSMS محصورة بمالك المنصة (The Owner) فقط.'
+          : 'Sorry, permission to edit and save messaging gateways and WhatsApp/SMS data is restricted to the platform owner (The Owner) only.',
       });
       return;
     }
@@ -100,7 +104,9 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
 
   const handleTestWhatsAppWeb = () => {
     const targetPhone = testPhoneNumber.trim() || form.whatsappPhoneNumber || '0501234567';
-    const testMessage = `السلام عليكم ورحمة الله، هذه رسالة تجريبية من بوابة واتساب لمدرسة ${schoolName} عبر نظام الحضور والغياب الذكي.`;
+    const testMessage = lang === 'ar'
+      ? `السلام عليكم ورحمة الله، هذه رسالة تجريبية من بوابة واتساب لمدرسة ${schoolName} عبر نظام الحضور والغياب الذكي.`
+      : `Peace be upon you and the mercy of Allah. This is a test message from the WhatsApp gateway for ${schoolName} school via the smart attendance system.`;
     openWhatsAppDirect(targetPhone, testMessage, cleanCountryCode);
   };
 
@@ -115,14 +121,18 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="font-bold text-amber-900 dark:text-amber-200 text-sm">
-                صلاحية خاصة ومحصورة بمالك المنصة (The Owner Only)
+                {lang === 'ar' ? 'صلاحية خاصة ومحصورة بمالك المنصة (The Owner Only)' : 'Special permission restricted to the platform owner (The Owner Only)'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
-                وضع القراءة فقط
+                {lang === 'ar' ? 'وضع القراءة فقط' : 'Read-only mode'}
               </span>
             </div>
             <p className="text-amber-800 dark:text-amber-300 leading-relaxed text-xs">
-              بيانات الربط مع بوابات الرسائل النصية القصيرة (SMS Gateway) ورقم هاتف الواتساب المعتمد للمراسلة وكلمات المرور البرمجية محمية ولا يمكن تعديلها إلا من قبل حساب <strong>مالك المنصة (The Owner / super_admin)</strong> حرصاً على سرية الاعتمادات والأمان المؤسسي.
+              {lang === 'ar' ? (
+                <>بيانات الربط مع بوابات الرسائل النصية القصيرة (SMS Gateway) ورقم هاتف الواتساب المعتمد للمراسلة وكلمات المرور البرمجية محمية ولا يمكن تعديلها إلا من قبل حساب <strong>مالك المنصة (The Owner / super_admin)</strong> حرصاً على سرية الاعتمادات والأمان المؤسسي.</>
+              ) : (
+                <>The integration data for SMS gateways, the approved WhatsApp messaging phone number, and API passwords are protected and can only be edited by the <strong>platform owner (The Owner / super_admin)</strong> account to preserve credential confidentiality and institutional security.</>
+              )}
             </p>
           </div>
         </div>
@@ -135,14 +145,16 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 dark:text-white text-sm">
-                  وضع التحكم الكامل لمالك المنصة (The Owner Control)
+                  {lang === 'ar' ? 'وضع التحكم الكامل لمالك المنصة (The Owner Control)' : 'Full control mode for the platform owner (The Owner Control)'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
-                  مصرح بالتعديل والحفظ
+                  {lang === 'ar' ? 'مصرح بالتعديل والحفظ' : 'Authorized to edit and save'}
                 </span>
               </div>
               <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                يمكنك كمالك للمنصة إدخال وتعديل أرقام الواتساب وبوابات الـ SMS المعتمدة لمدرسة ({schoolName}).
+                {lang === 'ar'
+                  ? `يمكنك كمالك للمنصة إدخال وتعديل أرقام الواتساب وبوابات الـ SMS المعتمدة لمدرسة (${schoolName}).`
+                  : `As the platform owner, you can enter and edit the WhatsApp numbers and approved SMS gateways for (${schoolName}) school.`}
               </p>
             </div>
           </div>
@@ -152,7 +164,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all cursor-pointer shadow-xs shrink-0"
           >
             <Save className="w-4 h-4" />
-            <span>حفظ الإعدادات</span>
+            <span>{lang === 'ar' ? 'حفظ الإعدادات' : 'Save settings'}</span>
           </button>
         </div>
       )}
@@ -183,17 +195,17 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             </div>
             <div>
               <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                بوابة وخدمة الواتساب المباشرة (WhatsApp Direct & Web)
+                {lang === 'ar' ? 'بوابة وخدمة الواتساب المباشرة (WhatsApp Direct & Web)' : 'Direct WhatsApp gateway and service (WhatsApp Direct & Web)'}
               </h4>
               <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                رقم هاتف الواتساب المعتمد للمراسلة وربط أولياء الأمور بالمدرسة مجاناً
+                {lang === 'ar' ? 'رقم هاتف الواتساب المعتمد للمراسلة وربط أولياء الأمور بالمدرسة مجاناً' : 'The approved WhatsApp phone number for messaging and connecting parents with the school for free'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              تفعيل إشعارات الواتساب:
+              {lang === 'ar' ? 'تفعيل إشعارات الواتساب:' : 'Enable WhatsApp notifications:'}
             </span>
             <input
               type="checkbox"
@@ -209,9 +221,9 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* WhatsApp Dedicated Phone Number */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
-              <span>رقم هاتف الواتساب المعتمد للمراسلة:</span>
+              <span>{lang === 'ar' ? 'رقم هاتف الواتساب المعتمد للمراسلة:' : 'Approved WhatsApp messaging phone number:'}</span>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" dir="ltr">
-                كود الدولة: {defaultCallingCode}
+                {lang === 'ar' ? 'كود الدولة:' : 'Country code:'} {defaultCallingCode}
               </span>
             </label>
             <div className="relative flex items-center">
@@ -228,12 +240,12 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
               />
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              الرقم المخصص لتواصل المدرسة بالواتساب مع أولياء الأمور (يستخدم عند فتح محادثات الواتساب المباشرة).
+              {lang === 'ar' ? 'الرقم المخصص لتواصل المدرسة بالواتساب مع أولياء الأمور (يستخدم عند فتح محادثات الواتساب المباشرة).' : 'The dedicated number for the school\'s WhatsApp communication with parents (used when opening direct WhatsApp conversations).'}
             </p>
             {form.whatsappPhoneNumber && (
               <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded">
                 <Sparkles className="w-3 h-3 shrink-0" />
-                <span>الصيغة الدولية المعتمدة لروابط واتساب:</span>
+                <span>{lang === 'ar' ? 'الصيغة الدولية المعتمدة لروابط واتساب:' : 'Approved international format for WhatsApp links:'}</span>
                 <span className="font-mono font-bold" dir="ltr">+{internationalFormatted}</span>
               </div>
             )}
@@ -242,7 +254,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* WhatsApp Service Mode */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              وضع خدمة الواتساب للمدرسة:
+              {lang === 'ar' ? 'وضع خدمة الواتساب للمدرسة:' : 'School WhatsApp service mode:'}
             </label>
             <div className="space-y-2 mt-1">
               <label
@@ -263,13 +275,13 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                 />
                 <div>
                   <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <span>إرسال مباشر عبر واتساب ويب / التطبيق (WhatsApp Web / App)</span>
+                    <span>{lang === 'ar' ? 'إرسال مباشر عبر واتساب ويب / التطبيق (WhatsApp Web / App)' : 'Direct sending via WhatsApp Web / App (WhatsApp Web / App)'}</span>
                     <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-semibold">
-                      مجاني ومفعّل
+                      {lang === 'ar' ? 'مجاني ومفعّل' : 'Free and enabled'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                    فتح محادثة واتساب مشفرة مباشرة بنقرة واحدة مع ولي الأمر ومضمون الرسالة جاهز دون أي تكلفة اشتراك مزود.
+                    {lang === 'ar' ? 'فتح محادثة واتساب مشفرة مباشرة بنقرة واحدة مع ولي الأمر ومضمون الرسالة جاهز دون أي تكلفة اشتراك مزود.' : 'Open an encrypted WhatsApp conversation directly in one click with the parent, with the message content ready at no provider subscription cost.'}
                   </p>
                 </div>
               </label>
@@ -292,13 +304,13 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                 />
                 <div>
                   <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <span>الربط البرمجي السحابي المباشر (WhatsApp Cloud API - Meta)</span>
+                    <span>{lang === 'ar' ? 'الربط البرمجي السحابي المباشر (WhatsApp Cloud API - Meta)' : 'Direct cloud API integration (WhatsApp Cloud API - Meta)'}</span>
                     <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.2 rounded">
-                      اختياري للمنشآت
+                      {lang === 'ar' ? 'اختياري للمنشآت' : 'Optional for organizations'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                    إرسال خلفي مؤتمت بالكامل عبر حساب Meta Business الموثق برمجياً.
+                    {lang === 'ar' ? 'إرسال خلفي مؤتمت بالكامل عبر حساب Meta Business الموثق برمجياً.' : 'Fully automated background sending via a programmatically verified Meta Business account.'}
                   </p>
                 </div>
               </label>
@@ -311,7 +323,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
             <h5 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Key className="w-4 h-4 text-emerald-500" />
-              <span>بيانات ربط WhatsApp Cloud API (Meta Developers)</span>
+              <span>{lang === 'ar' ? 'بيانات ربط WhatsApp Cloud API (Meta Developers)' : 'WhatsApp Cloud API integration data (Meta Developers)'}</span>
             </h5>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
@@ -375,7 +387,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
               type="text"
               value={testPhoneNumber}
               onChange={(e) => setTestPhoneNumber(e.target.value)}
-              placeholder="أدخل رقم ولي أمر للتجربة (مثال: 050xxxxxxx)"
+              placeholder={lang === 'ar' ? 'أدخل رقم ولي أمر للتجربة (مثال: 050xxxxxxx)' : 'Enter a parent number to test (e.g. 050xxxxxxx)'}
               className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono text-xs w-full sm:w-64"
             />
             <button
@@ -384,11 +396,11 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>تجربة فتح واتساب ويب</span>
+              <span>{lang === 'ar' ? 'تجربة فتح واتساب ويب' : 'Test opening WhatsApp Web'}</span>
             </button>
           </div>
           <span className="text-[11px] text-slate-500 dark:text-slate-400">
-            ملاحظة: يمكنك إرسال الرسائل مباشرة لجميع الطلاب من صفحة صندوق الإشعارات أو ملف الطالب.
+            {lang === 'ar' ? 'ملاحظة: يمكنك إرسال الرسائل مباشرة لجميع الطلاب من صفحة صندوق الإشعارات أو ملف الطالب.' : 'Note: You can send messages directly to all students from the notifications inbox page or the student profile.'}
           </span>
         </div>
       </div>
@@ -402,17 +414,17 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             </div>
             <div>
               <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                بوابة الرسائل النصية القصيرة (SMS Gateway Service)
+                {lang === 'ar' ? 'بوابة الرسائل النصية القصيرة (SMS Gateway Service)' : 'Short message service gateway (SMS Gateway Service)'}
               </h4>
               <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                ربط مزود خدمة الرسائل النصية المعتمد لإرسال إشعارات الغياب والتأخر الرسمية
+                {lang === 'ar' ? 'ربط مزود خدمة الرسائل النصية المعتمد لإرسال إشعارات الغياب والتأخر الرسمية' : 'Connect the approved SMS service provider to send official absence and tardiness notifications'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              تفعيل إرسال الرسائل النصية (SMS):
+              {lang === 'ar' ? 'تفعيل إرسال الرسائل النصية (SMS):' : 'Enable sending SMS messages:'}
             </span>
             <input
               type="checkbox"
@@ -428,7 +440,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* SMS Provider */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              مزود خدمة الـ SMS المعتمد:
+              {lang === 'ar' ? 'مزود خدمة الـ SMS المعتمد:' : 'Approved SMS service provider:'}
             </label>
             <select
               disabled={!isSuperAdmin}
@@ -436,35 +448,35 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
               onChange={(e) => handleFieldChange('smsProvider', e.target.value as SmsGatewayProvider)}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <option value="taqnyat">تقنيات (Taqnyat - بوابة سعودية معتمدة)</option>
-              <option value="unifonic">يونيفونك (Unifonic - معتمد)</option>
-              <option value="msegat">مسجات (Msegat - بوابة سعودية)</option>
-              <option value="twilio">تويليو (Twilio - مزود دولي)</option>
+              <option value="taqnyat">{lang === 'ar' ? 'تقنيات (Taqnyat - بوابة سعودية معتمدة)' : 'Taqnyat (Taqnyat - approved Saudi gateway)'}</option>
+              <option value="unifonic">{lang === 'ar' ? 'يونيفونك (Unifonic - معتمد)' : 'Unifonic (Unifonic - approved)'}</option>
+              <option value="msegat">{lang === 'ar' ? 'مسجات (Msegat - بوابة سعودية)' : 'Msegat (Msegat - Saudi gateway)'}</option>
+              <option value="twilio">{lang === 'ar' ? 'تويليو (Twilio - مزود دولي)' : 'Twilio (Twilio - international provider)'}</option>
             </select>
           </div>
 
           {/* SMS Sender ID */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              اسم المرسل المعتمد (Sender ID):
+              {lang === 'ar' ? 'اسم المرسل المعتمد (Sender ID):' : 'Approved sender name (Sender ID):'}
             </label>
             <input
               type="text"
               disabled={!isSuperAdmin}
               value={form.smsSenderId || ''}
               onChange={(e) => handleFieldChange('smsSenderId', e.target.value)}
-              placeholder="e.g. AL-MAJD أو SMARTSCHOOL"
+              placeholder={lang === 'ar' ? 'e.g. AL-MAJD أو SMARTSCHOOL' : 'e.g. AL-MAJD or SMARTSCHOOL'}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-              اسم المرسل المسجل والمطابق لترخيص هيئة الاتصالات والفضاء والتقنية.
+              {lang === 'ar' ? 'اسم المرسل المسجل والمطابق لترخيص هيئة الاتصالات والفضاء والتقنية.' : 'The registered sender name matching the Communications, Space and Technology Commission license.'}
             </p>
           </div>
 
           {/* SMS API Key / Token */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              مفتاح الواجهة البرمجية (API Key):
+              {lang === 'ar' ? 'مفتاح الواجهة البرمجية (API Key):' : 'API key (API Key):'}
             </label>
             <div className="relative flex items-center">
               <input
@@ -472,7 +484,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                 disabled={!isSuperAdmin}
                 value={form.smsApiKey || ''}
                 onChange={(e) => handleFieldChange('smsApiKey', e.target.value)}
-                placeholder="أدخل مفتاح الـ API..."
+                placeholder={lang === 'ar' ? 'أدخل مفتاح الـ API...' : 'Enter the API key...'}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pl-9 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
               <button
@@ -488,7 +500,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* SMS API Secret */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              الرمز السري (API Secret / Password):
+              {lang === 'ar' ? 'الرمز السري (API Secret / Password):' : 'API secret (API Secret / Password):'}
             </label>
             <div className="relative flex items-center">
               <input
@@ -496,7 +508,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                 disabled={!isSuperAdmin}
                 value={form.smsApiSecret || ''}
                 onChange={(e) => handleFieldChange('smsApiSecret', e.target.value)}
-                placeholder="أدخل الرمز السري..."
+                placeholder={lang === 'ar' ? 'أدخل الرمز السري...' : 'Enter the API secret...'}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pl-9 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
               <button
@@ -520,16 +532,16 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             </div>
             <div>
               <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                البريد الإلكتروني (النشرة الصباحية اليومية)
+                {lang === 'ar' ? 'البريد الإلكتروني (النشرة الصباحية اليومية)' : 'Email (daily morning digest)'}
               </h4>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                يُستخدم لإرسال موجز الإدارة الصباحي إلى قيادات المدرسة عبر البريد.
+                {lang === 'ar' ? 'يُستخدم لإرسال موجز الإدارة الصباحي إلى قيادات المدرسة عبر البريد.' : 'Used to send the morning management digest to school leadership via email.'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              تفعيل البريد الإلكتروني:
+              {lang === 'ar' ? 'تفعيل البريد الإلكتروني:' : 'Enable email:'}
             </span>
             <input
               type="checkbox"
@@ -545,7 +557,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* Email Provider */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              مزود البريد الإلكتروني:
+              {lang === 'ar' ? 'مزود البريد الإلكتروني:' : 'Email provider:'}
             </label>
             <select
               disabled={!isSuperAdmin}
@@ -553,16 +565,16 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
               onChange={(e) => handleFieldChange('emailProvider', e.target.value as EmailGatewayProvider)}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <option value="smtp">SMTP (خادم بريد المدرسة)</option>
-              <option value="resend">Resend (واجهة برمجية)</option>
-              <option value="sendgrid">SendGrid (واجهة برمجية)</option>
+              <option value="smtp">{lang === 'ar' ? 'SMTP (خادم بريد المدرسة)' : 'SMTP (school mail server)'}</option>
+              <option value="resend">{lang === 'ar' ? 'Resend (واجهة برمجية)' : 'Resend (API)'}</option>
+              <option value="sendgrid">{lang === 'ar' ? 'SendGrid (واجهة برمجية)' : 'SendGrid (API)'}</option>
             </select>
           </div>
 
           {/* From Email */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              عنوان المرسل (From Email):
+              {lang === 'ar' ? 'عنوان المرسل (From Email):' : 'Sender address (From Email):'}
             </label>
             <input
               type="email"
@@ -577,7 +589,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           {/* From Name */}
           <div>
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              اسم المرسل (From Name):
+              {lang === 'ar' ? 'اسم المرسل (From Name):' : 'Sender name (From Name):'}
             </label>
             <input
               type="text"
@@ -594,7 +606,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                خادم SMTP (Host):
+                {lang === 'ar' ? 'خادم SMTP (Host):' : 'SMTP server (Host):'}
               </label>
               <input
                 type="text"
@@ -607,7 +619,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             </div>
             <div>
               <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                المنفذ (Port):
+                {lang === 'ar' ? 'المنفذ (Port):' : 'Port (Port):'}
               </label>
               <input
                 type="number"
@@ -626,12 +638,12 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                   onChange={(e) => handleFieldChange('smtpSecure', e.target.checked)}
                   className="w-4 h-4 accent-indigo-600 rounded cursor-pointer disabled:opacity-50"
                 />
-                اتصال آمن (TLS/SSL)
+                {lang === 'ar' ? 'اتصال آمن (TLS/SSL)' : 'Secure connection (TLS/SSL)'}
               </label>
             </div>
             <div>
               <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                اسم المستخدم (SMTP User):
+                {lang === 'ar' ? 'اسم المستخدم (SMTP User):' : 'Username (SMTP User):'}
               </label>
               <input
                 type="text"
@@ -644,7 +656,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             </div>
             <div className="lg:col-span-2">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                كلمة مرور SMTP:
+                {lang === 'ar' ? 'كلمة مرور SMTP:' : 'SMTP password:'}
               </label>
               <div className="relative flex items-center">
                 <input
@@ -668,7 +680,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
         ) : (
           <div className="max-w-md">
             <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-              مفتاح الواجهة البرمجية (Email API Key):
+              {lang === 'ar' ? 'مفتاح الواجهة البرمجية (Email API Key):' : 'API key (Email API Key):'}
             </label>
             <div className="relative flex items-center">
               <input
@@ -676,7 +688,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
                 disabled={!isSuperAdmin}
                 value={form.emailApiKey || ''}
                 onChange={(e) => handleFieldChange('emailApiKey', e.target.value)}
-                placeholder="أدخل مفتاح الـ API..."
+                placeholder={lang === 'ar' ? 'أدخل مفتاح الـ API...' : 'Enter the API key...'}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pl-9 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
               <button
@@ -696,14 +708,16 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
           <span>
-            سجل التوثيق: تم الضبط الأخير بواسطة{' '}
+            {lang === 'ar' ? 'سجل التوثيق: تم الضبط الأخير بواسطة ' : 'Audit log: last configured by '}
             <strong className="text-slate-700 dark:text-slate-300">
-              {gatewayConfig.lastConfiguredByRole === 'super_admin' ? 'مالك المنصة (The Owner)' : 'مسؤول النظام'}
+              {gatewayConfig.lastConfiguredByRole === 'super_admin'
+                ? (lang === 'ar' ? 'مالك المنصة (The Owner)' : 'Platform owner (The Owner)')
+                : (lang === 'ar' ? 'مسؤول النظام' : 'System administrator')}
             </strong>
             {gatewayConfig.lastConfiguredByEmail && ` (${gatewayConfig.lastConfiguredByEmail})`}
             {gatewayConfig.lastConfiguredAt && (
               <span className="font-mono mr-1">
-                بتاريخ: {new Date(gatewayConfig.lastConfiguredAt).toLocaleString('ar-SA')}
+                {lang === 'ar' ? 'بتاريخ:' : 'on:'} {new Date(gatewayConfig.lastConfiguredAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
               </span>
             )}
           </span>
@@ -716,7 +730,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
             className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors shadow-2xs self-end sm:self-auto"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>حفظ واعتماد التغييرات</span>
+            <span>{lang === 'ar' ? 'حفظ واعتماد التغييرات' : 'Save and apply changes'}</span>
           </button>
         )}
       </div>

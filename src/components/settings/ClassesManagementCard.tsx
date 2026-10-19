@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SchoolClassConfig } from '../../types/attendance';
 import { School, Plus, Trash2, Edit2, Check, X, DoorOpen, Users, CheckCircle2 } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   classes: SchoolClassConfig[];
@@ -17,6 +18,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
   onAutoSave,
   disabled,
 }) => {
+  const { lang } = useAttendance();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [gradeInput, setGradeInput] = useState('');
@@ -70,7 +72,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
         : c
     );
     setEditingId(null);
-    await triggerAutoSave(updated, `تم حفظ تعديلات الشعبة (${nameInput.trim()}) بنجاح ✓`);
+    await triggerAutoSave(updated, lang === 'ar' ? `تم حفظ تعديلات الشعبة (${nameInput.trim()}) بنجاح ✓` : `Class section (${nameInput.trim()}) changes were saved successfully ✓`);
   };
 
   const cancelEdit = () => {
@@ -83,7 +85,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
     const updated = classes.filter((c) => c.id !== id);
     await triggerAutoSave(
       updated,
-      target ? `تم حذف الشعبة (${target.name}) وحفظ التعديلات بنجاح ✓` : 'تم حذف الفصل بنجاح ✓'
+      target ? (lang === 'ar' ? `تم حذف الشعبة (${target.name}) وحفظ التعديلات بنجاح ✓` : `Class section (${target.name}) was deleted and changes saved successfully ✓`) : (lang === 'ar' ? 'تم حذف الفصل بنجاح ✓' : 'Class deleted successfully ✓')
     );
   };
 
@@ -100,7 +102,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
     setNewName('');
     setNewRoom('');
     setIsAdding(false);
-    await triggerAutoSave(updated, `تمت إضافة الشعبة (${newClassItem.name}) وحفظها بنجاح ✓`);
+    await triggerAutoSave(updated, lang === 'ar' ? `تمت إضافة الشعبة (${newClassItem.name}) وحفظها بنجاح ✓` : `Class section (${newClassItem.name}) was added and saved successfully ✓`);
   };
 
   return (
@@ -115,7 +117,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
       <div className="flex items-center justify-between pb-1 border-b border-slate-100">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <School className="w-4 h-4 text-emerald-600" />
-          <span>الفصول والشعب المدرسية المعتمدة ({classes.length} فصول):</span>
+          <span>{lang === 'ar' ? `الفصول والشعب المدرسية المعتمدة (${classes.length} فصول):` : `Approved school classes and sections (${classes.length} classes):`}</span>
         </div>
         {!disabled && (
           <button
@@ -124,7 +126,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
             className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>إضافة فصل / شعبة جديدة</span>
+            <span>{lang === 'ar' ? 'إضافة فصل / شعبة جديدة' : 'Add new class / section'}</span>
           </button>
         )}
       </div>
@@ -134,22 +136,22 @@ export const ClassesManagementCard: React.FC<Props> = ({
         <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3 animate-in fade-in duration-200">
           <div className="font-bold text-emerald-900 text-xs flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5 text-emerald-600" />
-            <span>تعريف فصل دراسي جديد</span>
+            <span>{lang === 'ar' ? 'تعريف فصل دراسي جديد' : 'Define a new class'}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div>
-              <label className="text-slate-600 block mb-1">اسم الفصل / الشعبة *</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الفصل / الشعبة *' : 'Class / section name *'}</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="مثال: 10 / ج أو 11 / أ"
+                placeholder={lang === 'ar' ? 'مثال: 10 / ج أو 11 / أ' : 'Example: 10 / C or 11 / A'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 font-semibold"
                 autoFocus
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">الصف / المرحلة الدراسية *</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الصف / المرحلة الدراسية *' : 'Grade / grade level *'}</label>
               {educationalGrades.length > 0 ? (
                 <select
                   value={newGrade}
@@ -167,23 +169,23 @@ export const ClassesManagementCard: React.FC<Props> = ({
                   type="text"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
-                  placeholder="الصف العاشر"
+                  placeholder={lang === 'ar' ? 'الصف العاشر' : 'Tenth grade'}
                   className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
                 />
               )}
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">القاعة / الغرفة الصفية</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'القاعة / الغرفة الصفية' : 'Room / classroom'}</label>
               <input
                 type="text"
                 value={newRoom}
                 onChange={(e) => setNewRoom(e.target.value)}
-                placeholder="قاعة 103"
+                placeholder={lang === 'ar' ? 'قاعة 103' : 'Room 103'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">السعة الاستيعابية</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'السعة الاستيعابية' : 'Capacity'}</label>
               <input
                 type="number"
                 value={newCapacity}
@@ -200,7 +202,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
               onClick={() => setIsAdding(false)}
               className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-100 text-xs cursor-pointer"
             >
-              إلغاء
+              {lang === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
             <button
               type="button"
@@ -208,7 +210,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
               disabled={!newName.trim()}
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold cursor-pointer"
             >
-              حفظ الفصل
+              {lang === 'ar' ? 'حفظ الفصل' : 'Save class'}
             </button>
           </div>
         </div>
@@ -219,18 +221,18 @@ export const ClassesManagementCard: React.FC<Props> = ({
         <table className="w-full text-right border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[11px]">
-              <th className="p-2.5 font-bold">اسم الفصل / الشعبة</th>
-              <th className="p-2.5 font-bold">المرحلة / الصف</th>
-              <th className="p-2.5 font-bold">القاعة الصفية</th>
-              <th className="p-2.5 font-bold text-center">السعة</th>
-              {!disabled && <th className="p-2.5 text-center w-20">إجراءات</th>}
+              <th className="p-2.5 font-bold">{lang === 'ar' ? 'اسم الفصل / الشعبة' : 'Class / section name'}</th>
+              <th className="p-2.5 font-bold">{lang === 'ar' ? 'المرحلة / الصف' : 'Grade level'}</th>
+              <th className="p-2.5 font-bold">{lang === 'ar' ? 'القاعة الصفية' : 'Classroom'}</th>
+              <th className="p-2.5 font-bold text-center">{lang === 'ar' ? 'السعة' : 'Capacity'}</th>
+              {!disabled && <th className="p-2.5 text-center w-20">{lang === 'ar' ? 'إجراءات' : 'Actions'}</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {classes.length === 0 ? (
               <tr>
                 <td colSpan={disabled ? 4 : 5} className="p-6 text-center text-slate-400">
-                  لم يتم إضافة فصول دراسية بعد. انقر على "إضافة فصل / شعبة جديدة" للبدء.
+                  {lang === 'ar' ? 'لم يتم إضافة فصول دراسية بعد. انقر على "إضافة فصل / شعبة جديدة" للبدء.' : 'No classes have been added yet. Click "Add new class / section" to start.'}
                 </td>
               </tr>
             ) : (
@@ -256,7 +258,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                               className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-800 font-medium"
                             >
                               {!educationalGrades.includes(gradeInput) && gradeInput && (
-                                <option value={gradeInput}>{gradeInput} (مخصص)</option>
+                                <option value={gradeInput}>{gradeInput} {lang === 'ar' ? '(مخصص)' : '(custom)'}</option>
                               )}
                               {educationalGrades.map((g) => (
                                 <option key={g} value={g}>
@@ -295,7 +297,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                               type="button"
                               onClick={() => saveEdit(cls.id)}
                               className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
-                              title="حفظ"
+                              title={lang === 'ar' ? 'حفظ' : 'Save'}
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -303,7 +305,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                               type="button"
                               onClick={cancelEdit}
                               className="p-1 text-slate-400 hover:bg-slate-100 rounded cursor-pointer"
-                              title="إلغاء"
+                              title={lang === 'ar' ? 'إلغاء' : 'Cancel'}
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -319,7 +321,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                         <td className="p-2.5 text-slate-700">{cls.grade}</td>
                         <td className="p-2.5 text-slate-500 flex items-center gap-1">
                           <DoorOpen className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{cls.room || 'غير محدد'}</span>
+                          <span>{cls.room || (lang === 'ar' ? 'غير محدد' : 'Not specified')}</span>
                         </td>
                         <td className="p-2.5 text-center font-mono text-slate-700">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-[11px]">
@@ -334,7 +336,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                                 type="button"
                                 onClick={() => startEdit(cls)}
                                 className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer transition-colors"
-                                title="تعديل"
+                                title={lang === 'ar' ? 'تعديل' : 'Edit'}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
@@ -342,7 +344,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                                 type="button"
                                 onClick={() => handleDelete(cls.id)}
                                 className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                title="حذف"
+                                title={lang === 'ar' ? 'حذف' : 'Delete'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

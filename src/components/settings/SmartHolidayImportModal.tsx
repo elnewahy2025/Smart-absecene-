@@ -21,6 +21,7 @@ import { COUNTRIES_LIST } from '../../config/countryCodes';
 import { authenticatedFetch } from '../../lib/api';
 import { getHolidayTypeLabel } from '../../utils/holidayUtils';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface SmartHolidayImportModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   initialAcademicYear = '1446-1447 هـ (2026-2027 م)',
   onApplyHolidays,
 }) => {
+  const { lang } = useAttendance();
   const [country, setCountry] = useState(initialCountry);
   const [academicYear, setAcademicYear] = useState(initialAcademicYear);
   const [isSearching, setIsSearching] = useState(false);
@@ -70,7 +72,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
       setSelectedHolidayIds(preset.officialHolidays.map((h) => h.id));
       setRecommendedWeekendDays(preset.defaultWeekendDays);
       setRecommendedMinistryHeader(preset.ministryHeaderAr);
-      setOfficialSource(`التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}`);
+      setOfficialSource(lang === 'ar' ? `التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}` : `Approved official academic calendar - ${preset.countryNameAr}`);
       setVerifiedMethod('official_preset');
       setSearchSuccess(true);
       setErrorMsg(null);
@@ -85,7 +87,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   // Execute Search via Server Gemini Endpoint or verified preset fallback
   const handlePerformSearch = async (targetCountry: string = country) => {
     if (!targetCountry.trim()) {
-      setErrorMsg('يرجى تحديد أو إدخال اسم الدولة للبحث عن تقويمها الرسمي.');
+      setErrorMsg(lang === 'ar' ? 'يرجى تحديد أو إدخال اسم الدولة للبحث عن تقويمها الرسمي.' : 'Please select or enter the country name to search for its official calendar.');
       return;
     }
 
@@ -111,7 +113,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
           setSelectedHolidayIds(data.holidays.map((h: OfficialHoliday) => h.id));
           setRecommendedWeekendDays(data.weekendDays || [5, 6]);
           setRecommendedMinistryHeader(data.ministryHeaderAr || '');
-          setOfficialSource(data.source || `التقويم الرسمي المعتمد لـ (${data.country})`);
+          setOfficialSource(data.source || (lang === 'ar' ? `التقويم الرسمي المعتمد لـ (${data.country})` : `Approved official calendar for (${data.country})`));
           setVerifiedMethod(data.verifiedBy === 'gemini_verified' ? 'gemini_verified' : 'official_preset');
           setSearchSuccess(true);
           return;
@@ -124,7 +126,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
       setSelectedHolidayIds(preset.officialHolidays.map((h) => h.id));
       setRecommendedWeekendDays(preset.defaultWeekendDays);
       setRecommendedMinistryHeader(preset.ministryHeaderAr);
-      setOfficialSource(`التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}`);
+      setOfficialSource(lang === 'ar' ? `التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}` : `Approved official academic calendar - ${preset.countryNameAr}`);
       setVerifiedMethod('official_preset');
       setSearchSuccess(true);
     } catch (err: any) {
@@ -135,7 +137,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
       setSelectedHolidayIds(preset.officialHolidays.map((h) => h.id));
       setRecommendedWeekendDays(preset.defaultWeekendDays);
       setRecommendedMinistryHeader(preset.ministryHeaderAr);
-      setOfficialSource(`التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}`);
+      setOfficialSource(lang === 'ar' ? `التقويم الدراسي الرسمي المعتمد - ${preset.countryNameAr}` : `Approved official academic calendar - ${preset.countryNameAr}`);
       setVerifiedMethod('official_preset');
       setSearchSuccess(true);
     } finally {
@@ -162,7 +164,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   const handleApply = async () => {
     const holidaysToImport = discoveredHolidays.filter((h) => selectedHolidayIds.includes(h.id));
     if (holidaysToImport.length === 0) {
-      setErrorMsg('يرجى اختيار عطلة رسمية واحدة على الأقل للاستيراد.');
+      setErrorMsg(lang === 'ar' ? 'يرجى اختيار عطلة رسمية واحدة على الأقل للاستيراد.' : 'Please select at least one official holiday to import.');
       return;
     }
 
@@ -175,7 +177,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
       });
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'حدث خطأ أثناء حفظ التقويم المستورد.');
+      setErrorMsg(err?.message || (lang === 'ar' ? 'حدث خطأ أثناء حفظ التقويم المستورد.' : 'An error occurred while saving the imported calendar.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -215,7 +217,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-black tracking-wide">
-                  أداة البحث الذكي والاستيراد المعتمد للتقويم والعطلات
+                  {lang === 'ar' ? 'أداة البحث الذكي والاستيراد المعتمد للتقويم والعطلات' : 'Smart search and approved import tool for calendars and holidays'}
                 </h3>
                 <span className="text-[10px] bg-yellow-400 text-amber-950 font-black px-2 py-0.5 rounded-full shadow-2xs">
                   The Owner Exclusive
@@ -225,7 +227,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                 </span>
               </div>
               <p className="text-xs text-amber-100 font-normal leading-relaxed">
-                بحث فوري وتحقق معتمد من مصادر وزارات التعليم ومجالس الوزراء الرسمية لأي دولة وعام دراسي، مع تكييف كامل للمنظومة.
+                {lang === 'ar' ? 'بحث فوري وتحقق معتمد من مصادر وزارات التعليم ومجالس الوزراء الرسمية لأي دولة وعام دراسي، مع تكييف كامل للمنظومة.' : 'Instant search and verified checking from official ministries of education and councils of ministers sources for any country and academic year, with full adaptation of the system.'}
               </p>
             </div>
           </div>
@@ -252,7 +254,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               <div className="sm:col-span-7">
                 <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
-                  الدولة المستهدفة بالبحث والتحقق:
+                  {lang === 'ar' ? 'الدولة المستهدفة بالبحث والتحقق:' : 'Target country for search and verification:'}
                 </label>
                 <div className="relative">
                   <input
@@ -266,7 +268,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                         handlePerformSearch(country);
                       }
                     }}
-                    placeholder="اكتب اسم أي دولة (مثال: مصر، السعودية، الإمارات، قطر، الأردن...)"
+                    placeholder={lang === 'ar' ? 'اكتب اسم أي دولة (مثال: مصر، السعودية، الإمارات، قطر، الأردن...)' : 'Type any country name (e.g. Egypt, Saudi Arabia, UAE, Qatar, Jordan...)'}
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 font-medium focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
                   <datalist id="modal-countries-datalist">
@@ -281,13 +283,13 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
 
               <div className="sm:col-span-5">
                 <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
-                  العام الدراسي المستهدف:
+                  {lang === 'ar' ? 'العام الدراسي المستهدف:' : 'Target academic year:'}
                 </label>
                 <input
                   type="text"
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
-                  placeholder="مثال: 1446-1447 هـ (2026-2027 م)"
+                  placeholder={lang === 'ar' ? 'مثال: 1446-1447 هـ (2026-2027 م)' : 'e.g. 1446-1447 AH (2026-2027 AD)'}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 font-medium focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
@@ -296,7 +298,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
             {/* Quick Country Buttons */}
             <div>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1.5 font-medium">
-                اختيار سريع لأهم الدول العربية:
+                {lang === 'ar' ? 'اختيار سريع لأهم الدول العربية:' : 'Quick selection of key Arab countries:'}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {popularCountries.map((pc) => {
@@ -334,12 +336,12 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                 {isSearching ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-yellow-200" />
-                    <span>جارٍ البحث والتحقق من المصادر الرسمية...</span>
+                    <span>{lang === 'ar' ? 'جارٍ البحث والتحقق من المصادر الرسمية...' : 'Searching and verifying official sources...'}</span>
                   </>
                 ) : (
                   <>
                     <Search className="w-4 h-4 text-yellow-200" />
-                    <span>بدء البحث الذكي والتحقق من التقويم الرسمي</span>
+                    <span>{lang === 'ar' ? 'بدء البحث الذكي والتحقق من التقويم الرسمي' : 'Start smart search and verify the official calendar'}</span>
                   </>
                 )}
               </button>
@@ -359,15 +361,19 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                     </span>
                     <span className="text-[11px] text-emerald-800 dark:text-emerald-300">
                       {verifiedMethod === 'gemini_verified'
-                        ? 'تم التحقق من روزنامة التقويم الدراسي عبر الذكاء الاصطناعي والمصادر الرسمية'
-                        : 'تقويم وزاري رسمي معتمد ومفحوص بالكامل (Verified Official Repository)'}
+                        ? lang === 'ar'
+                          ? 'تم التحقق من روزنامة التقويم الدراسي عبر الذكاء الاصطناعي والمصادر الرسمية'
+                          : 'The academic calendar schedule has been verified via artificial intelligence and official sources'
+                        : lang === 'ar'
+                          ? 'تقويم وزاري رسمي معتمد ومفحوص بالكامل (Verified Official Repository)'
+                          : 'Fully verified and approved official ministerial calendar (Verified Official Repository)'}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-900 dark:text-emerald-200 self-end sm:self-center">
                   <span className="px-2 py-0.5 rounded-full bg-white/70 dark:bg-slate-900/60 border border-emerald-300 dark:border-emerald-700">
-                    {discoveredHolidays.length} عطلة رسمية
+                    {discoveredHolidays.length} {lang === 'ar' ? 'عطلة رسمية' : 'official holidays'}
                   </span>
                 </div>
               </div>
@@ -382,13 +388,13 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                     className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
                   />
                   <span>
-                    تطبيق نمط عطلة نهاية الأسبوع لـ ({country}):{' '}
+                    {lang === 'ar' ? `تطبيق نمط عطلة نهاية الأسبوع لـ (${country}):` : `Apply the weekend pattern for (${country}):`}{' '}
                     <span className="text-amber-800 dark:text-amber-300 font-mono">
                       {recommendedWeekendDays.includes(5) && recommendedWeekendDays.includes(6)
-                        ? 'الجمعة والسبت'
+                        ? lang === 'ar' ? 'الجمعة والسبت' : 'Friday and Saturday'
                         : recommendedWeekendDays.includes(6) && recommendedWeekendDays.includes(0)
-                        ? 'السبت والأحد'
-                        : 'الجمعة فقط'}
+                        ? lang === 'ar' ? 'السبت والأحد' : 'Saturday and Sunday'
+                        : lang === 'ar' ? 'الجمعة فقط' : 'Friday only'}
                     </span>
                   </span>
                 </label>
@@ -400,7 +406,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                     onChange={(e) => setApplyHeader(e.target.checked)}
                     className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
                   />
-                  <span>تحديث الترويسة الوزارية الرسمية لنماذج وتقارير المدرسة تلقائياً</span>
+                  <span>{lang === 'ar' ? 'تحديث الترويسة الوزارية الرسمية لنماذج وتقارير المدرسة تلقائياً' : 'Automatically update the official ministerial header of school forms and reports'}</span>
                 </label>
               </div>
 
@@ -409,14 +415,14 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                 <div className="bg-slate-100 dark:bg-slate-800 p-2.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                   <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-amber-600" />
-                    <span>قائمة العطلات والمناسبات الرسمية المعتمدة ({discoveredHolidays.length}):</span>
+                    <span>{lang === 'ar' ? `قائمة العطلات والمناسبات الرسمية المعتمدة (${discoveredHolidays.length}):` : `List of approved official holidays and occasions (${discoveredHolidays.length}):`}</span>
                   </span>
                   <button
                     type="button"
                     onClick={handleSelectAll}
                     className="text-[11px] text-amber-700 dark:text-amber-300 hover:underline font-bold cursor-pointer"
                   >
-                    {selectedHolidayIds.length === discoveredHolidays.length ? 'إلغاء تحديد الكل' : 'تحديد الكل'}
+                    {selectedHolidayIds.length === discoveredHolidays.length ? (lang === 'ar' ? 'إلغاء تحديد الكل' : 'Deselect all') : (lang === 'ar' ? 'تحديد الكل' : 'Select all')}
                   </button>
                 </div>
 
@@ -446,7 +452,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                               {h.nameAr}
                             </span>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                              {getHolidayTypeLabel(h.type)}
+                              {getHolidayTypeLabel(h.type, lang)}
                             </span>
                           </div>
                           {h.nameEn && (
@@ -459,7 +465,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                               {h.startDate} {h.endDate !== h.startDate && `← ${h.endDate}`}
                             </span>
                             <span className="text-[10px] bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.2 rounded font-sans">
-                              {duration === 1 ? 'يوم واحد' : `${duration} أيام`}
+                              {duration === 1 ? (lang === 'ar' ? 'يوم واحد' : 'one day') : (lang === 'ar' ? `${duration} أيام` : `${duration} days`)}
                             </span>
                           </div>
                           {h.notes && (
@@ -485,7 +491,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
             disabled={isSubmitting}
             className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-xs"
           >
-            إلغاء
+            {lang === 'ar' ? 'إلغاء' : 'Cancel'}
           </button>
 
           <button
@@ -497,12 +503,12 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
             {isSubmitting ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>جارٍ اعتماد التقويم وحفظه...</span>
+                <span>{lang === 'ar' ? 'جارٍ اعتماد التقويم وحفظه...' : 'Approving and saving the calendar...'}</span>
               </>
             ) : (
               <>
                 <Check className="w-4 h-4" />
-                <span>اعتماد واستيراد ({selectedHolidayIds.length}) إجازة رسمية إلى تقويم المدرسة</span>
+                <span>{lang === 'ar' ? `اعتماد واستيراد (${selectedHolidayIds.length}) إجازة رسمية إلى تقويم المدرسة` : `Approve and import (${selectedHolidayIds.length}) official holidays into the school calendar`}</span>
               </>
             )}
           </button>

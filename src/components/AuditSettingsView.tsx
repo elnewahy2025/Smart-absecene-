@@ -95,7 +95,11 @@ export const AuditSettingsView: React.FC = () => {
         officialHolidays: formSettings.officialHolidays,
       });
     }
-    setSaveSuccessMsg('تم حفظ وتطبيق قواعد المدرسة والعطلات الرسمية بنجاح وتوثيق التحديث في سجل التدقيق.');
+    setSaveSuccessMsg(
+      lang === 'ar'
+        ? 'تم حفظ وتطبيق قواعد المدرسة والعطلات الرسمية بنجاح وتوثيق التحديث في سجل التدقيق.'
+        : 'School policies and official holidays were saved and applied successfully; the change was recorded in the audit log.'
+    );
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
@@ -113,7 +117,11 @@ export const AuditSettingsView: React.FC = () => {
         officialHolidays: formProfile.officialHolidays,
       });
     }
-    setSaveSuccessMsg('تم حفظ وتطبيق الملف التعريفي والتقويم المدرسي بنجاح وتوثيق التحديث في سجل التدقيق.');
+    setSaveSuccessMsg(
+      lang === 'ar'
+        ? 'تم حفظ وتطبيق الملف التعريفي والتقويم المدرسي بنجاح وتوثيق التحديث في سجل التدقيق.'
+        : 'The school profile and calendar were saved and applied successfully; the change was recorded in the audit log.'
+    );
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
@@ -243,7 +251,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              الهوية والترخيص
+              {lang === 'ar' ? 'الهوية والترخيص' : 'Identity & Licensing'}
             </button>
             <button
               type="button"
@@ -254,7 +262,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              العنوان والاتصال
+              {lang === 'ar' ? 'العنوان والاتصال' : 'Address & Contact'}
             </button>
             <button
               type="button"
@@ -265,7 +273,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              القيادة والتوقيعات (الوكيلان + الموجه)
+              {lang === 'ar' ? 'القيادة والتوقيعات (الوكيلان + الموجه)' : 'Leadership & Signatures (Deputies + Counselor)'}
             </button>
             <button
               type="button"
@@ -276,7 +284,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              التقويم الدراسي
+              {lang === 'ar' ? 'التقويم الدراسي' : 'Academic Calendar'}
             </button>
             <button
               type="button"
@@ -287,7 +295,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              المراحل والفصول الدراسية
+              {lang === 'ar' ? 'المراحل والفصول الدراسية' : 'Grades & Classes'}
             </button>
             <button
               type="button"
@@ -298,7 +306,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              توقيت الحصص اليومية
+              {lang === 'ar' ? 'توقيت الحصص اليومية' : 'Daily Period Timetable'}
             </button>
             <button
               type="button"
@@ -309,7 +317,7 @@ export const AuditSettingsView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              نقاط التجمع وهوامش التقارير
+              {lang === 'ar' ? 'نقاط التجمع وهوامش التقارير' : 'Assembly Points & Report Margins'}
             </button>
           </div>
 
@@ -351,7 +359,11 @@ export const AuditSettingsView: React.FC = () => {
                       officialHolidays: updates.officialHolidays || formProfile.officialHolidays,
                     });
                   }
-                  setSaveSuccessMsg('تم حفظ وتطبيق تحديثات التقويم المدرسي بنجاح وتوثيقها في سجل التدقيق.');
+                  setSaveSuccessMsg(
+                    lang === 'ar'
+                      ? 'تم حفظ وتطبيق تحديثات التقويم المدرسي بنجاح وتوثيقها في سجل التدقيق.'
+                      : 'Academic calendar updates were saved and applied successfully; the change was recorded in the audit log.'
+                  );
                   setTimeout(() => setSaveSuccessMsg(null), 4000);
                 }}
                 disabled={!canManageSettings}
@@ -365,7 +377,11 @@ export const AuditSettingsView: React.FC = () => {
                   const merged = { ...formProfile, ...updates };
                   setFormProfile(merged);
                   await updateSchoolProfile(merged);
-                  setSaveSuccessMsg('تم حفظ وتحديث المراحل والفصول والمواد بنجاح وتوثيقها في سجل التدقيق.');
+                  setSaveSuccessMsg(
+                    lang === 'ar'
+                      ? 'تم حفظ وتحديث المراحل والفصول والمواد بنجاح وتوثيقها في سجل التدقيق.'
+                      : 'Grades, classes and subjects were saved successfully; the change was recorded in the audit log.'
+                  );
                   setTimeout(() => setSaveSuccessMsg(null), 4000);
                 }}
                 disabled={!canManageSettings}
@@ -379,7 +395,11 @@ export const AuditSettingsView: React.FC = () => {
                   const merged = { ...formProfile, ...updates };
                   setFormProfile(merged);
                   await updateSchoolProfile(merged);
-                  setSaveSuccessMsg('تم حفظ وتحديث جدول الحصص اليومية بنجاح وتوثيقه في سجل التدقيق.');
+                  setSaveSuccessMsg(
+                    lang === 'ar'
+                      ? 'تم حفظ وتحديث جدول الحصص اليومية بنجاح وتوثيقه في سجل التدقيق.'
+                      : 'The daily period timetable was saved successfully; the change was recorded in the audit log.'
+                  );
                   setTimeout(() => setSaveSuccessMsg(null), 4000);
                 }}
                 disabled={!canManageSettings}
@@ -462,30 +482,36 @@ export const AuditSettingsView: React.FC = () => {
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
                 <tr>
-                  <th className="py-2.5 px-3">التوقيت والتاريخ</th>
-                  <th className="py-2.5 px-3">المنفّذ / الدور</th>
-                  <th className="py-2.5 px-3">نوع العملية</th>
-                  <th className="py-2.5 px-3">تفاصيل الإجراء</th>
-                  <th className="py-2.5 px-3">التغيير (السابق / الجديد)</th>
+                  <th className="py-2.5 px-3">{lang === 'ar' ? 'التوقيت والتاريخ' : 'Timestamp'}</th>
+                  <th className="py-2.5 px-3">{lang === 'ar' ? 'المنفّذ / الدور' : 'Performer / Role'}</th>
+                  <th className="py-2.5 px-3">{lang === 'ar' ? 'نوع العملية' : 'Action Type'}</th>
+                  <th className="py-2.5 px-3">{lang === 'ar' ? 'تفاصيل الإجراء' : 'Action Details'}</th>
+                  <th className="py-2.5 px-3">{lang === 'ar' ? 'التغيير (السابق / الجديد)' : 'Change (Before / After)'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredLogs.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-8 text-slate-500">
-                      لا توجد سجلات مطابقة
+                      {lang === 'ar' ? 'لا توجد سجلات مطابقة' : 'No matching log entries'}
                     </td>
                   </tr>
                 ) : (
                   filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                        {new Date(log.timestamp).toLocaleString('ar-SA')}
+                        {new Date(log.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')}
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="font-semibold text-slate-900">{log.performerName}</div>
                         <span className="text-[10px] text-slate-500 font-mono">
-                          ({log.performerRole === 'admin' ? 'مدير' : log.performerRole === 'registrar' ? 'شؤون طلبة' : log.performerRole === 'teacher' ? 'معلم' : 'ولي أمر'})
+                          ({log.performerRole === 'admin'
+                            ? lang === 'ar' ? 'مدير' : 'Admin'
+                            : log.performerRole === 'registrar'
+                            ? lang === 'ar' ? 'شؤون طلبة' : 'Registrar'
+                            : log.performerRole === 'teacher'
+                            ? lang === 'ar' ? 'معلم' : 'Teacher'
+                            : lang === 'ar' ? 'ولي أمر' : 'Parent'})
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
@@ -526,7 +552,7 @@ export const AuditSettingsView: React.FC = () => {
               </h3>
             </div>
             <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/40 border border-current font-mono">
-              قواعد الحضور
+              {lang === 'ar' ? 'قواعد الحضور' : 'Attendance Rules'}
             </span>
           </div>
 
@@ -543,9 +569,9 @@ export const AuditSettingsView: React.FC = () => {
                 }
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800"
               >
-                <option value="both">كلاهما (حضور صباحي يومي + حضور حصص دراسية)</option>
-                <option value="daily">حضور يومي صباحي فقط</option>
-                <option value="period">حضور حصص دراسية فقط</option>
+                <option value="both">{lang === 'ar' ? 'كلاهما (حضور صباحي يومي + حضور حصص دراسية)' : 'Both (daily morning + per-period)'}</option>
+                <option value="daily">{lang === 'ar' ? 'حضور يومي صباحي فقط' : 'Daily morning only'}</option>
+                <option value="period">{lang === 'ar' ? 'حضور حصص دراسية فقط' : 'Per-period only'}</option>
               </select>
             </div>
 
@@ -568,7 +594,7 @@ export const AuditSettingsView: React.FC = () => {
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 font-mono"
               />
               <span className="text-[11px] text-slate-500">
-                أي حضور بعد هذا الوقت يسجل كطالب "متأخر" في الكشف
+                {lang === 'ar' ? 'أي حضور بعد هذا الوقت يسجل كطالب "متأخر" في الكشف' : 'Any arrival after this time is recorded as "late" in the sheet'}
               </span>
             </div>
 
@@ -604,9 +630,9 @@ export const AuditSettingsView: React.FC = () => {
                 }
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 font-medium"
               >
-                <option value="both">كلاهما (SMS و WhatsApp معاً)</option>
-                <option value="SMS">رسائل نصية قصيرة (SMS) فقط</option>
-                <option value="WhatsApp">تطبيق WhatsApp فقط</option>
+                <option value="both">{lang === 'ar' ? 'كلاهما (SMS و WhatsApp معاً)' : 'Both (SMS and WhatsApp)'}</option>
+                <option value="SMS">{lang === 'ar' ? 'رسائل نصية قصيرة (SMS) فقط' : 'SMS only'}</option>
+                <option value="WhatsApp">{lang === 'ar' ? 'تطبيق WhatsApp فقط' : 'WhatsApp only'}</option>
               </select>
             </div>
 
@@ -625,7 +651,9 @@ export const AuditSettingsView: React.FC = () => {
                   rows={2}
                   value={
                     formSettings.absenceMessageTemplate ||
-                    'المكرم ولي أمر الطالب ({student_name}): نفيدكم بتسجيل غياب نجلكم عن ({subject}) بتاريخ {date}. يرجى تقديم العذر عبر الرابط المدرسي.'
+                    (lang === 'ar'
+                      ? 'المكرم ولي أمر الطالب ({student_name}): نفيدكم بتسجيل غياب نجلكم عن ({subject}) بتاريخ {date}. يرجى تقديم العذر عبر الرابط المدرسي.'
+                      : 'Dear parent of ({student_name}): we are informing you that your child was marked absent from ({subject}) on {date}. Please submit an excuse through the school link.')
                   }
                   onChange={(e) =>
                     setFormSettings({ ...formSettings, absenceMessageTemplate: e.target.value })
@@ -633,7 +661,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-sans"
                 />
                 <span className="text-[10px] text-slate-400 block">
-                  المتغيرات المتاحة: {`{student_name}`} ، {`{subject}`} ، {`{date}`}
+                {lang === 'ar' ? 'المتغيرات المتاحة: ' : 'Available variables: '}{`{student_name}`} ، {`{subject}`} ، {`{date}`}
                 </span>
               </div>
 
@@ -646,7 +674,9 @@ export const AuditSettingsView: React.FC = () => {
                   rows={2}
                   value={
                     formSettings.lateMessageTemplate ||
-                    'المكرم ولي أمر الطالب ({student_name}): تم تسجيل تأخر نجلكم ({minutes} دقيقة) عن دوام اليوم بتاريخ {date}.'
+                    (lang === 'ar'
+                      ? 'المكرم ولي أمر الطالب ({student_name}): تم تسجيل تأخر نجلكم ({minutes} دقيقة) عن دوام اليوم بتاريخ {date}.'
+                      : 'Dear parent of ({student_name}): your child was recorded as late today ({minutes} minutes) on {date}.')
                   }
                   onChange={(e) =>
                     setFormSettings({ ...formSettings, lateMessageTemplate: e.target.value })
@@ -654,7 +684,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-sans"
                 />
                 <span className="text-[10px] text-slate-400 block">
-                  المتغيرات المتاحة: {`{student_name}`} ، {`{minutes}`} ، {`{date}`}
+                  {lang === 'ar' ? 'المتغيرات المتاحة: ' : 'Available variables: '}{`{student_name}`} ، {`{minutes}`} ، {`{date}`}
                 </span>
               </div>
 
@@ -667,7 +697,9 @@ export const AuditSettingsView: React.FC = () => {
                   rows={2}
                   value={
                     formSettings.warningMessageTemplate ||
-                    'إشعار رسمي: المكرم ولي أمر الطالب ({student_name})، نظراً لتجاوز أيام الغياب غير المبررة الحد المسموح، نأمل مراجعة إدارة المدرسة عاجلاً.'
+                    (lang === 'ar'
+                      ? 'إشعار رسمي: المكرم ولي أمر الطالب ({student_name})، نظراً لتجاوز أيام الغياب غير المبررة الحد المسموح، نأمل مراجعة إدارة المدرسة عاجلاً.'
+                      : 'Official notice: dear parent of ({student_name}), as the unexcused absences have exceeded the permitted limit, please contact the school administration as soon as possible.')
                   }
                   onChange={(e) =>
                     setFormSettings({ ...formSettings, warningMessageTemplate: e.target.value })
@@ -689,7 +721,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إرسال رسالة تلقائية لولي الأمر فور اعتماد غياب الطالب
+                  {lang === 'ar' ? 'إرسال رسالة تلقائية لولي الأمر فور اعتماد غياب الطالب' : 'Automatically message the parent as soon as an absence is approved'}
                 </span>
               </label>
 
@@ -703,7 +735,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إرسال إشعار لولي الأمر عند تسجيل التأخر الصباحي
+                  {lang === 'ar' ? 'إرسال إشعار لولي الأمر عند تسجيل التأخر الصباحي' : 'Notify the parent when a morning tardiness is recorded'}
                 </span>
               </label>
 
@@ -717,7 +749,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إرسال رسالة تأكيد لولي الأمر عند قبول واعتماد العذر الطبي
+                  {lang === 'ar' ? 'إرسال رسالة تأكيد لولي الأمر عند قبول واعتماد العذر الطبي' : 'Send a confirmation message to the parent when a medical excuse is approved'}
                 </span>
               </label>
 
@@ -734,7 +766,7 @@ export const AuditSettingsView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-slate-800 font-medium">
-                  إلزامية إرفاق تقرير طبي أو مستند رسمي عند تقديم عذر الغياب
+                  {lang === 'ar' ? 'إلزامية إرفاق تقرير طبي أو مستند رسمي عند تقديم عذر الغياب' : 'Require a medical report or official document when submitting an absence excuse'}
                 </span>
               </label>
             </div>

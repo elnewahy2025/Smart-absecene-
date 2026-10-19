@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AcademicTerm } from '../../types/attendance';
 import { Calendar, CheckCircle2, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   terms: AcademicTerm[];
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave, disabled }) => {
+  const { lang } = useAttendance();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameArInput, setNameArInput] = useState('');
   const [startDateInput, setStartDateInput] = useState('');
@@ -48,7 +50,13 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
     }));
     await triggerAutoSave(
       updated,
-      target ? `تم تعيين (${target.nameAr}) كفصل دراسي نشط حالياً وحفظ الإعدادات بنجاح ✓` : 'تم تحديد الفصل الدراسي النشط وحفظه بنجاح ✓'
+      target
+        ? lang === 'ar'
+          ? `تم تعيين (${target.nameAr}) كفصل دراسي نشط حالياً وحفظ الإعدادات بنجاح ✓`
+          : `(${target.nameAr}) has been set as the current active academic term and settings saved successfully ✓`
+        : lang === 'ar'
+          ? 'تم تحديد الفصل الدراسي النشط وحفظه بنجاح ✓'
+          : 'Active academic term selected and saved successfully ✓'
     );
   };
 
@@ -74,7 +82,12 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
         : t
     );
     setEditingId(null);
-    await triggerAutoSave(updated, `تم حفظ تعديلات (${nameArInput.trim()}) وتحديث التقويم بنجاح ✓`);
+    await triggerAutoSave(
+      updated,
+      lang === 'ar'
+        ? `تم حفظ تعديلات (${nameArInput.trim()}) وتحديث التقويم بنجاح ✓`
+        : `Edits to (${nameArInput.trim()}) saved and calendar updated successfully ✓`
+    );
   };
 
   const cancelEdit = (e: React.MouseEvent) => {
@@ -92,7 +105,13 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
     }
     await triggerAutoSave(
       remaining,
-      target ? `تم حذف (${target.nameAr}) وحفظ التعديلات بنجاح ✓` : 'تم حذف الفصل الدراسي بنجاح ✓'
+      target
+        ? lang === 'ar'
+          ? `تم حذف (${target.nameAr}) وحفظ التعديلات بنجاح ✓`
+          : `(${target.nameAr}) deleted and changes saved successfully ✓`
+        : lang === 'ar'
+          ? 'تم حذف الفصل الدراسي بنجاح ✓'
+          : 'Academic term deleted successfully ✓'
     );
   };
 
@@ -111,7 +130,12 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
     setNewStartDate('');
     setNewEndDate('');
     setIsAdding(false);
-    await triggerAutoSave(updated, `تمت إضافة (${newTermItem.nameAr}) وحفظ التقويم المدرسي بنجاح ✓`);
+    await triggerAutoSave(
+      updated,
+      lang === 'ar'
+        ? `تمت إضافة (${newTermItem.nameAr}) وحفظ التقويم المدرسي بنجاح ✓`
+        : `(${newTermItem.nameAr}) added and school calendar saved successfully ✓`
+    );
   };
 
   return (
@@ -126,7 +150,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
       <div className="flex items-center justify-between pb-1 border-b border-slate-100">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <Calendar className="w-4 h-4 text-purple-600" />
-          <span>الفصول الدراسية (انقر لتحديد الفصل النشط حالياً):</span>
+          <span>{lang === 'ar' ? 'الفصول الدراسية (انقر لتحديد الفصل النشط حالياً):' : 'Academic terms (click to set the currently active term):'}</span>
         </div>
         {!disabled && (
           <button
@@ -135,7 +159,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
             className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>إضافة فصل دراسي (ترم) جديد</span>
+            <span>{lang === 'ar' ? 'إضافة فصل دراسي (ترم) جديد' : 'Add new academic term'}</span>
           </button>
         )}
       </div>
@@ -145,22 +169,22 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
         <div className="p-3 bg-purple-50/50 border border-purple-200 rounded-xl space-y-3 animate-in fade-in duration-200 text-xs">
           <div className="font-bold text-purple-900 flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5 text-purple-600" />
-            <span>تعريف ترم / فصل دراسي جديد</span>
+            <span>{lang === 'ar' ? 'تعريف ترم / فصل دراسي جديد' : 'Define a new academic term'}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1">اسم الترم (عربي) *</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الترم (عربي) *' : 'Term name (Arabic) *'}</label>
               <input
                 type="text"
                 value={newNameAr}
                 onChange={(e) => setNewNameAr(e.target.value)}
-                placeholder="الفصل الدراسي الأول"
+                placeholder={lang === 'ar' ? 'الفصل الدراسي الأول' : 'First Term'}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 font-semibold"
                 autoFocus
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">تاريخ البداية</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ البداية' : 'Start date'}</label>
               <input
                 type="date"
                 value={newStartDate}
@@ -169,7 +193,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">تاريخ النهاية</label>
+              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ النهاية' : 'End date'}</label>
               <input
                 type="date"
                 value={newEndDate}
@@ -184,7 +208,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               onClick={() => setIsAdding(false)}
               className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
             >
-              إلغاء
+              {lang === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
             <button
               type="button"
@@ -192,7 +216,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               disabled={!newNameAr.trim()}
               className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-bold cursor-pointer"
             >
-              حفظ الترم
+              {lang === 'ar' ? 'حفظ الترم' : 'Save term'}
             </button>
           </div>
         </div>
@@ -215,7 +239,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               {isEditing ? (
                 <div className="space-y-2 text-xs" onClick={(e) => e.stopPropagation()}>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">اسم الفصل الدراسي:</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'اسم الفصل الدراسي:' : 'Term name:'}</label>
                     <input
                       type="text"
                       value={nameArInput}
@@ -227,7 +251,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">تاريخ البداية:</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ البداية:' : 'Start date:'}</label>
                     <input
                       type="date"
                       value={startDateInput}
@@ -239,7 +263,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">تاريخ النهاية:</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ النهاية:' : 'End date:'}</label>
                     <input
                       type="date"
                       value={endDateInput}
@@ -258,7 +282,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                       className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>{isSaving ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}</span>
+                      <span>{isSaving ? (lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ التعديلات' : 'Save changes')}</span>
                     </button>
                     <button
                       type="button"
@@ -266,7 +290,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                       disabled={isSaving}
                       className="px-2.5 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-100 cursor-pointer transition-colors"
                     >
-                      إلغاء
+                      {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                     </button>
                   </div>
                 </div>
@@ -285,7 +309,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                             type="button"
                             onClick={(e) => startEdit(term, e)}
                             className="p-1 text-slate-400 hover:text-purple-600 rounded cursor-pointer"
-                            title="تعديل المواعيد"
+                            title={lang === 'ar' ? 'تعديل المواعيد' : 'Edit dates'}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -294,7 +318,7 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                               type="button"
                               onClick={(e) => handleDelete(term.id, e)}
                               className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
-                              title="حذف"
+                              title={lang === 'ar' ? 'حذف' : 'Delete'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -305,11 +329,11 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                   </div>
                   <div className="text-[11px] text-slate-600 space-y-1 font-mono bg-slate-50 p-2 rounded-lg border border-slate-100">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">من:</span>
+                      <span className="text-slate-400">{lang === 'ar' ? 'من:' : 'From:'}</span>
                       <span className="font-semibold text-slate-800">{term.startDate}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">إلى:</span>
+                      <span className="text-slate-400">{lang === 'ar' ? 'إلى:' : 'To:'}</span>
                       <span className="font-semibold text-slate-800">{term.endDate}</span>
                     </div>
                   </div>

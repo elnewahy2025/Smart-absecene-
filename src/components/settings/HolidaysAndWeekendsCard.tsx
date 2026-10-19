@@ -64,6 +64,8 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     attendanceCtx = useAttendance();
   } catch {}
 
+  const lang: 'ar' | 'en' = attendanceCtx?.lang === 'en' ? 'en' : 'ar';
+
   const effectiveIsSuperAdmin =
     isSuperAdmin ??
     Boolean(attendanceCtx?.isSuperAdmin || attendanceCtx?.currentUser?.role === 'super_admin');
@@ -107,17 +109,22 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     let updated: number[];
     if (current.includes(dayIndex)) {
       if (current.length === 1) {
-        alert('يجب الإبقاء على يوم عطلة أسبوعية واحد على الأقل للمدرسة.');
+        alert(lang === 'ar' ? 'يجب الإبقاء على يوم عطلة أسبوعية واحد على الأقل للمدرسة.' : 'At least one weekly weekend day must be kept for the school.');
         return;
       }
       updated = current.filter((d) => d !== dayIndex);
     } else {
       updated = [...current, dayIndex].sort((a, b) => a - b);
     }
-    const dayName = WEEK_DAYS.find((d) => d.index === dayIndex)?.nameAr || '';
+    const dayName = (() => {
+      const found = WEEK_DAYS.find((d) => d.index === dayIndex);
+      return (lang === 'ar' ? found?.nameAr : found?.nameEn) || '';
+    })();
     await triggerAutoSave(
       { weekendDays: updated },
-      `تم تحديث أيام العطلة الأسبوعية وحفظها بنجاح (${dayName}) ✓`
+      lang === 'ar'
+        ? `تم تحديث أيام العطلة الأسبوعية وحفظها بنجاح (${dayName}) ✓`
+        : `Weekly weekend days updated and saved successfully (${dayName}) ✓`
     );
   };
 
@@ -125,29 +132,34 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
   const applyPreset = async (preset: 'saudi' | 'intl' | 'fridayOnly') => {
     if (disabled || isSaving) return;
     let days = [5, 6];
-    let label = 'الجمعة والسبت (المملكة)';
+    let label = lang === 'ar' ? 'الجمعة والسبت (المملكة)' : 'Friday and Saturday (Kingdom)';
     if (preset === 'saudi') {
       days = [5, 6];
-      label = 'الجمعة والسبت (النمط السعودي المعتمد)';
+      label = lang === 'ar' ? 'الجمعة والسبت (النمط السعودي المعتمد)' : 'Friday and Saturday (approved Saudi pattern)';
     } else if (preset === 'intl') {
       days = [6, 0];
-      label = 'السبت والأحد (النمط الدولي)';
+      label = lang === 'ar' ? 'السبت والأحد (النمط الدولي)' : 'Saturday and Sunday (international pattern)';
     } else if (preset === 'fridayOnly') {
       days = [5];
-      label = 'الجمعة فقط';
+      label = lang === 'ar' ? 'الجمعة فقط' : 'Friday only';
     }
-    await triggerAutoSave({ weekendDays: days }, `تم تطبيق وحفظ إعداد العطلة الأسبوعية: ${label} ✓`);
+    await triggerAutoSave(
+      { weekendDays: days },
+      lang === 'ar'
+        ? `تم تطبيق وحفظ إعداد العطلة الأسبوعية: ${label} ✓`
+        : `Weekly weekend setting applied and saved: ${label} ✓`
+    );
   };
 
   // Add new holiday
   const handleAddHoliday = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!newHoliday.nameAr?.trim()) {
-      setFormError('يرجى إدخال اسم العطلة أو المناسبة الرسمية.');
+      setFormError(lang === 'ar' ? 'يرجى إدخال اسم العطلة أو المناسبة الرسمية.' : 'Please enter the name of the holiday or official occasion.');
       return;
     }
     if (!newHoliday.startDate) {
-      setFormError('يرجى تحديد تاريخ بداية الإجازة.');
+      setFormError(lang === 'ar' ? 'يرجى تحديد تاريخ بداية الإجازة.' : 'Please specify the holiday start date.');
       return;
     }
 
@@ -155,7 +167,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     const end = newHoliday.endDate || start;
 
     if (end < start) {
-      setFormError('تاريخ نهاية الإجازة لا يمكن أن يكون قبل تاريخ البداية.');
+      setFormError(lang === 'ar' ? 'تاريخ نهاية الإجازة لا يمكن أن يكون قبل تاريخ البداية.' : 'The holiday end date cannot be before the start date.');
       return;
     }
 
@@ -180,7 +192,9 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     setFormError(null);
     await triggerAutoSave(
       { officialHolidays: [...officialHolidays, created] },
-      `تمت إضافة العطلة الرسمية (${created.nameAr}) وحفظ التقويم بنجاح ✓`
+      lang === 'ar'
+        ? `تمت إضافة العطلة الرسمية (${created.nameAr}) وحفظ التقويم بنجاح ✓`
+        : `Official holiday (${created.nameAr}) added and calendar saved successfully ✓`
     );
   };
 
@@ -188,11 +202,17 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
   const handleDeleteHoliday = async (id: string) => {
     if (disabled || isSaving) return;
     const target = officialHolidays.find((h) => h.id === id);
-    if (confirm('هل أنت متأكد من حذف هذه العطلة الرسمية؟')) {
+    if (confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذه العطلة الرسمية؟' : 'Are you sure you want to delete this official holiday?')) {
       const remaining = officialHolidays.filter((h) => h.id !== id);
       await triggerAutoSave(
         { officialHolidays: remaining },
-        target ? `تم حذف (${target.nameAr}) وحفظ التحديثات بنجاح ✓` : 'تم حذف العطلة الرسمية بنجاح ✓'
+        target
+          ? lang === 'ar'
+            ? `تم حذف (${target.nameAr}) وحفظ التحديثات بنجاح ✓`
+            : `(${target.nameAr}) deleted and updates saved successfully ✓`
+          : lang === 'ar'
+            ? 'تم حذف العطلة الرسمية بنجاح ✓'
+            : 'Official holiday deleted successfully ✓'
       );
     }
   };
@@ -202,7 +222,9 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     if (disabled || isSaving) return;
     if (
       confirm(
-        `هل تريد استيراد وتطبيق التقويم الدراسي الرسمي المعتمد لـ (${activePreset.countryNameAr})؟ سيتم تطبيق العطلات الرسمية المعتمدة ونمط العطلة الأسبوعية.`
+        lang === 'ar'
+          ? `هل تريد استيراد وتطبيق التقويم الدراسي الرسمي المعتمد لـ (${activePreset.countryNameAr})؟ سيتم تطبيق العطلات الرسمية المعتمدة ونمط العطلة الأسبوعية.`
+          : `Do you want to import and apply the official approved academic calendar for (${activePreset.countryNameAr})? The approved official holidays and weekly weekend pattern will be applied.`
       )
     ) {
       await triggerAutoSave(
@@ -210,7 +232,9 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           weekendDays: activePreset.defaultWeekendDays,
           officialHolidays: [...activePreset.officialHolidays],
         },
-        `تم استيراد تقويم (${activePreset.countryNameAr}) الرسمي المعتمد وحفظه بنجاح ✓`
+        lang === 'ar'
+          ? `تم استيراد تقويم (${activePreset.countryNameAr}) الرسمي المعتمد وحفظه بنجاح ✓`
+          : `Official approved calendar for (${activePreset.countryNameAr}) imported and saved successfully ✓`
       );
       if (attendanceCtx?.updateSchoolProfile && activePreset.ministryHeaderAr) {
         attendanceCtx.updateSchoolProfile({
@@ -234,7 +258,9 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     }
     await triggerAutoSave(
       updates,
-      `تم استيراد واعتماد (${result.officialHolidays.length}) إجازة رسمية وحفظها بنجاح في المنظومة ✓`
+      lang === 'ar'
+        ? `تم استيراد واعتماد (${result.officialHolidays.length}) إجازة رسمية وحفظها بنجاح في المنظومة ✓`
+        : `(${result.officialHolidays.length}) official holidays imported and approved, and saved successfully in the system ✓`
     );
     if (result.ministryHeaderAr) {
       if (attendanceCtx?.updateSchoolProfile) {
@@ -273,15 +299,15 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
         <div className="flex items-center gap-2.5">
           <CalendarOff className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
-            <h4 className="text-sm">أيام العطلات الأسبوعية الرسمية والإجازات المعتمدة</h4>
+            <h4 className="text-sm">{lang === 'ar' ? 'أيام العطلات الأسبوعية الرسمية والإجازات المعتمدة' : 'Official weekly weekends and approved holidays'}</h4>
             <p className="text-[11px] font-normal opacity-80">
-              تُستبعد هذه الأيام تلقائياً من رصد واحتساب غياب الطلاب في كافة شاشات وكشوف وتقارير النظام
+              {lang === 'ar' ? 'تُستبعد هذه الأيام تلقائياً من رصد واحتساب غياب الطلاب في كافة شاشات وكشوف وتقارير النظام' : 'These days are automatically excluded from tracking and counting student absences across all screens, registers and reports of the system'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/40 dark:bg-slate-800/60 border border-current font-mono">
-            {activeSchoolDaysCount} أيام دوام / {activeWeekendCount} أيام عطلة
+            {activeSchoolDaysCount} {lang === 'ar' ? 'أيام دوام' : 'working days'} / {activeWeekendCount} {lang === 'ar' ? 'أيام عطلة' : 'weekend days'}
           </span>
 
           {/* Platform Owner Exclusive Smart AI Search Button */}
@@ -290,11 +316,11 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
               type="button"
               onClick={() => setShowOwnerSearchModal(true)}
               className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] cursor-pointer shadow-xs transition-all border border-amber-400 transform hover:scale-[1.02] active:scale-[0.98]"
-              title="زر البحث والاستيراد الذكي المعتمد (خاص بمالك المنصة The Owner)"
+              title={lang === 'ar' ? 'زر البحث والاستيراد الذكي المعتمد (خاص بمالك المنصة The Owner)' : 'Approved smart search and import button (exclusive to The Owner of the platform)'}
             >
               <Crown className="w-3.5 h-3.5 text-yellow-200" />
               <Sparkles className="w-3 h-3 text-yellow-200 animate-pulse" />
-              <span>بحث واستيراد ذكي (The Owner)</span>
+              <span>{lang === 'ar' ? 'بحث واستيراد ذكي (The Owner)' : 'Smart search and import (The Owner)'}</span>
               <span className="text-[9px] px-1.5 py-0.2 bg-white/20 rounded-full font-mono">AI Search</span>
             </button>
           )}
@@ -304,10 +330,10 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
               type="button"
               onClick={handleRestoreMOECalendar}
               className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
-              title={`استيراد التقويم الرسمي المعتمد لـ (${activePreset.countryNameAr})`}
+              title={lang === 'ar' ? `استيراد التقويم الرسمي المعتمد لـ (${activePreset.countryNameAr})` : `Import the official approved calendar for (${activePreset.countryNameAr})`}
             >
               <RotateCcw className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-              <span>استيراد تقويم {activePreset.countryNameAr}</span>
+              <span>{lang === 'ar' ? `استيراد تقويم ${activePreset.countryNameAr}` : `Import calendar of ${activePreset.countryNameAr}`}</span>
             </button>
           )}
         </div>
@@ -318,10 +344,10 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
         <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
         <div className="space-y-0.5 leading-relaxed text-[11px]">
           <span className="font-bold block text-emerald-900 dark:text-emerald-300">
-            الحماية الأكاديمية التلقائية من رصد الغياب في العطلات:
+            {lang === 'ar' ? 'الحماية الأكاديمية التلقائية من رصد الغياب في العطلات:' : 'Automatic academic protection against counting absences on holidays:'}
           </span>
           <p className="text-emerald-800 dark:text-emerald-300/90">
-            أي يوم يوافق عطلة نهاية أسبوع أو إجازة رسمية (مثل اليوم الوطني، يوم التأسيس، إجازات نهاية الأسبوع المطولة، وأعياد الفطر والأضحى) لن يُحتسب كغياب لأي طالب في المدرسة، ويتم استثناؤه من حساب المعدلات ونسب الانضباط ومؤشرات الخطر.
+            {lang === 'ar' ? 'أي يوم يوافق عطلة نهاية أسبوع أو إجازة رسمية (مثل اليوم الوطني، يوم التأسيس، إجازات نهاية الأسبوع المطولة، وأعياد الفطر والأضحى) لن يُحتسب كغياب لأي طالب في المدرسة، ويتم استثناؤه من حساب المعدلات ونسب الانضباط ومؤشرات الخطر.' : 'Any day that coincides with a weekend or official holiday (such as National Day, Founding Day, extended weekends, and Eid al-Fitr and Eid al-Adha holidays) will not be counted as an absence for any student in the school, and is excluded from calculating averages, discipline rates and risk indicators.'}
           </p>
         </div>
       </div>
@@ -332,36 +358,36 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           <div>
             <h5 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>أيام عطلة نهاية الأسبوع الرسمية (إغلاق المدرسة):</span>
+              <span>{lang === 'ar' ? 'أيام عطلة نهاية الأسبوع الرسمية (إغلاق المدرسة):' : 'Official weekend days (school closure):'}</span>
             </h5>
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              حدد الأيام التي تُغلق فيها المدرسة أسبوعياً
+              {lang === 'ar' ? 'حدد الأيام التي تُغلق فيها المدرسة أسبوعياً' : 'Select the days on which the school closes weekly'}
             </span>
           </div>
 
           {!disabled && (
             <div className="flex items-center gap-1 text-[10px]">
-              <span className="text-slate-500 dark:text-slate-400">نماذج جاهزة:</span>
+              <span className="text-slate-500 dark:text-slate-400">{lang === 'ar' ? 'نماذج جاهزة:' : 'Presets:'}</span>
               <button
                 type="button"
                 onClick={() => applyPreset('saudi')}
                 className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
               >
-                الجمعة والسبت (السعودية)
+                {lang === 'ar' ? 'الجمعة والسبت (السعودية)' : 'Friday and Saturday (Saudi Arabia)'}
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('intl')}
                 className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
               >
-                السبت والأحد
+                {lang === 'ar' ? 'السبت والأحد' : 'Saturday and Sunday'}
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('fridayOnly')}
                 className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
               >
-                الجمعة فقط
+                {lang === 'ar' ? 'الجمعة فقط' : 'Friday only'}
               </button>
             </div>
           )}
@@ -383,16 +409,16 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                     : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-emerald-300 dark:hover:border-emerald-500 font-medium'
                 }`}
               >
-                <div className="text-xs mb-1">{day.nameAr}</div>
+                <div className="text-xs mb-1">{lang === 'ar' ? day.nameAr : day.nameEn}</div>
                 <div className="text-[10px] font-mono opacity-60 mb-2">{day.nameEn}</div>
                 <div>
                   {isWeekend ? (
                     <span className="inline-flex items-center gap-1 text-[10px] bg-rose-200 dark:bg-rose-900/60 text-rose-900 dark:text-rose-200 px-1.5 py-0.5 rounded font-bold">
-                      عطلة رسمية
+                      {lang === 'ar' ? 'عطلة رسمية' : 'Official holiday'}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                      يوم دوام
+                      {lang === 'ar' ? 'يوم دوام' : 'Working day'}
                     </span>
                   )}
                 </div>
@@ -408,10 +434,10 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           <div>
             <h5 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <Palmtree className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>قائمة العطلات الرسمية والأعياد والمناسبات ({officialHolidays.length} عطلة معتمدة):</span>
+              <span>{lang === 'ar' ? `قائمة العطلات الرسمية والأعياد والمناسبات (${officialHolidays.length} عطلة معتمدة):` : `List of official holidays, festivals and occasions (${officialHolidays.length} approved holidays):`}</span>
             </h5>
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              الأعياد الدينية، اليوم الوطني، يوم التأسيس، وإجازات نهاية الأسبوع المطولة
+              {lang === 'ar' ? 'الأعياد الدينية، اليوم الوطني، يوم التأسيس، وإجازات نهاية الأسبوع المطولة' : 'Religious holidays, National Day, Founding Day, and extended weekends'}
             </span>
           </div>
 
@@ -422,7 +448,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
               className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>إضافة إجازة / عطلة رسمية جديدة</span>
+              <span>{lang === 'ar' ? 'إضافة إجازة / عطلة رسمية جديدة' : 'Add new holiday / official occasion'}</span>
             </button>
           )}
         </div>
@@ -432,26 +458,26 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2.5 px-3">اسم المناسبة / العطلة الرسمية</th>
-                <th className="py-2.5 px-3">تصنيف الإجازة</th>
-                <th className="py-2.5 px-3">تاريخ البداية</th>
-                <th className="py-2.5 px-3">تاريخ النهاية</th>
-                <th className="py-2.5 px-3 text-center">المدة</th>
-                <th className="py-2.5 px-3">ملاحظات</th>
-                {!disabled && <th className="py-2.5 px-3 text-center">إجراءات</th>}
+                <th className="py-2.5 px-3">{lang === 'ar' ? 'اسم المناسبة / العطلة الرسمية' : 'Occasion / official holiday name'}</th>
+                <th className="py-2.5 px-3">{lang === 'ar' ? 'تصنيف الإجازة' : 'Holiday classification'}</th>
+                <th className="py-2.5 px-3">{lang === 'ar' ? 'تاريخ البداية' : 'Start date'}</th>
+                <th className="py-2.5 px-3">{lang === 'ar' ? 'تاريخ النهاية' : 'End date'}</th>
+                <th className="py-2.5 px-3 text-center">{lang === 'ar' ? 'المدة' : 'Duration'}</th>
+                <th className="py-2.5 px-3">{lang === 'ar' ? 'ملاحظات' : 'Notes'}</th>
+                {!disabled && <th className="py-2.5 px-3 text-center">{lang === 'ar' ? 'إجراءات' : 'Actions'}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {officialHolidays.length === 0 ? (
                 <tr>
                   <td colSpan={disabled ? 6 : 7} className="text-center py-8 text-slate-400 dark:text-slate-500">
-                    لا توجد عطلات رسمية مسجلة حالياً. انقر على "استيراد تقويم وزارة التعليم" لتحميل التقويم الرسمي.
+                    {lang === 'ar' ? 'لا توجد عطلات رسمية مسجلة حالياً. انقر على "استيراد تقويم وزارة التعليم" لتحميل التقويم الرسمي.' : 'No official holidays are currently registered. Click "Import Ministry of Education calendar" to load the official calendar.'}
                   </td>
                 </tr>
               ) : (
                 officialHolidays.map((holiday) => {
                   const duration = getDurationDays(holiday.startDate, holiday.endDate);
-                  const typeLabel = getHolidayTypeLabel(holiday.type, 'ar');
+                  const typeLabel = getHolidayTypeLabel(holiday.type, lang);
                   return (
                     <tr key={holiday.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2.5 px-3">
@@ -484,7 +510,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                         {holiday.endDate}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                        {duration} {duration === 1 ? 'يوم' : 'أيام'}
+                        {duration} {duration === 1 ? (lang === 'ar' ? 'يوم' : 'day') : (lang === 'ar' ? 'أيام' : 'days')}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed text-[11px]">
                         {holiday.notes || '---'}
@@ -495,7 +521,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                             type="button"
                             onClick={() => handleDeleteHoliday(holiday.id)}
                             className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
-                            title="حذف العطلة"
+                            title={lang === 'ar' ? 'حذف العطلة' : 'Delete holiday'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -517,7 +543,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Palmtree className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">إضافة عطلة / مناسبة رسمية جديدة للمدرسة</h4>
+                <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">{lang === 'ar' ? 'إضافة عطلة / مناسبة رسمية جديدة للمدرسة' : 'Add a new holiday / official occasion for the school'}</h4>
               </div>
               <button
                 type="button"
@@ -538,12 +564,12 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
             <div className="space-y-3.5">
               <div>
                 <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                  اسم العطلة أو المناسبة الرسمية (بالعربية) *:
+                  {lang === 'ar' ? 'اسم العطلة أو المناسبة الرسمية (بالعربية) *:' : 'Holiday or official occasion name (in Arabic) *:'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="مثال: إجازة منتصف العام الدراسي، يوم التأسيس، تعليق الدراسة..."
+                  placeholder={lang === 'ar' ? 'مثال: إجازة منتصف العام الدراسي، يوم التأسيس، تعليق الدراسة...' : 'e.g. Mid-year school vacation, Founding Day, class suspension...'}
                   value={newHoliday.nameAr}
                   onChange={(e) => setNewHoliday({ ...newHoliday, nameAr: e.target.value })}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 font-medium"
@@ -552,7 +578,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
 
               <div>
                 <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                  الاسم بالإنجليزية (اختياري):
+                  {lang === 'ar' ? 'الاسم بالإنجليزية (اختياري):' : 'English name (optional):'}
                 </label>
                 <input
                   type="text"
@@ -566,7 +592,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                    تاريخ البدء *:
+                    {lang === 'ar' ? 'تاريخ البدء *:' : 'Start date *:'}
                   </label>
                   <input
                     type="date"
@@ -586,7 +612,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
 
                 <div>
                   <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                    تاريخ النهاية *:
+                    {lang === 'ar' ? 'تاريخ النهاية *:' : 'End date *:'}
                   </label>
                   <input
                     type="date"
@@ -600,28 +626,28 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
 
               <div>
                 <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                  تصنيف الإجازة:
+                  {lang === 'ar' ? 'تصنيف الإجازة:' : 'Holiday classification:'}
                 </label>
                 <select
                   value={newHoliday.type}
                   onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value as HolidayType })}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 cursor-pointer"
                 >
-                  <option value="national">مناسبة وطنية رسمية (اليوم الوطني، يوم التأسيس)</option>
-                  <option value="religious">عطلة دينية (عيد الفطر، عيد الأضحى)</option>
-                  <option value="extended_weekend">إجازة نهاية أسبوع مطولة</option>
-                  <option value="official">عطلة رسمية عامة</option>
-                  <option value="emergency">تعليق دراسة طارئ (أحوال جوية / طوارئ)</option>
+                  <option value="national">{lang === 'ar' ? 'مناسبة وطنية رسمية (اليوم الوطني، يوم التأسيس)' : 'Official national occasion (National Day, Founding Day)'}</option>
+                  <option value="religious">{lang === 'ar' ? 'عطلة دينية (عيد الفطر، عيد الأضحى)' : 'Religious holiday (Eid al-Fitr, Eid al-Adha)'}</option>
+                  <option value="extended_weekend">{lang === 'ar' ? 'إجازة نهاية أسبوع مطولة' : 'Extended weekend'}</option>
+                  <option value="official">{lang === 'ar' ? 'عطلة رسمية عامة' : 'General official holiday'}</option>
+                  <option value="emergency">{lang === 'ar' ? 'تعليق دراسة طارئ (أحوال جوية / طوارئ)' : 'Emergency class suspension (weather / emergencies)'}</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
-                  ملاحظات أو قرار الاعتماد الوزاري:
+                  {lang === 'ar' ? 'ملاحظات أو قرار الاعتماد الوزاري:' : 'Notes or the ministerial approval decision:'}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="مثال: بناءً على التعميم الوزاري رقم ... للتقويم الدراسي المعتمد"
+                  placeholder={lang === 'ar' ? 'مثال: بناءً على التعميم الوزاري رقم ... للتقويم الدراسي المعتمد' : 'e.g. Based on ministerial circular No. ... for the approved academic calendar'}
                   value={newHoliday.notes || ''}
                   onChange={(e) => setNewHoliday({ ...newHoliday, notes: e.target.value })}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-slate-100"
@@ -634,7 +660,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  إلغاء
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   type="button"
@@ -642,7 +668,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                   disabled={isSaving}
                   className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  {isSaving ? 'جارٍ الحفظ...' : 'حفظ واعتماد العطلة'}
+                  {isSaving ? (lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ واعتماد العطلة' : 'Save and approve holiday')}
                 </button>
               </div>
             </div>
