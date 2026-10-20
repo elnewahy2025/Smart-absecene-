@@ -5,8 +5,9 @@
  * Run: npm run test:rules
  * Requires Java (the Firestore emulator is a JVM process).
  *
- * H-1 (parent attendance scope) and H-4 (settings read exposure) are not
- * asserted here yet: both need a data-model change, tracked in PROGRESS.md.
+ * Profile provisioning and gateway-credential boundaries are covered below.
+ * Parent-scoped attendance-session reads still need a data-model change
+ * (tracked in PROGRESS.md).
  */
 
 import fs from 'node:fs';
@@ -59,6 +60,33 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     role: 'parent',
     phone: '+966500000002',
     status: 'active',
+  });
+  // Legacy self-registered profiles never received the server-owned `status`
+  // field. They must be denied even if their phone matches a student.
+  await setDoc(doc(db, 'users', 'legacy1'), {
+    userId: 'legacy1',
+    tenantId: 'school-1',
+    name: 'Legacy Parent',
+    email: 'legacy@example.com',
+    role: 'parent',
+    phone: '+966500000001',
+  });
+  await setDoc(doc(db, 'users', 'legacyadmin'), {
+    userId: 'legacyadmin',
+    tenantId: 'school-1',
+    name: 'Legacy Admin',
+    email: 'legacyadmin@example.com',
+    role: 'admin',
+    phone: '+966500000022',
+  });
+  await setDoc(doc(db, 'users', 'inactive1'), {
+    userId: 'inactive1',
+    tenantId: 'school-1',
+    name: 'Inactive Parent',
+    email: 'inactive@example.com',
+    role: 'parent',
+    phone: '+966500000001',
+    status: 'inactive',
   });
   await setDoc(doc(db, 'users', 'teacher1'), {
     userId: 'teacher1',
@@ -317,6 +345,9 @@ const registrarDb = testEnv.authenticatedContext('registrar1').firestore();
 const admin2Db = testEnv.authenticatedContext('admin2').firestore();
 const teacher2Db = testEnv.authenticatedContext('teacher2').firestore();
 const parent3Db = testEnv.authenticatedContext('parent3').firestore();
+const legacyDb = testEnv.authenticatedContext('legacy1').firestore();
+const legacyAdminDb = testEnv.authenticatedContext('legacyadmin').firestore();
+const inactiveDb = testEnv.authenticatedContext('inactive1').firestore();
 const ownerDb = testEnv.authenticatedContext('owner1').firestore();
 
 let failures = 0;
@@ -392,6 +423,22 @@ await expectAllowed('parent can update their own name', updateDoc(doc(parentDb, 
   name: 'Parent One Updated',
 }));
 
+// Legacy/unprovisioned profiles are inert even when their stored phone matches
+// a student, and cannot self-activate or self-assign privileges.
+await expectDenied('legacy unprovisioned parent cannot read a student', getDoc(doc(legacyDb, 'students', 'student1')));
+await expectDenied('legacy parent cannot self-activate their profile', updateDoc(doc(legacyDb, 'users', 'legacy1'), {
+  status: 'active',
+}));
+await expectDenied('legacy unprovisioned admin cannot list users', getDocs(query(collection(legacyAdminDb, 'users'), where('tenantId', '==', 'school-1'))));
+await expectDenied('legacy unprovisioned admin cannot read a student', getDoc(doc(legacyAdminDb, 'students', 'student1')));
+await expectDenied('inactive parent cannot read a student', getDoc(doc(inactiveDb, 'students', 'student1')));
+await expectDenied('teacher cannot self-assign classes', updateDoc(doc(teacherDb, 'users', 'teacher1'), {
+  assignedClasses: ['class-2a'],
+}));
+await expectAllowed('teacher can update their own name', updateDoc(doc(teacherDb, 'users', 'teacher1'), {
+  name: 'Teacher One Updated',
+}));
+
 // Session locking still holds.
 await expectAllowed('teacher can edit a draft session', updateDoc(doc(teacherDb, 'attendance_sessions', 'draft1'), {
   presentCount: 0,
@@ -428,11 +475,12 @@ await expectDenied('parent cannot read another child justification', getDoc(doc(
 await expectAllowed('tenant registry is publicly readable', getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'tenants', 'school-1')));
 await expectDenied('parent cannot write tenant registry', setDoc(doc(parentDb, 'tenants', 'school-1'), { nameAr: 'hijacked' }, { merge: true }));
 
-// Self-signup may only create a parent profile.
+// Profiles are provisioned server-side; the client can only create one as the
+// platform owner (SEC-01).
 const newParentDb = testEnv.authenticatedContext('newparent').firestore();
 const attackerDb = testEnv.authenticatedContext('attacker').firestore();
 
-await expectAllowed('new user can self-register as parent', setDoc(doc(newParentDb, 'users', 'newparent'), {
+await expectDenied('new user cannot self-register as parent', setDoc(doc(newParentDb, 'users', 'newparent'), {
   userId: 'newparent',
   tenantId: 'school-1',
   name: 'New Parent',
@@ -452,13 +500,49 @@ await expectDenied('new user cannot self-register as registrar', setDoc(doc(atta
   status: 'active',
 }));
 
-// Settings are tenant-readable; gateway credentials are admin-only.
+await expectAllowed('platform owner can provision a profile', setDoc(doc(ownerDb, 'users', 'provisioned'), {
+  userId: 'provisioned',
+  tenantId: 'school-1',
+  name: 'Provisioned User',
+  email: 'provisioned@example.com',
+  role: 'parent',
+  phone: '+966500000032',
+  status: 'active',
+}));
+
+// Empty phone/email must never match an empty guardian field.
+await testEnv.withSecurityRulesDisabled(async (context) => {
+  const db = context.firestore();
+  await setDoc(doc(db, 'users', 'parent-empty'), {
+    userId: 'parent-empty',
+    tenantId: 'school-1',
+    name: 'Parent Empty',
+    email: 'empty@example.com',
+    role: 'parent',
+    phone: '',
+    status: 'active',
+  });
+  await setDoc(doc(db, 'students', 'student-empty'), {
+    studentNumber: 'S0',
+    fullName: 'Unlinked Child',
+    className: '10 / أ',
+    classId: 'class-1a',
+    tenantId: 'school-1',
+    guardianPhone: '',
+    guardianEmail: '',
+  });
+});
+const emptyParentDb = testEnv.authenticatedContext('parent-empty').firestore();
+await expectDenied('parent with no phone cannot read an unlinked student', getDoc(doc(emptyParentDb, 'students', 'student-empty')));
+
+// Settings are tenant-readable; gateway credentials are server-only.
 await expectAllowed('parent can read shared settings', getDoc(doc(parentDb, 'settings', 'school-1')));
 await expectDenied('parent cannot read private gateway settings', getDoc(doc(parentDb, 'settings_private', 'school-1')));
-await expectAllowed('admin can read private gateway settings', getDoc(doc(adminDb, 'settings_private', 'school-1')));
-await expectAllowed('admin can write private gateway settings', setDoc(doc(adminDb, 'settings_private', 'school-1'), {
+await expectDenied('school admin cannot read private gateway settings', getDoc(doc(adminDb, 'settings_private', 'school-1')));
+await expectDenied('school admin cannot write private gateway settings', setDoc(doc(adminDb, 'settings_private', 'school-1'), {
   messagingGateway: { smsProvider: 'taqnyat', senderId: 'SCHOOL' },
 }, { merge: true }));
+await expectDenied('platform owner cannot read private gateway settings from the client', getDoc(doc(ownerDb, 'settings_private', 'school-1')));
 
 // --- Cross-tenant isolation (school-1 roles must never touch school-2) ------
 const school2Student = {
@@ -501,7 +585,8 @@ await expectDenied('parent cannot submit an excuse for another child', addDoc(co
 
 // --- Platform owner bypass uses admins/{uid} with role super_admin ----------
 await expectAllowed('platform owner reads any school', getDoc(doc(ownerDb, 'students', 'student3')));
-await expectAllowed('platform owner writes any school', setDoc(doc(ownerDb, 'students', 'ownerwrite'), school2Student));
+await expectAllowed('platform owner updates any school', updateDoc(doc(ownerDb, 'students', 'student3'), { fullName: 'Owner Updated' }));
+await expectDenied('platform owner cannot create students client-side', setDoc(doc(ownerDb, 'students', 'ownerwrite'), school2Student));
 await expectDenied('tenant admin is not a platform owner', getDoc(doc(adminDb, 'admins', 'owner1')));
 
 // --- Registrar role ---------------------------------------------------------
@@ -511,15 +596,23 @@ const registrarStudent = {
   className: '10 / ج',
   tenantId: 'school-1',
 };
-await expectAllowed('registrar can create students', setDoc(doc(registrarDb, 'students', 'registrar-student'), registrarStudent));
+await testEnv.withSecurityRulesDisabled(async (context) => {
+  const db = context.firestore();
+  await setDoc(doc(db, 'students', 'registrar-student'), registrarStudent);
+  await setDoc(doc(db, 'students', 'admin-delete-student'), { ...registrarStudent, fullName: 'Admin Delete Target' });
+});
+await expectDenied('registrar cannot create students client-side', setDoc(doc(registrarDb, 'students', 'registrar-student-2'), registrarStudent));
 await expectAllowed('registrar can update students', updateDoc(doc(registrarDb, 'students', 'registrar-student'), { fullName: 'Registrar Updated' }));
+await expectDenied('registrar cannot change enrollment status directly', updateDoc(doc(registrarDb, 'students', 'registrar-student'), { enrollmentStatus: 'transferred' }));
+await expectDenied('registrar cannot move students between tenants', updateDoc(doc(registrarDb, 'students', 'registrar-student'), { tenantId: 'school-2' }));
 await expectDenied('registrar cannot delete students', deleteDoc(doc(registrarDb, 'students', 'registrar-student')));
 await expectDenied('registrar cannot read private settings', getDoc(doc(registrarDb, 'settings_private', 'school-1')));
 await expectAllowed('registrar can read audit logs', getDoc(doc(registrarDb, 'audit_logs', 'audit1')));
 await expectDenied('registrar cannot write tenant registry', setDoc(doc(registrarDb, 'tenants', 'school-1'), { nameEn: 'hijacked' }, { merge: true }));
 
-// --- Tenant admin deletion is tenant-scoped, never cross-tenant -------------
-await expectAllowed('school admin can delete in own school', deleteDoc(doc(adminDb, 'students', 'registrar-student')));
+// --- Student writes are server-only, including for tenant admins -----------
+await expectDenied('school admin cannot create students client-side', setDoc(doc(adminDb, 'students', 'admin-created'), { ...registrarStudent, fullName: 'Admin Created' }));
+await expectDenied('school admin cannot delete in own school', deleteDoc(doc(adminDb, 'students', 'admin-delete-student')));
 await expectDenied('school admin cannot delete in another school', deleteDoc(doc(adminDb, 'students', 'student3')));
 
 // --- Subscription enforcement per school ------------------------------------

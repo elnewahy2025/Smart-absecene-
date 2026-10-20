@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Student } from '../../types/attendance';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
@@ -7,7 +7,7 @@ interface DeleteStudentConfirmationModalProps {
   isOpen: boolean;
   student: Student | null;
   onClose: () => void;
-  onConfirmDelete: (studentId: string) => void;
+  onConfirmDelete: (studentId: string) => Promise<{ success: boolean; message: string }>;
   lang: 'ar' | 'en';
 }
 
@@ -19,9 +19,35 @@ export const DeleteStudentConfirmationModal: React.FC<DeleteStudentConfirmationM
   lang,
 }) => {
   const isAr = lang === 'ar';
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   if (!isOpen || !student) return null;
+
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    setError(null);
+    setIsDeleting(true);
+    try {
+      const result = await onConfirmDelete(student.id);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      onClose();
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : isAr
+            ? 'تعذّر حذف الطالب. حاول مجدداً.'
+            : 'Could not delete the student. Please try again.'
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Confirm student deletion" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -54,24 +80,37 @@ export const DeleteStudentConfirmationModal: React.FC<DeleteStudentConfirmationM
           </div>
         </div>
 
+        {error && (
+          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+            {error}
+          </div>
+        )}
+
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 text-xs">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-medium cursor-pointer"
+            disabled={isDeleting}
+            className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isAr ? 'إلغاء' : 'Cancel'}
           </button>
           <button
             type="button"
-            onClick={() => {
-              onConfirmDelete(student.id);
-              onClose();
-            }}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>{isAr ? 'نعم، حذف نهائي' : 'Yes, Delete'}</span>
+            <span>
+              {isDeleting
+                ? isAr
+                  ? 'جارٍ الحذف...'
+                  : 'Deleting...'
+                : isAr
+                  ? 'نعم، حذف نهائي'
+                  : 'Yes, Delete'}
+            </span>
           </button>
         </div>
       </div>

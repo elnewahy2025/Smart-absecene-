@@ -3,7 +3,6 @@ import {
   Tenant,
   UserProfile,
   Student,
-  StudentEnrollmentStatus,
   AttendanceSession,
   AttendanceRecord,
   StudentAttendanceRecord,
@@ -106,7 +105,6 @@ import {
   where,
   getDocs,
   updateDoc,
-  deleteDoc,
 } from 'firebase/firestore';
 
 const toFirestoreData = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -288,12 +286,12 @@ interface AttendanceContextType {
   addAuditLog: (entry: Omit<AuditLog, 'id' | 'tenantId' | 'timestamp'>) => void;
 
   // Student Enrollment & Lifecycle
-  addStudent: (student: Omit<Student, 'id' | 'tenantId' | 'attendanceRate' | 'totalAbsences' | 'totalLates'>) => Student;
+  addStudent: (student: Omit<Student, 'id' | 'tenantId' | 'attendanceRate' | 'totalAbsences' | 'totalLates'>) => Promise<Student>;
   updateStudent: (studentId: string, updates: Partial<Student>) => void;
-  transferStudent: (studentId: string, details: { destinationSchool: string; reason?: string }) => void;
-  restoreStudent: (studentId: string) => void;
-  deleteStudent: (studentId: string) => { success: boolean; message: string };
-  importStudents: (newStudents: Partial<Student>[]) => { imported: number; duplicates: number };
+  transferStudent: (studentId: string, details: { destinationSchool: string; reason?: string }) => Promise<{ success: boolean; message: string }>;
+  restoreStudent: (studentId: string) => Promise<{ success: boolean; message: string }>;
+  deleteStudent: (studentId: string) => Promise<{ success: boolean; message: string }>;
+  importStudents: (newStudents: Partial<Student>[]) => Promise<{ imported: number; duplicates: number }>;
 
   // School & Class Analytics
   classesStats: SchoolClassSummary[];
@@ -304,7 +302,7 @@ interface AttendanceContextType {
   schoolProfile: TenantSchoolProfile;
   updateSchoolProfile: (newProfile: Partial<TenantSchoolProfile>) => Promise<void>;
   messagingGateway: SchoolMessagingGatewayConfig;
-  updateMessagingGateway: (config: Partial<SchoolMessagingGatewayConfig>) => { success: boolean; message: string };
+  updateMessagingGateway: (config: Partial<SchoolMessagingGatewayConfig>) => Promise<{ success: boolean; message: string }>;
   isOffDay: (dateStr: string) => OffDayCheckResult;
   weekendDays: number[];
   officialHolidays: OfficialHoliday[];
@@ -695,6 +693,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           return;
         }
 
+        // 1b. Fall back to the Admin SDK-managed owner document so a missing
+        // VITE owner-email entry cannot lock the platform owner out.
+        try {
+          const ownerSnap = await getDoc(doc(db, 'admins', user.uid));
+          if (ownerSnap.exists() && (ownerSnap.data() as any)?.role === 'super_admin') {
+            setUserRole('super_admin');
+            applyAccountTenant('super_admin');
+            return;
+          }
+        } catch (ownerErr) {
+          console.warn('[AUTH] Could not read the platform-owner document:', ownerErr);
+        }
+
         // 2. Check local user registry for known seeded users / roles
         const matchedLocalUser = allUsers.find((u) => u.email.toLowerCase() === userEmail);
 
@@ -711,6 +722,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
           const userSnap = await getDoc(userProfileRef);
           if (userSnap.exists()) {
             const data = userSnap.data();
+            // Profiles are server-provisioned and always carry an explicit
+            // status. A missing/non-active status means this is a legacy or
+            // unprovisioned account and must not receive tenant data.
+            if (data.status !== 'active') {
+              console.warn('[AUTH] Inactive or unprovisioned profile; ending the session.');
+              await signOut(auth).catch(() => {});
+              return;
+            }
             if (data.role) {
               setUserRole(data.role as UserRole);
             }
@@ -726,24 +745,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
                 email: data.email || user.email || '',
                 role: (data.role as UserRole) || 'parent',
                 phone: data.phone || '',
-                status: data.status || 'active',
+                status: data.status,
               } as UserProfile;
               const map = new Map(prev.map((item) => [item.id, item]));
               map.set(profile.id, profile);
               return Array.from(map.values());
             });
           } else {
-            // New user registration profile initialization
-            await setDoc(userProfileRef, {
-              userId: user.uid,
-              tenantId: tenantId,
-              name: user.displayName || 'مستخدم معتمد',
-              email: user.email || '',
-              role: currentUserRole,
-              phone: user.phoneNumber || '',
-              assignedClasses: currentUserRole === 'teacher' ? ['class-1a', 'class-1b'] : [],
-              createdAt: new Date().toISOString(),
-            }, { merge: true });
+            // Accounts are provisioned by staff through the server (Admin SDK).
+            // Never invent a trusted profile here: a self-created phone/email
+            // could otherwise unlock another family's records.
+            console.warn('[AUTH] No provisioned profile for this account; ending the session.');
+            await signOut(auth).catch(() => {});
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
@@ -1300,17 +1313,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     return () => unsubscribe();
   }, [firebaseUser, tenantId]);
 
-  // Gateway credentials live in an admin-only document, never in the tenant-readable settings.
+  // Gateway credentials are server-owned and encrypted at rest. Only the
+  // platform owner may fetch them; school admins never see the document.
   useEffect(() => {
-    if (!firebaseUser || !canManageSettings) return;
+    if (!firebaseUser || !isSuperAdmin) return;
 
-    const privateRef = doc(db, 'settings_private', tenantId);
-    const unsubscribe = onSnapshot(
-      privateRef,
-      (snapshot) => {
-        if (!snapshot.exists()) return;
-        const gateway = (snapshot.data() as any)?.messagingGateway;
-        if (!gateway) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/messaging-gateway');
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const gateway = payload?.gateway;
+        if (cancelled || !gateway) return;
 
         setSettingsMap((prev) => ({
           ...prev,
@@ -1326,12 +1341,15 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
             messagingGateway: gateway,
           },
         }));
-      },
-      (error) => console.error('[SETTINGS] Could not load messaging gateway:', error)
-    );
+      } catch (error) {
+        console.warn('[SETTINGS] Could not load messaging gateway:', error);
+      }
+    })();
 
-    return () => unsubscribe();
-  }, [firebaseUser, tenantId, canManageSettings]);
+    return () => {
+      cancelled = true;
+    };
+  }, [firebaseUser, tenantId, isSuperAdmin]);
 
   useEffect(() => {
     if (!firebaseUser || !canManageSettings || !settingsHydratedRef.current) return;
@@ -1342,7 +1360,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       const currentProfile = schoolProfilesMap[tenantId] || getDefaultSchoolProfile(tenantId);
       const { messagingGateway: gatewayFromSettings, ...settingsForStore } = currentSettings;
       const { messagingGateway: gatewayFromProfile, ...profileForStore } = currentProfile;
-      const gateway = gatewayFromSettings || gatewayFromProfile;
       const timestamp = new Date().toISOString();
       const payload = {
         settings: settingsForStore,
@@ -1357,14 +1374,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       void setDoc(doc(db, 'settings', tenantId), payload, { merge: true }).catch((error) =>
         console.error('[SETTINGS] Could not persist shared settings:', error)
       );
-
-      if (gateway) {
-        void setDoc(
-          doc(db, 'settings_private', tenantId),
-          { messagingGateway: gateway, updatedAt: timestamp, updatedBy: firebaseUser.uid },
-          { merge: true }
-        ).catch((error) => console.error('[SETTINGS] Could not persist messaging gateway:', error));
-      }
     }, 1200);
 
     return () => clearTimeout(timer);
@@ -1527,17 +1536,24 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       temporaryPassword = payload.temporaryPassword;
       serverUser = payload.user as UserProfile;
     } catch (err) {
-      console.warn('[USERS] Server account creation unavailable, falling back to local profile:', err);
+      console.warn('[USERS] Server account creation unavailable:', err);
+      return {
+        success: false,
+        message: 'تعذّر الاتصال بالخادم لإنشاء حساب الدخول. لا يتم إنشاء حسابات محلية غير موثوقة.',
+      };
     }
 
-    const id = serverUser?.id || `user-${userData.role}-${Date.now().toString().slice(-4)}`;
+    if (!serverUser) {
+      return { success: false, message: 'تعذّر إنشاء حساب الدخول على الخادم.' };
+    }
+
     const newUser: UserProfile = {
       ...userData,
-      ...(serverUser || {}),
-      id,
+      ...serverUser,
+      id: serverUser.id,
       tenantId,
       status: userData.status || 'active',
-      createdAt: serverUser?.createdAt || new Date().toISOString(),
+      createdAt: serverUser.createdAt || new Date().toISOString(),
     };
 
     setAllUsers((prev) => {
@@ -1548,30 +1564,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       return updated;
     });
 
-    if (!serverUser && firebaseUser) {
-      setDoc(
-        doc(db, 'users', id),
-        {
-          userId: id,
-          tenantId,
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-          phone: newUser.phone,
-          jobTitle: newUser.jobTitle || '',
-          assignedClasses: newUser.assignedClasses || [],
-          assignedSubjects: newUser.assignedSubjects || [],
-          status: newUser.status,
-          createdAt: newUser.createdAt,
-        },
-        { merge: true }
-      ).catch((err) => console.warn('[FIRESTORE] User doc sync failed:', err));
-    }
-
     addAuditLog({
       action: 'create',
       entityType: 'settings',
-      entityId: id,
+      entityId: newUser.id,
       performerId: currentUser.id,
       performerRole: currentUserRole,
       performerName: currentUser.name,
@@ -2781,27 +2777,23 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     return sent;
   };
 
-  const persistStudent = (student: Student) => {
-    if (!firebaseUser) return;
-    void setDoc(doc(db, 'students', student.id), toFirestoreData(student), { merge: true }).catch((error) =>
-      console.error('[STUDENTS] Could not persist student:', error)
-    );
-  };
-
   const persistStudentPatch = (studentId: string, updates: Partial<Student>) => {
     if (!firebaseUser) return;
     void setDoc(doc(db, 'students', studentId), toFirestoreData(updates), { merge: true }).catch((error) =>
       console.error('[STUDENTS] Could not update student:', error)
     );
   };
-  const importStudents = (newStudentsList: Partial<Student>[]) => {
+
+  const importStudents = async (newStudentsList: Partial<Student>[]): Promise<{ imported: number; duplicates: number }> => {
     if (!canImportStudents) {
       console.warn('Unauthorized: Student import requires administrator or registrar privileges.');
       return { imported: 0, duplicates: 0 };
     }
-    let imported = 0;
-    let duplicates = 0;
+    if (!firebaseUser) {
+      throw new Error('يجب تسجيل الدخول لاستيراد الطلاب.');
+    }
 
+    let duplicates = 0;
     const existingNatIds = new Set(students.map((s) => s.nationalId));
     const existingStdNums = new Set(students.map((s) => s.studentNumber));
 
@@ -2812,7 +2804,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       id: c.id,
     }));
 
-    const additions: Student[] = [];
+    const additions: Partial<Student>[] = [];
 
     newStudentsList.forEach((raw, i) => {
       const nationalId = raw.nationalId?.trim() || `1099${Date.now() + i}`;
@@ -2839,8 +2831,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       existingStdNums.add(studentNumber);
 
       additions.push({
-        id: `std-imp-${Date.now()}-${i}`,
-        tenantId: tenantId,
         studentNumber,
         nationalId,
         fullName: raw.fullName?.trim() || `طالب جديد ${i + 1}`,
@@ -2851,45 +2841,66 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         guardianPhone: raw.guardianPhone?.trim() || '',
         guardianRelationship: raw.guardianRelationship || '',
         bloodType: raw.bloodType || '',
-        totalAbsences: 0,
-        totalLates: 0,
-        attendanceRate: 100,
       });
-      imported++;
     });
 
-    if (additions.length > 0) {
-      setAllStudents((prev) => [...prev, ...additions]);
-      additions.forEach(persistStudent);
-      addAuditLog({
-        entityType: 'student',
-        entityId: `bulk-import-${Date.now()}`,
-        action: 'create',
-        performerId: currentUser.id,
-        performerName: currentUser.name,
-        performerRole: currentUser.role,
-        details: `استيراد معتمد لقائمة الطلاب: نجح استيراد ${imported} طالب جديد، وتم استبعاد ${duplicates} سجل مكرر لمنع ازدواجية البيانات.`,
-        detailsEn: `Approved student list import: ${imported} new students imported successfully, and ${duplicates} duplicate records were excluded to prevent data duplication.`,
-      });
+    if (additions.length === 0) {
+      return { imported: 0, duplicates };
     }
 
-    return { imported, duplicates };
+    const response = await authenticatedFetch('/api/students/import', {
+      method: 'POST',
+      body: JSON.stringify({ tenantId, students: additions }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.error || 'تعذّر استيراد الطلاب على الخادم. تحقق من البيانات وحاول مجدداً.');
+    }
+
+    const createdStudents = (payload.students || []) as Student[];
+    const importedCount = typeof payload.imported === 'number' ? payload.imported : createdStudents.length;
+    const serverDuplicates = typeof payload.duplicates === 'number' ? payload.duplicates : 0;
+    const totalDuplicates = duplicates + serverDuplicates;
+
+    setAllStudents((prev) => {
+      const updated = [...prev, ...createdStudents];
+      if (typeof localCache !== 'undefined') {
+        localCache.setItem('school_students', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    addAuditLog({
+      entityType: 'student',
+      entityId: `bulk-import-${Date.now()}`,
+      action: 'create',
+      performerId: currentUser.id,
+      performerName: currentUser.name,
+      performerRole: currentUser.role,
+      details: `استيراد معتمد لقائمة الطلاب: نجح استيراد ${importedCount} طالب جديد، وتم استبعاد ${totalDuplicates} سجل مكرر لمنع ازدواجية البيانات.`,
+      detailsEn: `Approved student list import: ${importedCount} new students imported successfully, and ${totalDuplicates} duplicate records were excluded to prevent data duplication.`,
+    });
+
+    return { imported: importedCount, duplicates: totalDuplicates };
   };
 
-  const addStudent = (
+  const addStudent = async (
     studentData: Omit<Student, 'id' | 'tenantId' | 'attendanceRate' | 'totalAbsences' | 'totalLates'>
-  ): Student => {
-    const id = `std-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const newStudent: Student = {
-      ...studentData,
-      id,
-      tenantId,
-      totalAbsences: 0,
-      totalLates: 0,
-      attendanceRate: 100,
-      enrollmentStatus: studentData.enrollmentStatus || 'active',
-    };
+  ): Promise<Student> => {
+    if (!firebaseUser) {
+      throw new Error('يجب تسجيل الدخول لإضافة طالب.');
+    }
 
+    const response = await authenticatedFetch('/api/students', {
+      method: 'POST',
+      body: JSON.stringify({ ...studentData, tenantId }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success || !payload.student) {
+      throw new Error(payload?.error || 'تعذّر إضافة الطالب على الخادم. تحقق من البيانات وحاول مجدداً.');
+    }
+
+    const newStudent = payload.student as Student;
     setAllStudents((prev) => {
       const updated = [newStudent, ...prev];
       if (typeof localCache !== 'undefined') {
@@ -2898,12 +2909,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       return updated;
     });
 
-    persistStudent(newStudent);
-
     addAuditLog({
       action: 'create',
       entityType: 'student',
-      entityId: id,
+      entityId: newStudent.id,
       performerId: currentUser.id,
       performerRole: currentUserRole,
       performerName: currentUser.name,
@@ -2915,10 +2924,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   };
 
   const updateStudent = (studentId: string, updates: Partial<Student>) => {
-    persistStudentPatch(studentId, updates);
+    const safeUpdates = { ...updates } as Record<string, unknown>;
+    delete safeUpdates.id;
+    delete safeUpdates.tenantId;
+    delete safeUpdates.enrollmentStatus;
+    delete safeUpdates.transferredAt;
+    delete safeUpdates.destinationSchool;
+    delete safeUpdates.transferReason;
+    const nextUpdates = safeUpdates as Partial<Student>;
+
+    persistStudentPatch(studentId, nextUpdates);
     setAllStudents((prev) => {
       const updated = prev.map((s) =>
-        s.id === studentId && s.tenantId === tenantId ? { ...s, ...updates } : s
+        s.id === studentId && s.tenantId === tenantId ? { ...s, ...nextUpdates } : s
       );
       if (typeof localCache !== 'undefined') {
         localCache.setItem('school_students', JSON.stringify(updated));
@@ -2933,127 +2951,171 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       performerId: currentUser.id,
       performerRole: currentUserRole,
       performerName: currentUser.name,
-      details: `تحديث بيانات الطالب (${updates.fullName || studentId}) في السجل المدرسي`,
-      detailsEn: `Updating student data (${updates.fullName || studentId}) in the school record`,
+      details: `تحديث بيانات الطالب (${nextUpdates.fullName || studentId}) في السجل المدرسي`,
+      detailsEn: `Updating student data (${nextUpdates.fullName || studentId}) in the school record`,
     });
   };
 
-  const transferStudent = (
+  const transferStudent = async (
     studentId: string,
     details: { destinationSchool: string; reason?: string }
-  ) => {
-    const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
-    if (!target) return;
-    persistStudentPatch(studentId, {
-      enrollmentStatus: 'transferred',
-      transferredAt: new Date().toISOString(),
-      destinationSchool: details.destinationSchool,
-      transferReason: details.reason || 'نقل رسمي إلى مدرسة أخرى',
-    });
-
-    const now = new Date().toISOString();
-    setAllStudents((prev) => {
-      const updated = prev.map((s) =>
-        s.id === studentId && s.tenantId === tenantId
-          ? {
-              ...s,
-              enrollmentStatus: 'transferred' as StudentEnrollmentStatus,
-              transferredAt: now,
-              destinationSchool: details.destinationSchool,
-              transferReason: details.reason || 'نقل رسمي إلى مدرسة أخرى',
-            }
-          : s
-      );
-      if (typeof localCache !== 'undefined') {
-        localCache.setItem('school_students', JSON.stringify(updated));
-      }
-      return updated;
-    });
-
-    addAuditLog({
-      action: 'update',
-      entityType: 'student',
-      entityId: studentId,
-      performerId: currentUser.id,
-      performerRole: currentUserRole,
-      performerName: currentUser.name,
-      details: `نقل رسمي للطالب (${target.fullName}) إلى (${details.destinationSchool}). تم إخفاء الطالب من كشوف الحضور اليومية مع حفظ بياناته في أرشيف النقل.`,
-      detailsEn: `Official transfer of student (${target.fullName}) to (${details.destinationSchool}). The student was hidden from daily attendance sheets while their data was preserved in the transfer archive.`,
-    });
-  };
-
-  const restoreStudent = (studentId: string) => {
-    const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
-    if (!target) return;
-    persistStudentPatch(studentId, {
-      enrollmentStatus: 'active',
-      transferredAt: undefined,
-      destinationSchool: undefined,
-      transferReason: undefined,
-    });
-
-    setAllStudents((prev) => {
-      const updated = prev.map((s) =>
-        s.id === studentId && s.tenantId === tenantId
-          ? {
-              ...s,
-              enrollmentStatus: 'active' as StudentEnrollmentStatus,
-              transferredAt: undefined,
-              destinationSchool: undefined,
-              transferReason: undefined,
-            }
-          : s
-      );
-      if (typeof localCache !== 'undefined') {
-        localCache.setItem('school_students', JSON.stringify(updated));
-      }
-      return updated;
-    });
-
-    addAuditLog({
-      action: 'update',
-      entityType: 'student',
-      entityId: studentId,
-      performerId: currentUser.id,
-      performerRole: currentUserRole,
-      performerName: currentUser.name,
-      details: `إلغاء إجراء النقل واستعادة قيد الطالب (${target.fullName}) إلى مقاعد الدراسة النشطة.`,
-      detailsEn: `Cancelling the transfer and restoring student (${target.fullName}) to active enrollment.`,
-    });
-  };
-
-  const deleteStudent = (studentId: string): { success: boolean; message: string } => {
+  ): Promise<{ success: boolean; message: string }> => {
     const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
     if (!target) {
       return { success: false, message: 'الطالب غير موجود' };
     }
-
-    if (firebaseUser) {
-      void deleteDoc(doc(db, 'students', studentId)).catch((error) =>
-        console.error('[STUDENTS] Could not delete student:', error)
-      );
+    if (!firebaseUser) {
+      return { success: false, message: 'يجب تسجيل الدخول لنقل الطالب.' };
     }
 
-    setAllStudents((prev) => {
-      const updated = prev.filter((s) => s.id !== studentId);
-      if (typeof localCache !== 'undefined') {
-        localCache.setItem('school_students', JSON.stringify(updated));
+    try {
+      const response = await authenticatedFetch(
+        `/api/students/${encodeURIComponent(studentId)}/transfer`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ ...details, tenantId }),
+        }
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success || !payload.student) {
+        return {
+          success: false,
+          message: payload?.error || 'تعذّر نقل الطالب على الخادم. حاول مجدداً.',
+        };
       }
-      return updated;
-    });
 
-    addAuditLog({
-      action: 'delete',
-      entityType: 'student',
-      entityId: studentId,
-      performerId: currentUser.id,
-      performerRole: currentUserRole,
-      performerName: currentUser.name,
-      details: `حذف نهائي لسجل الطالب (${target.fullName} - سجل مدني ${target.nationalId}) من المدرسة.`,
-      detailsEn: `Permanent deletion of the student record (${target.fullName} - Civil ID ${target.nationalId}) from the school.`,
-    });
+      const updatedStudent = payload.student as Student;
+      setAllStudents((prev) => {
+        const updated = prev.map((s) =>
+          s.id === studentId && s.tenantId === tenantId ? { ...s, ...updatedStudent } : s
+        );
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_students', JSON.stringify(updated));
+        }
+        return updated;
+      });
 
-    return { success: true, message: 'تم حذف سجل الطالب نهائياً' };
+      addAuditLog({
+        action: 'update',
+        entityType: 'student',
+        entityId: studentId,
+        performerId: currentUser.id,
+        performerRole: currentUserRole,
+        performerName: currentUser.name,
+        details: `نقل رسمي للطالب (${target.fullName}) إلى (${details.destinationSchool}). تم إخفاء الطالب من كشوف الحضور اليومية مع حفظ بياناته في أرشيف النقل.`,
+        detailsEn: `Official transfer of student (${target.fullName}) to (${details.destinationSchool}). The student was hidden from daily attendance sheets while their data was preserved in the transfer archive.`,
+      });
+
+      return { success: true, message: 'تم نقل الطالب بنجاح' };
+    } catch (error) {
+      console.error('[STUDENTS] Could not transfer student:', error);
+      return { success: false, message: 'تعذّر الاتصال بالخادم لنقل الطالب. حاول مجدداً.' };
+    }
+  };
+
+  const restoreStudent = async (studentId: string): Promise<{ success: boolean; message: string }> => {
+    const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
+    if (!target) {
+      return { success: false, message: 'الطالب غير موجود' };
+    }
+    if (!firebaseUser) {
+      return { success: false, message: 'يجب تسجيل الدخول لاستعادة الطالب.' };
+    }
+
+    try {
+      const response = await authenticatedFetch(
+        `/api/students/${encodeURIComponent(studentId)}/restore`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ tenantId }),
+        }
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success || !payload.student) {
+        return {
+          success: false,
+          message: payload?.error || 'تعذّر استعادة الطالب. قد يكون الحد الأقصى لعدد الطلاب قد بلغ.',
+        };
+      }
+
+      const restoredStudent = payload.student as Student;
+      setAllStudents((prev) => {
+        const updated = prev.map((s) =>
+          s.id === studentId && s.tenantId === tenantId ? { ...s, ...restoredStudent } : s
+        );
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_students', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      addAuditLog({
+        action: 'update',
+        entityType: 'student',
+        entityId: studentId,
+        performerId: currentUser.id,
+        performerRole: currentUserRole,
+        performerName: currentUser.name,
+        details: `إلغاء إجراء النقل واستعادة قيد الطالب (${target.fullName}) إلى مقاعد الدراسة النشطة.`,
+        detailsEn: `Cancelling the transfer and restoring student (${target.fullName}) to active enrollment.`,
+      });
+
+      return { success: true, message: 'تم استعادة الطالب بنجاح' };
+    } catch (error) {
+      console.error('[STUDENTS] Could not restore student:', error);
+      return { success: false, message: 'تعذّر الاتصال بالخادم لاستعادة الطالب. حاول مجدداً.' };
+    }
+  };
+
+  const deleteStudent = async (studentId: string): Promise<{ success: boolean; message: string }> => {
+    const target = allStudents.find((s) => s.id === studentId && s.tenantId === tenantId);
+    if (!target) {
+      return { success: false, message: 'الطالب غير موجود' };
+    }
+    if (!firebaseUser) {
+      return { success: false, message: 'يجب تسجيل الدخول لحذف الطالب.' };
+    }
+
+    try {
+      const response = await authenticatedFetch(
+        `/api/students/${encodeURIComponent(studentId)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ tenantId }),
+        }
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        return {
+          success: false,
+          message: payload?.error || 'تعذّر حذف سجل الطالب على الخادم. حاول مجدداً.',
+        };
+      }
+
+      setAllStudents((prev) => {
+        const updated = prev.filter((s) => s.id !== studentId);
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem('school_students', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      addAuditLog({
+        action: 'delete',
+        entityType: 'student',
+        entityId: studentId,
+        performerId: currentUser.id,
+        performerRole: currentUserRole,
+        performerName: currentUser.name,
+        details: `حذف نهائي لسجل الطالب (${target.fullName} - سجل مدني ${target.nationalId}) من المدرسة.`,
+        detailsEn: `Permanent deletion of the student record (${target.fullName} - Civil ID ${target.nationalId}) from the school.`,
+      });
+
+      return { success: true, message: 'تم حذف سجل الطالب نهائياً' };
+    } catch (error) {
+      console.error('[STUDENTS] Could not delete student:', error);
+      return { success: false, message: 'تعذّر الاتصال بالخادم لحذف الطالب. حاول مجدداً.' };
+    }
   };
 
   const updateSettings = (newSettings: Partial<SchoolSettings>) => {
@@ -3157,9 +3219,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     });
   };
 
-  const updateMessagingGateway = (
+  const updateMessagingGateway = async (
     config: Partial<SchoolMessagingGatewayConfig>
-  ): { success: boolean; message: string } => {
+  ): Promise<{ success: boolean; message: string }> => {
     if (!isSuperAdmin) {
       const errorMsg = 'عذراً، صلاحية ضبط وتعديل بوابات الرسائل والواتساب محصورة بمالك المنصة (The Owner) فقط.';
       console.warn(errorMsg);
@@ -3185,66 +3247,88 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
       lastConfiguredAt: new Date().toISOString(),
     };
 
-    // 1. Update in SchoolProfilesMap
-    setSchoolProfilesMap((prev) => {
-      const current = prev[tenantId] || getDefaultSchoolProfile(tenantId);
-      const updatedProfile = {
-        ...current,
-        messagingGateway: updatedGateway,
-      };
-      if (typeof localCache !== 'undefined') {
-        localCache.setItem(
-          'tenant_school_profiles',
-          JSON.stringify({
-            ...prev,
-            [tenantId]: updatedProfile,
-          })
-        );
+    try {
+      const response = await authenticatedFetch('/api/settings/messaging-gateway', {
+        method: 'PUT',
+        body: JSON.stringify(updatedGateway),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        return {
+          success: false,
+          message: payload?.error || 'تعذر حفظ بيانات بوابة المراسلة. يرجى المحاولة مرة أخرى.',
+        };
       }
+
+      const savedGateway = (payload.gateway || updatedGateway) as SchoolMessagingGatewayConfig;
+
+      // 1. Update in SchoolProfilesMap
+      setSchoolProfilesMap((prev) => {
+        const current = prev[tenantId] || getDefaultSchoolProfile(tenantId);
+        const updatedProfile = {
+          ...current,
+          messagingGateway: savedGateway,
+        };
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem(
+            'tenant_school_profiles',
+            JSON.stringify({
+              ...prev,
+              [tenantId]: updatedProfile,
+            })
+          );
+        }
+        return {
+          ...prev,
+          [tenantId]: updatedProfile,
+        };
+      });
+
+      // 2. Update in SettingsMap
+      setSettingsMap((prev) => {
+        const current = prev[tenantId] || getDefaultSchoolSettings(tenantId);
+        const updatedSettings = {
+          ...current,
+          messagingGateway: savedGateway,
+        };
+        if (typeof localCache !== 'undefined') {
+          localCache.setItem(
+            'school_settings',
+            JSON.stringify({
+              ...prev,
+              [tenantId]: updatedSettings,
+            })
+          );
+        }
+        return {
+          ...prev,
+          [tenantId]: updatedSettings,
+        };
+      });
+
+      // 3. Log audit event
+      addAuditLog({
+        entityType: 'settings',
+        entityId: `gateway-${tenantId}`,
+        action: 'update',
+        performerId: currentUser.id,
+        performerName: currentUser.name,
+        performerRole: currentUser.role,
+        details: `تحديث بيانات وبوابات المراسلة والواتساب (رقم الواتساب: ${savedGateway.whatsappPhoneNumber}، وضع الخدمة: ${savedGateway.whatsappServiceMode}، مزود SMS: ${savedGateway.smsProvider}) بواسطة مالك المنصة.`,
+        detailsEn: `Updating messaging and WhatsApp gateway data (WhatsApp number: ${savedGateway.whatsappPhoneNumber}, service mode: ${savedGateway.whatsappServiceMode}, SMS provider: ${savedGateway.smsProvider}) by the platform owner.`,
+      });
+
       return {
-        ...prev,
-        [tenantId]: updatedProfile,
+        success: true,
+        message: 'تم حفظ وتفعيل بوابات المراسلة والواتساب للمدرسة بنجاح من قبل مالك المنصة.',
       };
-    });
-
-    // 2. Update in SettingsMap
-    setSettingsMap((prev) => {
-      const current = prev[tenantId] || getDefaultSchoolSettings(tenantId);
-      const updatedSettings = {
-        ...current,
-        messagingGateway: updatedGateway,
-      };
-      if (typeof localCache !== 'undefined') {
-        localCache.setItem(
-          'school_settings',
-          JSON.stringify({
-            ...prev,
-            [tenantId]: updatedSettings,
-          })
-        );
-      }
+    } catch (err) {
+      console.warn('[SETTINGS] Could not save messaging gateway:', err);
       return {
-        ...prev,
-        [tenantId]: updatedSettings,
+        success: false,
+        message: 'تعذر الاتصال بالخادم لحفظ بيانات بوابة المراسلة.',
       };
-    });
-
-    // 3. Log audit event
-    addAuditLog({
-      entityType: 'settings',
-      entityId: `gateway-${tenantId}`,
-      action: 'update',
-      performerId: currentUser.id,
-      performerName: currentUser.name,
-      performerRole: currentUser.role,
-      details: `تحديث بيانات وبوابات المراسلة والواتساب (رقم الواتساب: ${updatedGateway.whatsappPhoneNumber}، وضع الخدمة: ${updatedGateway.whatsappServiceMode}، مزود SMS: ${updatedGateway.smsProvider}) بواسطة مالك المنصة.`,
-      detailsEn: `Updating messaging and WhatsApp gateway data (WhatsApp number: ${updatedGateway.whatsappPhoneNumber}, service mode: ${updatedGateway.whatsappServiceMode}, SMS provider: ${updatedGateway.smsProvider}) by the platform owner.`,
-    });
-
-    return {
-      success: true,
-      message: 'تم حفظ وتفعيل بوابات المراسلة والواتساب للمدرسة بنجاح من قبل مالك المنصة.',
-    };
+    }
   };
 
   const updateDigestConfig = (cfg: Partial<DailyEmailDigestConfig>) => {

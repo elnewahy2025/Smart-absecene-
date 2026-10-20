@@ -20,9 +20,13 @@
     "seed:tenant": "node scripts/seed-tenant-demo.mjs",
     "probe:security": "node scripts/security-probes.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-smart-school \"node scripts/test-firestore-rules.mjs\"",
+    "test:seats": "firebase emulators:exec --only firestore --project demo-smart-school \"tsx scripts/test-user-seats.ts && tsx scripts/test-student-seats.ts\"",
+    "reconcile:seats": "tsx scripts/reconcile-user-seats.ts",
     "audit": "node scripts/ci-security-audit.mjs",
+    "audit:users": "tsx scripts/audit-unprovisioned-users.ts",
     "rotate:secrets": "node scripts/rotate-tenant-ai-secrets.mjs",
     "migrate:secrets": "node scripts/migrate-ai-secrets-to-firestore.mjs",
+    "migrate:gateway": "tsx scripts/migrate-gateway-secrets.ts",
     "golive": "node scripts/golive-check.mjs"
   },
   "dependencies": {

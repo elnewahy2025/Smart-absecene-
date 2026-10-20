@@ -113,6 +113,29 @@ import {
   sendEmail,
 } from './src/utils/messagingProviders';
 import type { SchoolMessagingGatewayConfig } from './src/types/attendance';
+import {
+  buildGatewayDocument,
+  decryptGatewayConfig,
+  GATEWAY_SECRET_FIELDS,
+  maskGatewaySecrets,
+  mergeGatewaySecretValue,
+} from './src/utils/tenantGatewaySecrets';
+import {
+  releaseUserSeat,
+  reserveUserSeat,
+  USER_SEAT_LIMIT_CODE,
+} from './src/utils/tenantUserSeats';
+import {
+  isActiveStudentRecord,
+  normalizeStudentCreateInput,
+} from './src/utils/studentEnrollment';
+import type { StudentCreateFields } from './src/utils/studentEnrollment';
+import {
+  ensureStudentUsageDocument,
+  reserveStudentSeats,
+  StudentSeatLimitError,
+  STUDENT_SEAT_LIMIT_CODE,
+} from './src/utils/tenantStudentSeats';
 import { isPublicRoute } from './src/utils/routeAuth';
 import {
   applyReactivate,
@@ -589,31 +612,47 @@ const upsertManagedAccount = async (
     created = true;
   }
 
-  await admin.auth().setCustomUserClaims(user.uid, { role: input.role, tenantId: input.tenantId });
+  try {
+    await admin.auth().setCustomUserClaims(user.uid, { role: input.role, tenantId: input.tenantId });
 
-  const timestamp = new Date().toISOString();
-  const profile: Record<string, any> = {
-    userId: user.uid,
-    tenantId: input.tenantId,
-    name: input.name || input.email,
-    email: input.email,
-    role: input.role,
-    phone: input.phone || '',
-    jobTitle: input.jobTitle || '',
-    status,
-    updatedAt: timestamp,
-  };
-  if (created) profile.createdAt = timestamp;
-  if (Array.isArray(input.assignedClasses)) profile.assignedClasses = input.assignedClasses;
-  if (Array.isArray(input.assignedSubjects)) profile.assignedSubjects = input.assignedSubjects;
+    const timestamp = new Date().toISOString();
+    const profile: Record<string, any> = {
+      userId: user.uid,
+      tenantId: input.tenantId,
+      name: input.name || input.email,
+      email: input.email,
+      role: input.role,
+      phone: input.phone || '',
+      jobTitle: input.jobTitle || '',
+      status,
+      updatedAt: timestamp,
+    };
+    if (created) profile.createdAt = timestamp;
+    if (Array.isArray(input.assignedClasses)) profile.assignedClasses = input.assignedClasses;
+    if (Array.isArray(input.assignedSubjects)) profile.assignedSubjects = input.assignedSubjects;
 
-  await admin.firestore().doc(`users/${user.uid}`).set(profile, { merge: true });
+    await admin.firestore().doc(`users/${user.uid}`).set(profile, { merge: true });
+  } catch (error) {
+    // Do not leave an Auth account without a Firestore profile (which would
+    // also leak a reserved seat) when a brand-new account fails mid-provision.
+    if (created) await admin.auth().deleteUser(user.uid).catch(() => {});
+    throw error;
+  }
 
   return {
     uid: user.uid,
     password: created || resetPassword ? temporaryPassword : '',
     created,
   };
+};
+
+const findAuthUserByEmail = async (email: string): Promise<any | null> => {
+  try {
+    return await admin.auth().getUserByEmail(email);
+  } catch (error: any) {
+    if (error?.code === 'auth/user-not-found') return null;
+    throw error;
+  }
 };
 
 // The owner is identified by the Admin-SDK-set claim only. The previous email
@@ -625,8 +664,8 @@ const resolveServerIdentity = (
   decoded: any
 ): { role: string; tenantId: string } | null => {
   // Claims are set only by the Admin SDK. The Firestore profile is intentionally
-  // NOT trusted here: firestore.rules lets a user create their own profile with
-  // an arbitrary role, which would turn self-signup into privilege escalation.
+  // NOT trusted here: even though client-side profile creation is now limited to
+  // the platform owner, the profile document is not an authorization source.
   const claimRole = typeof decoded?.role === 'string' ? decoded.role : '';
   const claimTenant = typeof decoded?.tenantId === 'string' ? decoded.tenantId : '';
   if (VALID_ROLES.has(claimRole) && claimTenant) {
@@ -997,6 +1036,65 @@ const ensureJsonObject = (value: any, fallback: Record<string, any> = {}) => {
 // settings_private/{tenantId} document. Returns null when the platform lacks
 // privileged Firestore access or the school has not configured a gateway, so the
 // caller can fail closed instead of pretending a message was sent.
+const GATEWAY_STRING_FIELDS = [
+  'whatsappPhoneNumber',
+  'whatsappBusinessAccountId',
+  'whatsappPhoneNumberId',
+  'smsSenderId',
+  'smsSenderPhone',
+  'smtpHost',
+  'smtpUser',
+  'fromEmail',
+  'fromName',
+] as const;
+
+const DEFAULT_GATEWAY_CONFIG: SchoolMessagingGatewayConfig = {
+  whatsappPhoneNumber: '',
+  whatsappServiceMode: 'web_direct',
+  smsProvider: 'taqnyat',
+  smsSenderId: '',
+  enableWhatsAppNotifications: false,
+  enableSmsNotifications: false,
+};
+
+function sanitizeGatewayConfig(
+  input: any,
+  base: SchoolMessagingGatewayConfig
+): SchoolMessagingGatewayConfig {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const next: any = { ...base };
+
+  for (const field of GATEWAY_STRING_FIELDS) {
+    if (typeof source[field] === 'string') {
+      next[field] = source[field].trim().slice(0, field === 'smtpHost' ? 255 : 500);
+    }
+  }
+  for (const field of GATEWAY_SECRET_FIELDS) {
+    if (typeof source[field] === 'string') {
+      const merged = mergeGatewaySecretValue(source[field], base[field]);
+      if (merged !== undefined) next[field] = merged.slice(0, 2000);
+    }
+  }
+  if (['web_direct', 'cloud_api'].includes(source.whatsappServiceMode)) {
+    next.whatsappServiceMode = source.whatsappServiceMode;
+  }
+  if (['taqnyat', 'unifonic', 'twilio', 'msegat'].includes(source.smsProvider)) {
+    next.smsProvider = source.smsProvider;
+  }
+  if (['smtp', 'resend', 'sendgrid'].includes(source.emailProvider)) {
+    next.emailProvider = source.emailProvider;
+  }
+  if (typeof source.smtpPort === 'number' && Number.isFinite(source.smtpPort)) {
+    next.smtpPort = Math.trunc(source.smtpPort);
+  }
+  for (const field of ['smtpSecure', 'emailEnabled', 'enableWhatsAppNotifications', 'enableSmsNotifications'] as const) {
+    if (typeof source[field] === 'boolean') {
+      next[field] = source[field];
+    }
+  }
+  return next as SchoolMessagingGatewayConfig;
+}
+
 async function loadMessagingGatewayConfig(
   tenantId: string
 ): Promise<SchoolMessagingGatewayConfig | null> {
@@ -1004,9 +1102,23 @@ async function loadMessagingGatewayConfig(
   try {
     const snapshot = await admin.firestore().doc(`settings_private/${tenantId}`).get();
     if (!snapshot.exists) return null;
-    const gateway = (snapshot.data() as any)?.messagingGateway;
-    if (!gateway || typeof gateway !== 'object') return null;
-    return gateway as SchoolMessagingGatewayConfig;
+
+    const data = snapshot.data() as any;
+    const publicConfig = data?.messagingGateway;
+    const encrypted = data?.messagingGatewaySecrets;
+    const hasPublic = publicConfig && typeof publicConfig === 'object' && !Array.isArray(publicConfig);
+    const hasEncrypted = encrypted && typeof encrypted === 'object' && !Array.isArray(encrypted);
+
+    if (!hasPublic && !hasEncrypted) return null;
+
+    const base = hasPublic ? (publicConfig as Record<string, unknown>) : {};
+    if (hasEncrypted) {
+      const decrypted = decryptGatewayConfig(encrypted);
+      if (decrypted) {
+        return { ...base, ...decrypted } as unknown as SchoolMessagingGatewayConfig;
+      }
+    }
+    return Object.keys(base).length > 0 ? (base as unknown as SchoolMessagingGatewayConfig) : null;
   } catch (error: any) {
     console.warn(`[GATEWAY:${tenantId}] Could not load messaging gateway config:`, error?.message || error);
     return null;
@@ -1782,6 +1894,76 @@ app.post('/api/tenant/ai-config/test', requireRole(['admin']), requireTenant, as
   }
 });
 
+// Messaging gateway credentials: platform-owner only, encrypted at rest with
+// AES-256-GCM. The browser never reads settings_private directly.
+app.get('/api/settings/messaging-gateway', requirePlatformOwner, requireTenant, async (req, res) => {
+  if (!firebaseAdminReady) {
+    return res.status(503).json({ success: false, error: 'Authentication is not configured on this server.', code: 'AUTH_NOT_CONFIGURED' });
+  }
+  const tenantId = resolveTargetTenantId(req);
+  if (!TENANT_ID_PATTERN.test(tenantId)) {
+    return res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+  }
+  try {
+    const gateway = await loadMessagingGatewayConfig(tenantId);
+    if (gateway) {
+      // Lazy migration: the first owner read upgrades a legacy plaintext
+      // document to the encrypted envelope.
+      try {
+        const ref = admin.firestore().doc(`settings_private/${tenantId}`);
+        const snapshot = await ref.get();
+        if (snapshot.exists && !(snapshot.data() as any)?.messagingGatewaySecrets) {
+          const config = sanitizeGatewayConfig(gateway, DEFAULT_GATEWAY_CONFIG);
+          // Replace the document: this removes legacy plaintext secret fields.
+          await ref.set(buildGatewayDocument(config, (req as any).user?.email || ''));
+        }
+      } catch (migrationError: any) {
+        console.warn(`[GATEWAY:${tenantId}] Could not migrate gateway credentials to the encrypted format:`, migrationError?.message || migrationError);
+      }
+    }
+    return res.json({
+      success: true,
+      tenantId,
+      gateway: gateway ? maskGatewaySecrets(gateway) : null,
+    });
+  } catch (err: any) {
+    console.error('[GATEWAY-GET-ERROR]', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Could not load the messaging gateway configuration.' });
+  }
+});
+
+app.put('/api/settings/messaging-gateway', requirePlatformOwner, requireTenant, async (req, res) => {
+  if (!firebaseAdminReady) {
+    return res.status(503).json({ success: false, error: 'Authentication is not configured on this server.', code: 'AUTH_NOT_CONFIGURED' });
+  }
+  const tenantId = resolveTargetTenantId(req);
+  if (!TENANT_ID_PATTERN.test(tenantId)) {
+    return res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+  }
+  try {
+    const current = (await loadMessagingGatewayConfig(tenantId)) || DEFAULT_GATEWAY_CONFIG;
+    const incoming = req.body?.gateway && typeof req.body.gateway === 'object' ? req.body.gateway : req.body;
+    const config = sanitizeGatewayConfig(incoming, current);
+    const updatedBy = (req as any).user?.email || '';
+    const document = buildGatewayDocument(config, updatedBy);
+    // Replace the document: this removes legacy plaintext secret fields.
+    await admin.firestore().doc(`settings_private/${tenantId}`).set(document);
+    return res.json({
+      success: true,
+      tenantId,
+      gateway: maskGatewaySecrets({
+        ...config,
+        lastConfiguredByRole: 'super_admin',
+        lastConfiguredByEmail: updatedBy,
+        lastConfiguredAt: document.updatedAt,
+      }),
+    });
+  } catch (err: any) {
+    console.error('[GATEWAY-PUT-ERROR]', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Could not save the messaging gateway configuration.' });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   let dynamicTenantsCount = 0;
   try {
@@ -2237,39 +2419,68 @@ app.post('/api/users', requireRole(['admin', 'registrar']), async (req, res) => 
       return res.status(403).json({ success: false, error: 'Only an administrator can create another administrator.' });
     }
 
-    const account = await upsertManagedAccount({
-      tenantId,
-      email,
-      name,
-      role,
-      phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 30) : '',
-      jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '',
-      status: typeof body.status === 'string' ? body.status : 'active',
-      assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses.filter((c: unknown) => typeof c === 'string').slice(0, 50) : undefined,
-      assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects.filter((s: unknown) => typeof s === 'string').slice(0, 50) : undefined,
-      password: typeof body.password === 'string' ? body.password : undefined,
-    });
+    // Enforce the plan's user-seat limit (only for brand-new accounts; editing
+    // an existing member must keep working after the school reaches its cap).
+    // The seat is reserved transactionally before Auth user creation and is
+    // released if the request fails or turns out to be an update.
+    const subscription = await loadTenantSubscription(tenantId);
+    const maxUsers = subscription.limits?.maxUsers;
+    const limitEnabled = typeof maxUsers === 'number' && maxUsers > 0;
 
-    return res.json({
-      success: true,
-      created: account.created,
-      temporaryPassword: account.password,
-      user: {
-        id: account.uid,
-        userId: account.uid,
+    let releaseSeat: (() => Promise<void>) | null = null;
+    try {
+      if (limitEnabled) {
+        const existingAuthUser = await findAuthUserByEmail(email);
+        if (!existingAuthUser) {
+          releaseSeat = await reserveUserSeat(admin.firestore(), tenantId, maxUsers);
+        }
+      }
+
+      const account = await upsertManagedAccount({
         tenantId,
-        name,
         email,
+        name,
         role,
         phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 30) : '',
         jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '',
         status: typeof body.status === 'string' ? body.status : 'active',
-        assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses : undefined,
-        assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects : undefined,
-      },
-    });
+        assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses.filter((c: unknown) => typeof c === 'string').slice(0, 50) : undefined,
+        assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects.filter((s: unknown) => typeof s === 'string').slice(0, 50) : undefined,
+        password: typeof body.password === 'string' ? body.password : undefined,
+      });
+
+      if (!account.created && releaseSeat) {
+        await releaseSeat();
+        releaseSeat = null;
+      }
+
+      return res.json({
+        success: true,
+        created: account.created,
+        temporaryPassword: account.password,
+        user: {
+          id: account.uid,
+          userId: account.uid,
+          tenantId,
+          name,
+          email,
+          role,
+          phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 30) : '',
+          jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '',
+          status: typeof body.status === 'string' ? body.status : 'active',
+          assignedClasses: Array.isArray(body.assignedClasses) ? body.assignedClasses : undefined,
+          assignedSubjects: Array.isArray(body.assignedSubjects) ? body.assignedSubjects : undefined,
+        },
+      });
+    } catch (error) {
+      if (releaseSeat) await releaseSeat().catch(() => {});
+      throw error;
+    }
   } catch (err: any) {
     console.error('[USERS-CREATE-ERROR]', err?.message || err);
+    if (err?.code === USER_SEAT_LIMIT_CODE) {
+      return res.status(403).json({ success: false, error: err.message, code: USER_SEAT_LIMIT_CODE });
+    }
     const status = typeof err?.statusCode === 'number' ? err.statusCode : 500;
     return res.status(status).json({ success: false, error: err?.message || 'Could not create the account.' });
   }
@@ -2370,11 +2581,469 @@ app.delete('/api/users/:uid', requireRole(['admin']), async (req, res) => {
 
     await admin.firestore().doc(`users/${uid}`).delete();
     await admin.auth().deleteUser(uid).catch(() => {});
+    if (typeof existing.tenantId === 'string' && existing.tenantId) {
+      await releaseUserSeat(admin.firestore(), existing.tenantId).catch((releaseError: any) => {
+        console.warn('[USERS-DELETE] Could not release the user seat:', releaseError?.message || releaseError);
+      });
+    }
 
     return res.json({ success: true });
   } catch (err: any) {
     console.error('[USERS-DELETE-ERROR]', err?.message || err);
     return res.status(500).json({ success: false, error: `Could not delete the account: ${err?.message || 'unknown error'}` });
+  }
+});
+
+// --- Student enrollment (server-authoritative seat enforcement) --------------
+// Student creation, bulk import, deletion, transfer, and restoration go through
+// the API so maxStudents cannot be bypassed with a direct Firestore write.
+const MAX_STUDENTS_PER_IMPORT = 1000;
+const STUDENT_IMPORT_CHUNK_SIZE = 450;
+
+class DuplicateStudentError extends Error {
+  readonly code = 'DUPLICATE_STUDENT';
+  readonly statusCode = 409;
+
+  constructor() {
+    super('A student with the same national ID or student number already exists in this school.');
+    this.name = 'DuplicateStudentError';
+  }
+}
+
+class StudentNotFoundError extends Error {
+  readonly code = 'STUDENT_NOT_FOUND';
+  readonly statusCode = 404;
+
+  constructor() {
+    super('The student record was not found.');
+    this.name = 'StudentNotFoundError';
+  }
+}
+
+const readStudentSeatCount = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+
+const isValidStudentDocumentId = (value: string): boolean =>
+  Boolean(value) && value.length <= 200 && !value.includes('/');
+
+const buildStudentRecord = (
+  value: StudentCreateFields,
+  studentId: string,
+  tenantId: string,
+  actorUid: string,
+  now: string
+): Record<string, any> =>
+  stripUndefinedDeep({
+    ...value,
+    id: studentId,
+    tenantId,
+    totalAbsences: 0,
+    totalLates: 0,
+    attendanceRate: 100,
+    createdAt: now,
+    createdBy: actorUid,
+  });
+
+const handleStudentRouteError = (
+  res: express.Response,
+  err: any,
+  label: string,
+  fallback: string
+) => {
+  console.error(`[${label}]`, err?.message || err);
+  if (err?.code === STUDENT_SEAT_LIMIT_CODE) {
+    return res.status(403).json({ success: false, error: err.message, code: STUDENT_SEAT_LIMIT_CODE });
+  }
+  if (err?.code === 'DUPLICATE_STUDENT') {
+    return res.status(409).json({ success: false, error: err.message, code: 'DUPLICATE_STUDENT' });
+  }
+  if (err?.code === 'STUDENT_NOT_FOUND') {
+    return res.status(404).json({ success: false, error: err.message, code: 'STUDENT_NOT_FOUND' });
+  }
+  return res.status(500).json({ success: false, error: fallback });
+};
+
+// Body: { student fields, tenantId? }
+app.post('/api/students', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Firestore is not configured on this server.' });
+    }
+
+    const actor = (req as any).user;
+    const tenantId = resolveTargetTenantId(req);
+    if (!TENANT_ID_PATTERN.test(tenantId)) {
+      return res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+    }
+
+    const normalized = normalizeStudentCreateInput(req.body);
+    if (!normalized.ok) {
+      return res.status(400).json({ success: false, error: normalized.error, code: 'INVALID_STUDENT' });
+    }
+
+    const subscription = await loadTenantSubscription(tenantId);
+    const configuredMaxStudents = subscription.limits?.maxStudents;
+    const studentLimit =
+      typeof configuredMaxStudents === 'number' && configuredMaxStudents > 0
+        ? Math.floor(configuredMaxStudents)
+        : 0;
+
+    const db = admin.firestore();
+    const studentId = `std-${crypto.randomUUID()}`;
+    const studentRef = db.doc(`students/${studentId}`);
+    const usageRef = db.doc(`tenant_usage/${tenantId}`);
+
+    await ensureStudentUsageDocument(db, tenantId);
+
+    const student = await db.runTransaction(async (transaction) => {
+      const usage = await transaction.get(usageRef);
+
+      const nationalId = normalized.value.nationalId;
+      const studentNumber = normalized.value.studentNumber;
+      const nationalIdMatches = await transaction.get(
+        db.collection('students').where('nationalId', '==', nationalId)
+      );
+      const studentNumberMatches = await transaction.get(
+        db.collection('students').where('studentNumber', '==', studentNumber)
+      );
+      const duplicate =
+        nationalIdMatches.docs.some((doc) => doc.data().tenantId === tenantId) ||
+        studentNumberMatches.docs.some((doc) => doc.data().tenantId === tenantId);
+      if (duplicate) throw new DuplicateStudentError();
+
+      const current = readStudentSeatCount(usage.data()?.studentCount);
+      if (studentLimit > 0 && current >= studentLimit) {
+        throw new StudentSeatLimitError(studentLimit, 1, current);
+      }
+
+      const now = new Date().toISOString();
+      const record = buildStudentRecord(normalized.value, studentId, tenantId, actor.uid, now);
+      transaction.set(studentRef, record);
+      transaction.set(
+        usageRef,
+        { studentCount: current + 1, updatedAt: now },
+        { merge: true }
+      );
+      return record;
+    });
+
+    return res.status(201).json({ success: true, student });
+  } catch (err: any) {
+    return handleStudentRouteError(res, err, 'STUDENTS-CREATE-ERROR', 'Could not create the student record.');
+  }
+});
+
+// Body: { students: [...], tenantId? }
+app.post('/api/students/import', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Firestore is not configured on this server.' });
+    }
+
+    const actor = (req as any).user;
+    const tenantId = resolveTargetTenantId(req);
+    if (!TENANT_ID_PATTERN.test(tenantId)) {
+      return res.status(400).json({ success: false, error: 'A valid tenantId is required.' });
+    }
+
+    const rawStudents = Array.isArray(req.body?.students) ? req.body.students : null;
+    if (!rawStudents || rawStudents.length === 0) {
+      return res.status(400).json({ success: false, error: 'students must be a non-empty array.' });
+    }
+    if (rawStudents.length > MAX_STUDENTS_PER_IMPORT) {
+      return res.status(400).json({
+        success: false,
+        error: `A single import cannot exceed ${MAX_STUDENTS_PER_IMPORT} students.`,
+      });
+    }
+
+    const normalizedStudents: StudentCreateFields[] = [];
+    for (let index = 0; index < rawStudents.length; index += 1) {
+      const normalized = normalizeStudentCreateInput(rawStudents[index]);
+      if (!normalized.ok) {
+        return res.status(400).json({
+          success: false,
+          error: `students[${index}]: ${normalized.error}`,
+          code: 'INVALID_STUDENT',
+        });
+      }
+      normalizedStudents.push(normalized.value);
+    }
+
+    const db = admin.firestore();
+    const existingSnapshot = await db.collection('students').where('tenantId', '==', tenantId).get();
+    const existingNationalIds = new Set<string>();
+    const existingStudentNumbers = new Set<string>();
+    existingSnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (typeof data.nationalId === 'string' && data.nationalId) existingNationalIds.add(data.nationalId);
+      if (typeof data.studentNumber === 'string' && data.studentNumber) existingStudentNumbers.add(data.studentNumber);
+    });
+
+    const additions: StudentCreateFields[] = [];
+    let duplicates = 0;
+    for (const value of normalizedStudents) {
+      if (existingNationalIds.has(value.nationalId) || existingStudentNumbers.has(value.studentNumber)) {
+        duplicates += 1;
+        continue;
+      }
+      existingNationalIds.add(value.nationalId);
+      existingStudentNumbers.add(value.studentNumber);
+      additions.push(value);
+    }
+
+    if (additions.length === 0) {
+      return res.json({ success: true, imported: 0, duplicates, students: [] });
+    }
+
+    const subscription = await loadTenantSubscription(tenantId);
+    const configuredMaxStudents = subscription.limits?.maxStudents;
+    const studentLimit =
+      typeof configuredMaxStudents === 'number' && configuredMaxStudents > 0
+        ? Math.floor(configuredMaxStudents)
+        : 0;
+
+    const releaseSeats = await reserveStudentSeats(db, tenantId, studentLimit, additions.length);
+
+    const now = new Date().toISOString();
+    const created: Record<string, any>[] = [];
+    try {
+      for (let offset = 0; offset < additions.length; offset += STUDENT_IMPORT_CHUNK_SIZE) {
+        const batch = db.batch();
+        for (const value of additions.slice(offset, offset + STUDENT_IMPORT_CHUNK_SIZE)) {
+          const studentId = `std-${crypto.randomUUID()}`;
+          const record = buildStudentRecord(value, studentId, tenantId, actor.uid, now);
+          batch.set(db.doc(`students/${studentId}`), record);
+          created.push(record);
+        }
+        await batch.commit();
+      }
+    } catch (writeError) {
+      for (let offset = 0; offset < created.length; offset += STUDENT_IMPORT_CHUNK_SIZE) {
+        const cleanup = db.batch();
+        for (const record of created.slice(offset, offset + STUDENT_IMPORT_CHUNK_SIZE)) {
+          cleanup.delete(db.doc(`students/${record.id}`));
+        }
+        await cleanup.commit().catch((cleanupError: any) => {
+          console.warn('[STUDENTS-IMPORT-ROLLBACK]', cleanupError?.message || cleanupError);
+        });
+      }
+      if (releaseSeats) await releaseSeats().catch(() => {});
+      throw writeError;
+    }
+
+    return res.status(201).json({
+      success: true,
+      imported: created.length,
+      duplicates,
+      students: created,
+    });
+  } catch (err: any) {
+    return handleStudentRouteError(res, err, 'STUDENTS-IMPORT-ERROR', 'Could not import the student records.');
+  }
+});
+
+app.delete('/api/students/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Firestore is not configured on this server.' });
+    }
+
+    const actor = (req as any).user;
+    const studentId = String(req.params.id || '');
+    if (!isValidStudentDocumentId(studentId)) {
+      return res.status(400).json({ success: false, error: 'A valid student id is required.' });
+    }
+
+    const db = admin.firestore();
+    const studentRef = db.doc(`students/${studentId}`);
+    const snapshot = await studentRef.get();
+    if (!snapshot.exists) throw new StudentNotFoundError();
+
+    const existing = snapshot.data() || {};
+    const tenantId = typeof existing.tenantId === 'string' ? existing.tenantId : '';
+    if (!tenantId) throw new StudentNotFoundError();
+    if (!isPlatformOwner(actor) && tenantId !== actor.tenantId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: the student belongs to another school.' });
+    }
+
+    await ensureStudentUsageDocument(db, tenantId);
+
+    await db.runTransaction(async (transaction) => {
+      const currentStudent = await transaction.get(studentRef);
+      if (!currentStudent.exists) throw new StudentNotFoundError();
+      const currentData = currentStudent.data() || {};
+      if (currentData.tenantId !== tenantId) throw new StudentNotFoundError();
+
+      const usageRef = db.doc(`tenant_usage/${tenantId}`);
+      const usage = await transaction.get(usageRef);
+      transaction.delete(studentRef);
+
+      if (isActiveStudentRecord(currentData) && usage.exists) {
+        const current = readStudentSeatCount(usage.data()?.studentCount);
+        transaction.set(
+          usageRef,
+          { studentCount: Math.max(0, current - 1), updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      }
+    });
+
+    return res.json({ success: true, studentId });
+  } catch (err: any) {
+    return handleStudentRouteError(res, err, 'STUDENTS-DELETE-ERROR', 'Could not delete the student record.');
+  }
+});
+
+// Body: { destinationSchool, reason?, tenantId? }
+app.post('/api/students/:id/transfer', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Firestore is not configured on this server.' });
+    }
+
+    const actor = (req as any).user;
+    const studentId = String(req.params.id || '');
+    if (!isValidStudentDocumentId(studentId)) {
+      return res.status(400).json({ success: false, error: 'A valid student id is required.' });
+    }
+
+    const destinationSchool = sanitizeText(req.body?.destinationSchool, '').slice(0, 120);
+    if (!destinationSchool) {
+      return res.status(400).json({ success: false, error: 'destinationSchool is required.' });
+    }
+    const reason = sanitizeText(req.body?.reason, '').slice(0, 500) || 'Official transfer to another school';
+
+    const db = admin.firestore();
+    const studentRef = db.doc(`students/${studentId}`);
+    const snapshot = await studentRef.get();
+    if (!snapshot.exists) throw new StudentNotFoundError();
+
+    const existing = snapshot.data() || {};
+    const tenantId = typeof existing.tenantId === 'string' ? existing.tenantId : '';
+    if (!tenantId) throw new StudentNotFoundError();
+    if (!isPlatformOwner(actor) && tenantId !== actor.tenantId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: the student belongs to another school.' });
+    }
+    if (existing.enrollmentStatus === 'transferred') {
+      return res.json({ success: true, student: existing });
+    }
+
+    await ensureStudentUsageDocument(db, tenantId);
+    const usageRef = db.doc(`tenant_usage/${tenantId}`);
+    const now = new Date().toISOString();
+    const updates = {
+      enrollmentStatus: 'transferred',
+      transferredAt: now,
+      destinationSchool,
+      transferReason: reason,
+      updatedAt: now,
+    };
+
+    const student = await db.runTransaction(async (transaction) => {
+      const currentStudent = await transaction.get(studentRef);
+      if (!currentStudent.exists) throw new StudentNotFoundError();
+      const currentData = currentStudent.data() || {};
+      if (currentData.tenantId !== tenantId) throw new StudentNotFoundError();
+      if (currentData.enrollmentStatus === 'transferred') return currentData;
+
+      const usage = await transaction.get(usageRef);
+      transaction.update(studentRef, updates);
+
+      if (isActiveStudentRecord(currentData) && usage.exists) {
+        const current = readStudentSeatCount(usage.data()?.studentCount);
+        transaction.set(
+          usageRef,
+          { studentCount: Math.max(0, current - 1), updatedAt: now },
+          { merge: true }
+        );
+      }
+      return stripUndefinedDeep({ ...currentData, ...updates });
+    });
+
+    return res.json({ success: true, student });
+  } catch (err: any) {
+    return handleStudentRouteError(res, err, 'STUDENTS-TRANSFER-ERROR', 'Could not transfer the student record.');
+  }
+});
+
+app.post('/api/students/:id/restore', requireRole(['admin', 'registrar']), async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: 'Firestore is not configured on this server.' });
+    }
+
+    const actor = (req as any).user;
+    const studentId = String(req.params.id || '');
+    if (!isValidStudentDocumentId(studentId)) {
+      return res.status(400).json({ success: false, error: 'A valid student id is required.' });
+    }
+
+    const db = admin.firestore();
+    const studentRef = db.doc(`students/${studentId}`);
+    const snapshot = await studentRef.get();
+    if (!snapshot.exists) throw new StudentNotFoundError();
+
+    const existing = snapshot.data() || {};
+    const tenantId = typeof existing.tenantId === 'string' ? existing.tenantId : '';
+    if (!tenantId) throw new StudentNotFoundError();
+    if (!isPlatformOwner(actor) && tenantId !== actor.tenantId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: the student belongs to another school.' });
+    }
+    if (isActiveStudentRecord(existing)) {
+      return res.json({ success: true, student: existing });
+    }
+
+    const subscription = await loadTenantSubscription(tenantId);
+    const configuredMaxStudents = subscription.limits?.maxStudents;
+    const studentLimit =
+      typeof configuredMaxStudents === 'number' && configuredMaxStudents > 0
+        ? Math.floor(configuredMaxStudents)
+        : 0;
+
+    await ensureStudentUsageDocument(db, tenantId);
+    const usageRef = db.doc(`tenant_usage/${tenantId}`);
+    const now = new Date().toISOString();
+
+    const student = await db.runTransaction(async (transaction) => {
+      const currentStudent = await transaction.get(studentRef);
+      if (!currentStudent.exists) throw new StudentNotFoundError();
+      const currentData = currentStudent.data() || {};
+      if (currentData.tenantId !== tenantId) throw new StudentNotFoundError();
+      if (isActiveStudentRecord(currentData)) return currentData;
+
+      const usage = await transaction.get(usageRef);
+      if (!usage.exists) {
+        throw new Error('The tenant student-usage document disappeared during restoration.');
+      }
+      const current = readStudentSeatCount(usage.data()?.studentCount);
+      if (studentLimit > 0 && current >= studentLimit) {
+        throw new StudentSeatLimitError(studentLimit, 1, current);
+      }
+
+      transaction.update(studentRef, {
+        enrollmentStatus: 'active',
+        transferredAt: admin.firestore.FieldValue.delete(),
+        destinationSchool: admin.firestore.FieldValue.delete(),
+        transferReason: admin.firestore.FieldValue.delete(),
+        updatedAt: now,
+      });
+      transaction.set(
+        usageRef,
+        { studentCount: current + 1, updatedAt: now },
+        { merge: true }
+      );
+
+      const rest: Record<string, any> = { ...currentData };
+      delete rest.transferredAt;
+      delete rest.destinationSchool;
+      delete rest.transferReason;
+      return stripUndefinedDeep({ ...rest, enrollmentStatus: 'active', updatedAt: now });
+    });
+
+    return res.json({ success: true, student });
+  } catch (err: any) {
+    return handleStudentRouteError(res, err, 'STUDENTS-RESTORE-ERROR', 'Could not restore the student record.');
   }
 });
 

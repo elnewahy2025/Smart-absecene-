@@ -72,9 +72,20 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     currentTenant,
     currentUser,
     canImportStudents,
+    tenantSubscription,
     behaviourIncidents,
     addBehaviourIncident,
   } = useAttendance();
+
+  const maxStudents = tenantSubscription?.limits?.maxStudents;
+  const studentLimitReached =
+    typeof maxStudents === 'number' &&
+    maxStudents > 0 &&
+    schoolEnrollmentStats.activeStudentsCount >= maxStudents;
+  const remainingStudentSeats =
+    typeof maxStudents === 'number' && maxStudents > 0
+      ? Math.max(0, maxStudents - schoolEnrollmentStats.activeStudentsCount)
+      : Number.POSITIVE_INFINITY;
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('all');
@@ -122,6 +133,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [validatedRows, setValidatedRows] = useState<ParsedImportRow[]>([]);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'valid' | 'errors'>('all');
   const [importResultSummary, setImportResultSummary] = useState<{ imported: number; duplicates: number } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // QR Code states
   const [selectedStudentForQR, setSelectedStudentForQR] = useState<Student | null>(null);
@@ -407,27 +420,47 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   };
 
   // Commit valid rows
-  const handleCommitImport = () => {
+  const handleCommitImport = async () => {
     const validRows = validatedRows.filter((r) => r.isValid);
-    if (validRows.length === 0) return;
+    if (isImporting || validRows.length === 0 || validRows.length > remainingStudentSeats) return;
 
-    const res = importStudents(
-      validRows.map((r) => ({
-        fullName: r.fullName,
-        nationalId: r.nationalId,
-        studentNumber: r.studentNumber,
-        grade: r.grade,
-        className: r.className,
-        classId:
-          classesStats.find((c) => c.className === r.className)?.classId ||
-          `class-${r.className.replace(/[^a-zA-Z0-9]/g, '')}`,
-        guardianName: r.guardianName,
-        guardianPhone: r.guardianPhone,
-        bloodType: r.bloodType,
-      }))
-    );
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      const res = await importStudents(
+        validRows.map((r) => ({
+          fullName: r.fullName,
+          nationalId: r.nationalId,
+          studentNumber: r.studentNumber,
+          grade: r.grade,
+          className: r.className,
+          classId:
+            classesStats.find((c) => c.className === r.className)?.classId ||
+            `class-${r.className.replace(/[^a-zA-Z0-9]/g, '')}`,
+          guardianName: r.guardianName,
+          guardianPhone: r.guardianPhone,
+          bloodType: r.bloodType,
+        }))
+      );
+      setImportResultSummary(res);
+    } catch (error) {
+      setImportError(
+        error instanceof Error
+          ? error.message
+          : lang === 'ar'
+            ? 'تعذّر استيراد الطلاب. حاول مجدداً.'
+            : 'Could not import the students. Please try again.'
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
-    setImportResultSummary(res);
+  const handleRestoreStudent = async (studentId: string) => {
+    const result = await restoreStudent(studentId);
+    if (!result.success) {
+      alert(result.message);
+    }
   };
 
   const handleCloseModal = () => {
@@ -437,6 +470,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     setUploadedFile(null);
     setValidatedRows([]);
     setImportResultSummary(null);
+    setImportError(null);
     setPreviewFilter('all');
   };
 
@@ -462,16 +496,25 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
           </h3>
           <p className="text-xs opacity-85 mt-0.5">
             {lang === 'ar'
-              ? `${schoolEnrollmentStats.activeStudentsCount} طالب نشط (${schoolEnrollmentStats.totalStudentsCount} إجمالي السجلات)`
+              ? `${schoolEnrollmentStats.activeStudentsCount} طالب نشط (${schoolEnrollmentStats.totalStudentsCount} سجل إجمالي)`
               : `${schoolEnrollmentStats.activeStudentsCount} Active Students (${schoolEnrollmentStats.totalStudentsCount} Total Records)`}
           </p>
+          {studentLimitReached && (
+            <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-300 mt-1">
+              {lang === 'ar'
+                ? `تم بلوغ الحد الأقصى لعدد الطلاب في خطتكم (${maxStudents}).`
+                : `Your plan's student limit has been reached (${maxStudents}).`}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {/* New Single Student Add Button */}
           <button
             onClick={() => setIsAddStudentModalOpen(true)}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+            disabled={studentLimitReached}
+            title={studentLimitReached ? (lang === 'ar' ? 'تم بلوغ الحد الأقصى لعدد الطلاب' : 'Student limit reached') : undefined}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus className="w-4 h-4" />
             <span>{lang === 'ar' ? 'إضافة طالب' : 'Add Student'}</span>
@@ -479,7 +522,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+            disabled={studentLimitReached}
+            title={studentLimitReached ? (lang === 'ar' ? 'تم بلوغ الحد الأقصى لعدد الطلاب' : 'Student limit reached') : undefined}
+            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload className="w-4 h-4" />
             <span>{lang === 'ar' ? 'استيراد CSV' : 'Import CSV'}</span>
@@ -778,7 +823,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                           {isTransferred ? (
                             <>
                               <button
-                                onClick={() => restoreStudent(s.id)}
+                                onClick={() => void handleRestoreStudent(s.id)}
                                 className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
                                 title="إلغاء إجراء النقل واستعادة قيد الطالب للدوام"
                               >
@@ -1139,6 +1184,20 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                       </table>
                     </div>
 
+                    {validCount > remainingStudentSeats && (
+                      <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-300">
+                        {lang === 'ar'
+                          ? `عدد الطلاب الصالحين (${validCount}) يتجاوز المقاعد المتبقية (${remainingStudentSeats}).`
+                          : `The ${validCount} valid students exceed the remaining ${remainingStudentSeats} seat(s).`}
+                      </p>
+                    )}
+
+                    {importError && (
+                      <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+                        {importError}
+                      </p>
+                    )}
+
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                       <button
@@ -1160,12 +1219,16 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                         <button
                           type="button"
                           onClick={handleCommitImport}
-                          disabled={validCount === 0}
-                          className="px-5 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold cursor-pointer shadow-xs"
+                          disabled={isImporting || validCount === 0 || validCount > remainingStudentSeats}
+                          className="px-5 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold cursor-pointer shadow-xs"
                         >
-                          {lang === 'ar'
-                            ? `اعتماد وحفظ (${validCount}) طلاب صالحين`
-                            : `Commit (${validCount}) Valid Students`}
+                          {isImporting
+                            ? lang === 'ar'
+                              ? 'جارٍ الاستيراد...'
+                              : 'Importing...'
+                            : lang === 'ar'
+                              ? `اعتماد وحفظ (${validCount}) طلاب صالحين`
+                              : `Commit (${validCount}) Valid Students`}
                         </button>
                       </div>
                     </div>

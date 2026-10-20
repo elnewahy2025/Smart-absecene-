@@ -7,7 +7,7 @@ interface TransferStudentModalProps {
   isOpen: boolean;
   student: Student | null;
   onClose: () => void;
-  onConfirmTransfer: (studentId: string, details: { destinationSchool: string; reason?: string }) => void;
+  onConfirmTransfer: (studentId: string, details: { destinationSchool: string; reason?: string }) => Promise<{ success: boolean; message: string }>;
   lang: 'ar' | 'en';
 }
 
@@ -22,23 +22,43 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   const [destinationSchool, setDestinationSchool] = useState('');
   const [reason, setReason] = useState('انتقال سكن ولي الأمر إلى حي/مدينة أخرى');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
 
   if (!isOpen || !student) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!destinationSchool.trim()) {
       setError(isAr ? 'يرجى إدخال اسم المدرسة المنقول إليها الطالب' : 'Please provide destination school name');
       return;
     }
 
-    onConfirmTransfer(student.id, {
-      destinationSchool: destinationSchool.trim(),
-      reason: reason.trim(),
-    });
-    onClose();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await onConfirmTransfer(student.id, {
+        destinationSchool: destinationSchool.trim(),
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      onClose();
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : isAr
+            ? 'تعذّر نقل الطالب. حاول مجدداً.'
+            : 'Could not transfer the student. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -130,10 +150,19 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>{isAr ? 'تأكيد النقل وإخفاء الطالب' : 'Confirm Transfer'}</span>
+              <span>
+                {isSubmitting
+                  ? isAr
+                    ? 'جارٍ النقل...'
+                    : 'Transferring...'
+                  : isAr
+                    ? 'تأكيد النقل وإخفاء الطالب'
+                    : 'Confirm Transfer'}
+              </span>
             </button>
           </div>
         </form>

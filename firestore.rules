@@ -111,12 +111,19 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Only staff-provisioned, active profiles get tenant access. Legacy
+    // self-registered profiles never received a server-owned `status` field,
+    // so this blocks them immediately even before they are cleaned up.
+    function hasActiveUserDoc() {
+      return hasUserDoc() && getUserData().get('status', '') == 'active';
+    }
+
     function isTenantUser(tenantId) {
-      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && tenantAccessAllowed(tenantId)));
+      return isSignedIn() && (isAdmin() || (hasActiveUserDoc() && getUserData().tenantId == tenantId && tenantAccessAllowed(tenantId)));
     }
 
     function isTenantRole(tenantId, roles) {
-      return isSignedIn() && (isAdmin() || (hasUserDoc() && getUserData().tenantId == tenantId && getUserData().role in roles && tenantAccessAllowed(tenantId)));
+      return isSignedIn() && (isAdmin() || (hasActiveUserDoc() && getUserData().tenantId == tenantId && getUserData().role in roles && tenantAccessAllowed(tenantId)));
     }
 
     // --- SUBSCRIPTION / RENEWAL ENFORCEMENT (defense-in-depth) ---
@@ -183,24 +190,22 @@ service cloud.firestore {
       allow get: if isSignedIn() && (
         isAdmin() ||
         request.auth.uid == userId ||
-        (hasUserDoc() && getUserData().role in ['admin', 'registrar'] &&
+        (hasActiveUserDoc() && getUserData().role in ['admin', 'registrar'] &&
           existing().tenantId == getUserData().tenantId &&
           tenantAccessAllowed(existing().tenantId))
       );
       allow list: if isSignedIn() && (
         isAdmin() ||
-        (hasUserDoc() && getUserData().role in ['admin', 'registrar'] &&
+        (hasActiveUserDoc() && getUserData().role in ['admin', 'registrar'] &&
           resource.data.tenantId == getUserData().tenantId &&
           tenantAccessAllowed(resource.data.tenantId))
       );
-      // New user registration cannot self-grant 'admin' role unless platform admin
-      allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
-        isAdmin() || (
-          tenantAccessAllowed(incoming().tenantId) &&
-          request.auth.uid == userId &&
-          incoming().role == 'parent'
-        )
-      );
+      // Profile documents are provisioned server-side with the Admin SDK. The
+      // client may only create one as the platform owner; self-registration
+      // would let an account inject a trusted phone/email and unlock another
+      // family's student records.
+      allow create: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) &&
+                    isAdmin();
       // Profile update cannot elevate role, change tenant, or rewrite verified contact fields
       allow update: if isSignedIn() && isValidId(userId) && isValidUserProfile(incoming()) && (
         isAdmin() || (
@@ -209,7 +214,10 @@ service cloud.firestore {
           incoming().role == existing().role &&
           incoming().tenantId == existing().tenantId &&
           incoming().phone == existing().phone &&
-          incoming().email == existing().email
+          incoming().email == existing().email &&
+          incoming().get('status', '') == existing().get('status', '') &&
+          incoming().get('assignedClasses', []) == existing().get('assignedClasses', []) &&
+          incoming().get('assignedSubjects', []) == existing().get('assignedSubjects', [])
         )
       );
       allow delete: if isAdmin() && isValidId(userId);
@@ -220,30 +228,33 @@ service cloud.firestore {
       // Staff can read all tenant students; parents can only read their child
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
+          hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             (getUserData().role == 'parent' && (
-              ('guardianPhone' in resource.data && resource.data.guardianPhone == getUserData().phone) ||
-              ('guardianEmail' in resource.data && resource.data.guardianEmail == getUserData().email) ||
+              (resource.data.get('guardianPhone', '') != '' && resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
+              (resource.data.get('guardianEmail', '') != '' && resource.data.get('guardianEmail', '') == getUserData().get('email', '')) ||
               ('id' in resource.data && resource.data.id == request.auth.uid)
             ))
           )
         )
       );
-      // Only Admin and Registrar can create or modify student master records
-      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
-                    isTenantRole(incoming().tenantId, ['admin', 'registrar']);
+      // Creation/deletion are server-only so the maxStudents counter cannot be
+      // bypassed with a direct Firestore write. Lifecycle changes (transfer /
+      // restore) also go through the API because they alter the seat count.
+      allow create, delete: if false;
+      // Admin and Registrar may still edit profile fields, but cannot move a
+      // record between schools or change its enrollment status directly.
       allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
-                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
-      allow delete: if isSignedIn() && isValidId(studentId) &&
-                    isTenantRole(resource.data.tenantId, ['admin']);
+                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']) &&
+                    incoming().tenantId == resource.data.tenantId &&
+                    incoming().get('enrollmentStatus', 'active') == resource.data.get('enrollmentStatus', 'active');
     }
 
     // 4. Attendance Sessions Collection
     match /attendance_sessions/{sessionId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) &&
+          hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) &&
           getUserData().role in ['admin', 'registrar', 'teacher']
         )
       );
@@ -265,9 +276,11 @@ service cloud.firestore {
     match /attendance_records/{recordId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
+          hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
-            (getUserData().role == 'parent' && resource.data.guardianPhone == getUserData().phone)
+            (getUserData().role == 'parent' &&
+              resource.data.get('guardianPhone', '') != '' &&
+              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
           )
         )
       );
@@ -279,10 +292,12 @@ service cloud.firestore {
     match /justifications/{justificationId} {
       allow read: if isSignedIn() && (
         isAdmin() || (
-          hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
+          hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             ('studentId' in resource.data && resource.data.studentId == request.auth.uid) ||
-            (getUserData().role == 'parent' && 'guardianPhone' in resource.data && resource.data.guardianPhone == getUserData().phone)
+            (getUserData().role == 'parent' &&
+              resource.data.get('guardianPhone', '') != '' &&
+              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
           )
         )
       );
@@ -311,17 +326,19 @@ service cloud.firestore {
       allow write: if isTenantRole(tenantId, ['admin']);
     }
 
-    // 6b. Private integration credentials (SMS / WhatsApp tokens), admin-only
+    // 6b. Private integration credentials (SMS / WhatsApp / SMTP) are stored
+    // encrypted at rest and are only readable through the server API, which
+    // checks the platform-owner role. No browser may touch this document.
     match /settings_private/{tenantId} {
-      allow read, write: if isTenantRole(tenantId, ['admin']);
+      allow read, write: if false;
     }
 
     // 7. Notification Outbox Collection
     match /notification_outbox/{notificationId} {
       allow read: if isSignedIn() && (
         isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
-        (hasUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && getUserData().role == 'parent' &&
-          'recipientPhone' in resource.data && resource.data.recipientPhone == getUserData().phone)
+        (hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && getUserData().role == 'parent' &&
+          resource.data.get('recipientPhone', '') != '' && resource.data.get('recipientPhone', '') == getUserData().get('phone', ''))
       );
       allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
                     isTenantRole(incoming().tenantId, ['admin', 'registrar', 'teacher']);

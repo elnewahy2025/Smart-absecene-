@@ -33,7 +33,7 @@ import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {
   gatewayConfig: SchoolMessagingGatewayConfig;
-  onSave: (config: Partial<SchoolMessagingGatewayConfig>) => { success: boolean; message: string };
+  onSave: (config: Partial<SchoolMessagingGatewayConfig>) => Promise<{ success: boolean; message: string }>;
   isSuperAdmin: boolean;
   schoolName: string;
   defaultCallingCode?: string;
@@ -79,7 +79,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       setSaveStatus({
@@ -91,7 +91,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
       return;
     }
 
-    const res = onSave(form);
+    const res = await onSave(form);
     setSaveStatus({
       type: res.success ? 'success' : 'error',
       text: res.message,
