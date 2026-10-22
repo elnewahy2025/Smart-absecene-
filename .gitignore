@@ -44,3 +44,5 @@ ui-debug.log
 # Playwright & test runner outputs
 playwright-report/
 test-results/
+audit-artifacts/
+audit_absence/

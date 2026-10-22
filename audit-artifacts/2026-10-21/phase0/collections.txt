@@ -1,7 +1,0 @@
-attendance_records  <- src\context\useParentAttendanceRecords.ts
-attendance_sessions  <- src\context\useFirestoreDataSync.ts
-audit_logs  <- scripts\test-firestore-rules.mjs, src\context\useFirestoreDataSync.ts
-justifications  <- scripts\test-firestore-rules.mjs, src\context\useFirestoreDataSync.ts
-notification_outbox  <- src\context\useFirestoreDataSync.ts
-students  <- src\context\useFirestoreDataSync.ts
-users  <- scripts\test-firestore-rules.mjs, src\context\useFirestoreDataSync.ts

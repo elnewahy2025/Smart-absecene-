@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStudentAbsenceAnalysis } from '../../../src/utils/studentAbsenceAnalysis';
+import { buildStudentAbsenceAnalysis } from './studentAbsenceAnalysis';
 
 describe('corrected behaviour: zero synthetic records', () => {
   it('does not fabricate absence/late records when no session records exist', () => {
