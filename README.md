@@ -1,154 +1,192 @@
-# نظام الحضور والغياب المدرسي الذكي ("مدرستي حضور")
-## Smart School Attendance, Compliance & Student Safety System
+# Smart School Attendance & Student Safety System ("Madrasati Hodoor")
 
-منصة متكاملة ومتقدمة لإدارة الحضور والانضباط المدرسي، مخصصة لبيئات التعليم باللغة العربية، تجمع بين الرصد اليومي اللحظي، الأعذار والتقارير الطبية، بوابة ولي الأمر الذكية، حصر الطوارئ والإخلاء، تقارير PDF المتجهية الرسمية، ومحرك التدقيق الذكي للالتزام بصفحة الإعدادات.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61dafb.svg)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.21-lightgrey.svg)](https://expressjs.com/)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth-orange.svg)](https://firebase.google.com/)
+[![Tests](https://img.shields.io/badge/Tests-636%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Security Audit](https://img.shields.io/badge/Security%20Audit-Zero%20Secrets%20%7C%20Clean-success.svg)](#security-policy)
+[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
----
+An enterprise-grade, multi-tenant school attendance, student safety, and compliance platform tailored for Arab and international educational institutions. Features real-time optical QR code attendance, automated medical excuse verification with AI, a comprehensive parent portal, emergency evacuation roster generation, server-rendered vector PDF reports, and strict multi-school boundary isolation.
 
-## 🌟 أبرز الركائز والمميزات المعمارية (Key Pillars)
-
-### 1. تعدد المدارس المستند للنطاقات (Domain-Based Multi-Tenancy)
-- عزل تام لكل مدرسة بناءً على اسم النطاق (`Host` / `Domain`) تلقائياً (مثل `andalus.smartschool.com` أو `portal.andalus.edu.sa`).
-- هوية مرئية خاصة لكل مدرسة (الشعار، الترويسة الوزارية، الختم الرسمي، الألوان) مع رفض تام لتسجيل الدخول العابر للمدارس (Cross-tenant rejection).
-
-### 2. مصفوفة الصلاحيات والحماية متعددة الطبقات (4-Tier RBAC)
-- دعم 4 أدوار مؤسسية معزولة: **مدير النظام / مدير المدرسة**، **وكيل شؤون الطلاب (المسجل)**، **المعلم**، و**ولي الأمر**.
-- حماية ثلاثية متكاملة:
-  1. قواعد أمان قاعدة البيانات (`firestore.rules`).
-  2. وسائط الخادم (`server.ts` -> `authenticateToken`, `requireRole`, `requireTenant`).
-  3. حواجز الواجهة الأمامية (`AttendanceContext.tsx`).
-- عزل كامل لخصوصية ولي الأمر: لا يمكن لولي الأمر رؤية أو متابعة أي سجل إلا لأبنائه المسجلين حصراً.
-
-### 3. الالتزام الصارم بالإعدادات كمصدر وحيد للحقيقة (Strict Settings Adherence)
-- تلتزم جميع العمليات والحسابات الرياضية والكشوف الميدانية بالبيانات المعتمدة في صفحة الإعدادات (`TenantSchoolProfile`):
-  - **التقويم الدراسي المعتمد**: يبدأ مع بداية الفصل الأول (`2026-09-01`)؛ ويُحظر تماماً أي تاريخ يقع خارج حدود العام الدراسي أو شهر 8.
-  - **استبعاد العطلات والإجازات**: يستبعد النظام تلقائياً عطلات نهاية الأسبوع والإجازات الرسمية المعتمدة (كاليوم الوطني ويوم التأسيس).
-  - **محرك رفض الملفات المخالفة**: يتم فحص أي ملف CSV مرفوع لقوائم الطلاب؛ ويتم فوراً رفض واستبعاد أي طالب ينتمي لفصل أو مرحلة غير مسجلة في لائحة المدرسة المعتمدة مع إظهار شريط تحذيري تنظيمي أحمر.
-
-### 4. الرصد اللمسّي والبصري السريع وضمانات الـ QR الثلاثية (Touchless QR Optical Attendance & 3-Condition Guardrails)
-- تحضير لحظي فائق السرعة عبر مسح البطاقات المدرسية:
-  - **الشرط الأول (تأكيد النمط)**: عزل كلي بين التحضير اليدوي والتحضير بالـ QR؛ لا يتم تصفير الكشف لحالة الانتظار إلا بعد تأكيد المعلم الصريح عبر نافذة تحذيرية واضحة.
-  - **الشرط الثاني (اعتماد الغياب المؤجل ومراجعة التأخر)**: يظل الطلاب غير الممسوحين في حالة انتظار طوال الجلسة، ولا يُعتمد الغياب النهائي إلا بعد إنهاء جلسة المسح مع نافذة فحص تتيح تحويل غير الممسوحين إلى «متأخر» بالدقائق تجنباً لظلم الطلاب المتأخرين.
-  - **الشرط الثالث (منع التكرار والختم الزمني الدقيق)**: منع تسجيل الطالب مرتين، مع إطلاق تنبيه صوتي وشريط تحذيري برتقالي يوضح وقت التسجيل السابق، وتوثيق وقت الحضور بالثانية لكل طالب.
-  - دعم الكاميرا المباشرة (WebRTC Continuous Stream).
-  - دعم التقاط صور الكاميرا على الهواتف المتصلة بالشبكة المحلية (`capture="environment"` + `jsQR`).
-  - دعم أجهزة قارئ الباركود الفيزيائية (Hardware Barcode Readers).
-
-### 5. محرك التقارير والطباعة المتجهية الأصيلة (Native Vector PDF Engine)
-- توليد وتنزيل وطباعة تقارير A4 رسمية عالية الدقة باستخدام محرك Chromium/Puppeteer في الخادم (`/api/pdf/generate`).
-- خطوط عربية رقعية ونسخية أصيلة (Cairo / Amiri) بنصوص متجهة قابلة للتحديد والنسخ، خالية من تشوهات لقطات الشاشة أو الصور النقطية.
-- يشمل: كشف الحضور الرسمي، كشف الإخلاء والسلامة، بطاقات QR الفردية والمجمعة للطلاب.
-
-### 6. بوابة ولي الأمر الشاملة (Comprehensive Parent Portal)
-- جدول تفصيلي موحد ومتعدد التبويبات لمتابعة الأبناء:
-  1. **سجل الحضور والغياب**: تواريخ، حصص، مواد، نوع الغياب/التأخر، وملاحظات المعلم.
-  2. **سجل المخالفات والسلوك**: وصف الواقعة، درجة المخالفة، وحسم النقاط.
-  3. **سجل الأعذار والتقارير الطبية**: تاريخ التقديم، المرفقات، ملخص فحص الذكاء الاصطناعي، وحالة الاعتماد.
-  4. **سجل الرسائل والإشعارات**: الرسائل الموجهة لولي الأمر عبر SMS و WhatsApp مع حالة الإرسال.
-  5. **نافذة فحص منبثقة تفاعلية** لفحص أدق التفاصيل بنقرة واحدة.
+> **Language Notice:** For the Arabic version of this documentation, please see [README.ar.md](README.ar.md).
 
 ---
 
-## 🛠️ التقنيات المستخدمة (Tech Stack)
+## 🌟 Key Architectural Pillars
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS (RTL-first), Lucide Icons, Recharts.
-- **Backend**: Express, TypeScript (`tsx`), Firebase Admin SDK, Puppeteer (Chromium PDF Engine), Google GenAI SDK (`@google/genai`).
-- **Database & Auth**: Google Cloud Firestore (Real-time snapshots), Firebase Authentication, Client Local Cache.
-- **Testing & Security**: Vitest, Cross-Platform Node.js Security Audit Scanner (`scripts/ci-security-audit.mjs`).
+### 1. Domain-Based Multi-Tenancy & Host Isolation
+- **Strict Host Binding:** Every school is completely isolated by hostname/subdomain (e.g., `andalus.smartschool.com` or custom domains).
+- **Custom Branding per Tenant:** Dedicated visual identities (logos, ministry headers, official stamps, color palettes).
+- **Anti-Tampering:** Sessions, database queries, and URL query strings enforce tenant isolation; cross-tenant access is rejected at both the Firestore rules and Express server boundaries.
+- **Platform Owner Hub:** Only verified Platform Owners (`super_admin`) have access to multi-tenant provisioning, cross-school overview, and the test tenant switcher.
+
+### 2. Multi-Tier Role-Based Access Control (RBAC)
+Supports five segregated user roles:
+- **Platform Owner (`super_admin`)**: Global system oversight, school provisioning, and messaging gateway infrastructure.
+- **School Principal / Admin (`admin`)**: School settings, staff accounts, timetable schedules, holidays, and official approval workflows.
+- **Registrar / Student Affairs (`registrar`)**: Student enrollment, class assignments, and attendance monitoring.
+- **Teacher (`teacher`)**: Daily class attendance, touchless QR scanning, and student conduct notes.
+- **Parent (`parent`)**: Real-time access strictly isolated to their own enrolled children (attendance, infractions, excuses, and outbox logs).
+
+### 3. Touchless QR Attendance Engine & 3-Condition Guardrails
+- **Continuous Camera & Barcode Scanner Support:** WebRTC real-time stream scanning, mobile camera environment capture, and physical USB/Bluetooth hardware barcode scanners.
+- **Guardrail 1 (Mode Confirmation):** Strict isolation between manual attendance and QR scanning to prevent accidental roster resets.
+- **Guardrail 2 (Deferred Absence & Late Minutes):** Non-scanned students remain pending until the session is finalized, allowing teachers to mark tardy arrivals with precise minutes.
+- **Guardrail 3 (Anti-Duplicate Detection & Timestamping):** Prevents duplicate scans, emits auditory and visual alerts with previous scan times, and records exact entry timestamps down to the second.
+
+### 4. Native Vector PDF Generation Engine
+- **Server-Side Puppeteer Engine:** High-resolution A4 official reports generated via headless Chromium (`/api/pdf/generate`).
+- **Typography & Formatting:** Native Cairo and Amiri Arabic typography with selectable, searchable vector text (zero pixelated canvas screenshots).
+- **Official Templates:** Attendance summaries, student QR ID badges, and emergency evacuation rosters with QR authenticity validation.
+
+### 5. Comprehensive Parent Portal
+- **Consolidated Multi-Child Dashboard:**
+  - **Attendance Timeline:** Detailed class periods, dates, subjects, absence types, and teacher notes.
+  - **Behavior & Conduct:** Real-time infractions, positive reinforcement points, and teacher feedback.
+  - **Medical Excuses:** Upload medical certificates with automated AI document verification and review tracking.
+  - **Communications History:** Outbound SMS and WhatsApp notification history with gateway delivery receipts.
+
+### 6. AI-Assisted Document Analysis
+- Uses Google Gemini API (`@google/genai`) to analyze medical reports, sick leaves, and excuse attachments.
+- Validates issue dates against the school calendar, checks for official stamps, and provides executive summaries to school administration.
 
 ---
 
-## 🚀 دليل التشغيل المحلي (Local Development Guide)
+## 🛠️ Technology Stack
 
-النظام مهيأ ومحمي بالكامل للعمل محلياً على بيئة **Windows 11** (PowerShell) و **Linux / macOS**:
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 18, TypeScript (Strict Mode), Vite 5, Tailwind CSS (RTL-first), Lucide Icons, Recharts |
+| **Backend** | Express 4, Node.js 20, TypeScript, Puppeteer (Chromium PDF Engine), Google GenAI SDK |
+| **Database & Auth** | Google Cloud Firestore (Real-time listeners & Security Rules), Firebase Authentication |
+| **Security & Headers** | Helmet (strict CSP, HSTS, COOP, no-referrer), Rate-Limiting, Magic Bytes Validation |
+| **Testing & Quality** | Vitest 1.6, Playwright, Node.js Security Scanner (`scripts/ci-security-audit.mjs`) |
 
-### 1. تثبيت الحزم البرمجية
-```powershell
-npm install
-```
+---
 
-### 2. التحقق من سلامة كود TypeScript
-```powershell
+## 🚀 Getting Started
+
+### Prerequisites
+- **Node.js**: `v18.x` or `v20.x+` (LTS recommended)
+- **npm**: `v9.x` or `v10.x+`
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-org/smart-school-attendance.git
+   cd smart-school-attendance
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables:**
+   ```powershell
+   # Windows (PowerShell):
+   Copy-Item .env.example .env
+
+   # macOS / Linux:
+   cp .env.example .env
+   ```
+   *Edit `.env` to configure your Firebase project credentials and optional Gemini API key.*
+
+4. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+   The application will be accessible at:  
+   👉 **http://localhost:5050**
+
+---
+
+## 🧪 Testing & Verification Gates
+
+The repository enforces automated quality and security gates:
+
+```bash
+# 1. TypeScript type checking (zero errors required)
 npm run lint
-```
-*(يتحقق من خلو الكود من أي أخطاء برمجية بنتيجة 0 أخطاء).*
 
-### 3. تشغيل حزم الاختبارات الآلية (Automated Tests)
-```powershell
+# 2. Run the automated Vitest test suite (636 tests across 69 test files)
 npm test
-```
-*(يشغل 69 حزمة اختبارية تضم 636 اختباراً آلياً تغطي الصلاحيات، عزل المدارس، الحسابات، والالتزام بالإعدادات بنسبة نجاح 100%).*
 
-### 4. الفحص الأمني المحلي المانع لتسريب الأسرار (Local Security Audit)
-```powershell
+# 3. Security and secret audit scanner
 npm run audit
-```
-*(يفحص نصوص المستودع بالكامل ضد أي مفاتيح مسربة، ويتحقق من عدم تتبع ملفات `.env` ووجود القالب النموذجي `.env.example`).*
 
-### 5. تنظيف وبناء نسخة الإنتاج
-```powershell
-npm run clean
+# 4. Production build (Vite client + esbuild server bundle)
 npm run build
+
+# 5. Start production server
+npm start
 ```
 
-### 6. تشغيل خادم التطوير المحلي
-```powershell
-npm run dev
-```
-التطبيق سيعمل محلياً على: `http://localhost:5050` (أو عبر النطاقات المحلية المعتمدة في `src/config/tenantRegistry.ts`).
+### Test Coverage Highlights
+- **Role-Based Access Control:** `src/utils/rbac.test.ts`, `server/authMiddleware.test.ts`
+- **Multi-School Isolation:** `src/utils/roleSchoolIsolation.test.ts`, `server/subscriptionEnforcement.test.ts`
+- **Settings Adherence:** `src/utils/settingsComplianceAudit.test.ts`
+- **Parent Portal Privacy:** `src/utils/parentPortalAudit.test.ts`
+- **Messaging Gateways:** `src/utils/messagingProviders.test.ts`, `src/utils/tenantGatewaySecrets.test.ts`
+- **WCAG Modal Accessibility:** `src/utils/modalA11y.test.ts`
+- **Integration Engine:** `src/utils/serverIntegration.test.ts`
 
 ---
 
-## 📁 هيكلية مجلدات المشروع (Project Structure)
+## 📁 Project Directory Layout
 
-```
-Smart-absecene-/
-├── .github/workflows/          # سير عمل التدقيق الأمني
-├── docs/                       # التوثيق الشامل والمعمارية
-│   ├── APPLICATION_OVERVIEW.md # نظرة عامة على التطبيق وحوكمة الإعدادات
-│   ├── ARCHITECTURE.md         # مخطط المعمارية وطبقات الحماية الثلاث
-│   ├── AUTHENTICATION_AUTHORIZATION.md # مصفوفة الصلاحيات وعزل المدارس
-│   ├── DATABASE.md             # حوكمة قاعدة البيانات ومجموعات Firestore
-│   ├── DEPLOYMENT.md           # دليل التشغيل والمتغيرات البيئية
-│   ├── FEATURES.md             # سجل الميزات المنجزة (0 إلى 18)
-│   ├── SECURITY_AUDIT.md       # مصفوفة التحصين الأمني
-│   └── TESTING.md              # دليل الاختبارات الآلية الـ 636
-├── scripts/                    # سكريبتات الفحص الأمني وتوليد التقارير
-│   └── ci-security-audit.mjs   # فحص الأمان المحلي المتوافق مع كافة المنصات
+```text
+├── docs/                           # Architecture, security, and deployment documentation
+│   ├── ARCHITECTURE.md             # System architecture & boundary defense
+│   ├── AUTHENTICATION_AUTHORIZATION.md # RBAC matrix and tenant isolation
+│   ├── DEPLOYMENT.md               # Production deployment instructions
+│   ├── FEATURES.md                 # Implemented platform features index
+│   └── TESTING.md                  # Detailed test suite specifications
+├── scripts/                        # Security audits, database seeders, and emulator helpers
+│   ├── ci-security-audit.mjs       # Cross-platform secret and security scanner
+│   ├── seed-emulator.mjs           # Local Firebase emulator seed script
+│   └── test-firestore-rules.mjs    # Automated Firestore security rules tester
+├── server/                         # Server-side route modules and security middleware
+│   ├── authMiddleware.ts           # Token verification & claims authorization
+│   ├── pdfReportRoutes.ts          # Authenticated vector PDF generation
+│   └── requestHardening.ts         # Rate limiting, input validation, and headers
 ├── src/
-│   ├── components/             # واجهات ومكونات التطبيق
-│   │   ├── attendance/         # كشوف الحضور، التقويم، وسجل السلوك
-│   │   ├── digest/             # الملخص الصباحي الذكي للإدارة
-│   │   ├── justifications/     # مراجعة ورفع الأعذار الطبية وفحصها بالذكاء الاصطناعي
-│   │   ├── parent/             # مكونات وجداول بوابة ولي الأمر الموحدة
-│   │   ├── reports/            # التقارير الإحصائية، خريطة الغياب، ومركز الطباعة
-│   │   └── settings/           # تبويبات إعدادات المدرسة، التقويم، القيادة، والمستخدمين
-│   ├── config/                 # سجل نطاقات المدارس والإعدادات المعتمدة
-│   │   ├── tenantRegistry.ts   # محرك عزل النطاقات وتحديد المدرسة
-│   │   └── tenantSettings.ts   # مصفوفة الإعدادات الافتراضية المعتمدة
-│   ├── context/                # سياق إدارة الحالة العامة (AttendanceContext)
-│   ├── lib/                    # عميل الشبكة الموثق وعميل Firebase
-│   ├── types/                  # التعريفات البرمجية الصارمة (attendance.ts)
-│   └── utils/                  # أدوات الحسابات، تصدير PDF، وملفات الاختبار الآلي
-├── server.ts                   # خادم Express ومسارات الذكاء الاصطناعي وتوليد PDF
-├── firestore.rules             # قواعد الأمان وقفل الكشوف وعزل المدارس
-├── package.json                # الحزم البرمجية وأوامر التشغيل المعتمدة
-└── README.md                   # دليل المشروع الرئيسي
+│   ├── components/                 # React UI components
+│   │   ├── attendance/             # Attendance sessions, rosters, QR modes
+│   │   ├── dashboard/              # Executive KPI analytics & trend charts
+│   │   ├── digest/                 # Daily proactive executive briefing
+│   │   ├── justifications/         # Medical excuse management & AI review
+│   │   ├── notifications/          # Single & batch parent dispatch modals
+│   │   ├── parent/                 # Dedicated parent portal components
+│   │   ├── reports/                # Statistical attendance & emergency reports
+│   │   ├── settings/               # School profile, calendar, gateway, and users
+│   │   └── students/               # Student roster registry & CSV ingestion
+│   ├── config/                     # Domain registries and tenant profiles
+│   ├── context/                    # Centralized AttendanceContext state & hooks
+│   ├── types/                      # TypeScript domain models and interfaces
+│   └── utils/                      # Calculations, cryptography, PDF, and test helpers
+├── server.ts                       # Express application server entrypoint
+├── firestore.rules                 # Cloud Firestore security rules
+├── firestore.indexes.json          # Composite query index definitions
+├── Dockerfile                      # Containerization for Docker deployments
+└── README.md                       # Main project documentation
 ```
 
 ---
 
-## 🔒 سياسة الأمان وحماية البيانات (Security Policy)
+## 🔒 Security Policy
 
-1. **انعدام الأسرار في المستودع (Zero Secrets)**: لا توجد أي مفاتيح API أو ملفات اعتماد سرية في الكود، وجميع المتغيرات الحساسة تُدار عبر بيئات التشغيل المحلية و `.env.example`.
-2. **قفل الكشوف المعتمدة (Session Locking)**: يُحظر على المعلمين تعديل كشوف الحضور بعد اعتمادها؛ وتقتصر إعادة الفتح على الإدارة مع تدوين السبب إجبارياً في سجل التدقيق.
-3. **فحص التواقيع الثنائية (Magic Bytes Validation)**: تُفحص كافة المرفقات المرفوعة للتأكد من أنها مستندات وصور حقيقية قبل معالجتها بحد أقصى 5 ميجابايت.
+1. **Zero Committed Secrets:** No API keys, credentials, or service accounts are committed to Git. Scanned continuously via `npm run audit`.
+2. **Session Immutability:** Once an attendance session is submitted and locked by a teacher, modifying records requires administrative unlocking with an unalterable audit log entry.
+3. **Safe File Ingestion:** Strict magic byte file signature validation on image and PDF uploads (5 MB payload limit) to prevent malicious upload attacks.
+4. **Header Hardening:** Express enforces `helmet` Content Security Policy, strict HSTS, and frame protection.
+5. **Private Credential Isolation:** Sensitive gateway credentials and tenant AI keys are isolated in restricted collections and encrypted at rest.
 
 ---
 
-## 📄 الوثائق المرجعية الإضافية
-
-- [سجل الميزات المنجزة بالتفصيل (docs/FEATURES.md)](file:///c:/Users/ahmed/Desktop/Smart-absecene-/docs/FEATURES.md)
-- [مصفوفة الصلاحيات والعزل (docs/AUTHENTICATION_AUTHORIZATION.md)](file:///c:/Users/ahmed/Desktop/Smart-absecene-/docs/AUTHENTICATION_AUTHORIZATION.md)
-- [دليل الاختبارات الآلية (docs/TESTING.md)](file:///c:/Users/ahmed/Desktop/Smart-absecene-/docs/TESTING.md)
-- [سجل الانتقال المعماري (MIGRATION_NOTES.md)](file:///c:/Users/ahmed/Desktop/Smart-absecene-/MIGRATION_NOTES.md)
+## 📄 License
+This project is licensed under the [MIT License](LICENSE).
