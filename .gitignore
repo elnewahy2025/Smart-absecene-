@@ -31,9 +31,11 @@ pnpm-lock.yaml
 scripts/*.pdf
 scripts/*.png
 
-# Office scratch & temp files
+# Office scratch, docs & temp files
 ~$*
 *.docx
+kh.docx
+handoff.md
 analize_extracted.txt
 
 # Firebase emulator logs
