@@ -1,0 +1,32 @@
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiChatRoutes.ts:20: app.post('/api/chat', requireRole(['admin', 'registrar', 'super_admin']), requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiChatRoutes.ts:125: app.post('/api/analyze-image', requireRole(['admin', 'registrar', 'teacher']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiDigestRoutes.ts:33: app.post('/api/daily-digest/generate-briefing', requireRole(['admin', 'registrar']), requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiDigestRoutes.ts:139: app.post('/api/daily-digest/dispatch', requireRole(['admin', 'registrar']), requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiDigestRoutes.ts:227: app.post(
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:41: app.get('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:57: app.post('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:81: app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:99: app.post('/api/tenant/ai-config/test', requireRole(['admin']), requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:161: app.get('/api/settings/messaging-gateway', requirePlatformOwner, requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:197: app.put('/api/settings/messaging-gateway', requirePlatformOwner, requireTenant, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\aiTenantSettingsRoutes.ts:230: app.post('/api/owner/holidays/search', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\bootstrap.ts:27: app.get('*', (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\healthRoutes.ts:28: app.get('/api/health', (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\healthRoutes.ts:59: app.get('/api/readyz', (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\pdfReportRoutes.ts:121: app.post(
+C:\Users\ahmed\Desktop\Smart-absecene-\server\studentEnrollmentRoutes.ts:107: app.post('/api/students', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\studentEnrollmentRoutes.ts:177: app.post('/api/students/import', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\studentEnrollmentRoutes.ts:286: app.delete('/api/students/:id', requireRole(['admin']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\studentEnrollmentRoutes.ts:339: app.post('/api/students/:id/transfer', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\studentEnrollmentRoutes.ts:410: app.post('/api/students/:id/restore', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\subscriptionRoutes.ts:70: app.get('/api/tenants/:tenantId/subscription', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\subscriptionRoutes.ts:83: app.post('/api/tenants/:tenantId/subscription/suspend', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\subscriptionRoutes.ts:106: app.post('/api/tenants/:tenantId/subscription/reactivate', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\subscriptionRoutes.ts:124: app.post('/api/tenants/:tenantId/subscription/renew', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\subscriptionRoutes.ts:155: app.patch('/api/tenants/:tenantId/subscription', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\tenantRegistryRoutes.ts:39: app.get('/api/tenant/resolve', async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\tenantRegistryRoutes.ts:48: app.get('/api/tenants', async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\tenantRegistryRoutes.ts:90: app.post('/api/tenants/provision', requirePlatformOwner, async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\userAccountRoutes.ts:41: app.post('/api/users', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\userAccountRoutes.ts:141: app.patch('/api/users/:uid', requireRole(['admin', 'registrar']), async (req, res) => {
+C:\Users\ahmed\Desktop\Smart-absecene-\server\userAccountRoutes.ts:209: app.delete('/api/users/:uid', requireRole(['admin']), async (req, res) => {

@@ -2,13 +2,11 @@ import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import {
-  ShieldAlert,
   ThumbsUp,
   AlertTriangle,
   PlusCircle,
   X,
   Calendar,
-  Clock,
   User,
   Star,
   Award,

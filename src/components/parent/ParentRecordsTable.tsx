@@ -3,20 +3,12 @@ import {
   Search,
   Filter,
   Calendar,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
   FileText,
-  Smartphone,
-  MessageSquare,
-  Award,
   FileCheck2,
   Eye,
   Printer,
-  ChevronDown,
   X,
   Plus,
-  ShieldAlert,
 } from 'lucide-react';
 import {
   Student,
@@ -27,6 +19,11 @@ import {
   AttendanceStatus,
 } from '../../types/attendance';
 import { ParentRecordDetailsModal, SelectedRecordType } from './ParentRecordDetailsModal';
+import {
+  buildParentRecords,
+  filterParentRecords,
+  getArabicDayName,
+} from '../../utils/parentRecords';
 
 export interface ParentRecordsTableProps {
   student: Student;
@@ -40,22 +37,6 @@ export interface ParentRecordsTableProps {
 
 type TabKey = 'all' | 'absences' | 'infractions' | 'justifications' | 'messages';
 
-interface UnifiedRecordItem {
-  id: string;
-  date: string;
-  time?: string;
-  type: 'absence' | 'late' | 'infraction' | 'positive' | 'justification' | 'notification';
-  title: string;
-  subtitle?: string;
-  statusBadge: {
-    label: string;
-    variant: 'danger' | 'warning' | 'success' | 'info' | 'neutral';
-  };
-  details: string;
-  notes?: string;
-  actionRequired?: boolean;
-  rawRecord: SelectedRecordType;
-}
 
 export const ParentRecordsTable: React.FC<ParentRecordsTableProps> = ({
   student,
@@ -71,253 +52,24 @@ export const ParentRecordsTable: React.FC<ParentRecordsTableProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'unexcused' | 'excused' | 'late'>('all');
   const [selectedRecord, setSelectedRecord] = useState<SelectedRecordType | null>(null);
 
-  // Helper: Arabic Day name from YYYY-MM-DD
-  const getArabicDayName = (dateStr: string): string => {
-    try {
-      const d = new Date(dateStr + 'T00:00:00');
-      return d.toLocaleDateString('ar-SA', { weekday: 'long' });
-    } catch {
-      return '';
-    }
-  };
-
-  // 1. Process Absence & Late Records for this student
-  const studentAbsenceAndLateRecords = useMemo(() => {
-    const list: {
-      sessionId: string;
-      date: string;
-      subject?: string;
-      sessionType: 'daily' | 'period';
-      periodNumber?: number;
-      className: string;
-      status: AttendanceStatus | string;
-      minutesLate?: number;
-      note?: string;
-      teacherName?: string;
-      justification?: Justification;
-    }[] = [];
-
-    sessions.forEach((sess) => {
-      const rec = sess.records.find((r) => r.studentId === student.id);
-      if (rec && (rec.status === 'absent' || rec.status === 'late' || rec.status === 'excused_absence')) {
-        const linkedJust = justifications.find((j) => j.absenceDate === sess.date);
-        list.push({
-          sessionId: sess.id,
-          date: sess.date,
-          subject: sess.subject,
-          sessionType: sess.sessionType,
-          periodNumber: sess.periodNumber,
-          className: sess.className,
-          status: rec.status,
-          minutesLate: rec.minutesLate,
-          note: rec.note,
-          teacherName: sess.teacherName,
-          justification: linkedJust,
-        });
-      }
-    });
-
-    return list.sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, student.id, justifications]);
-
-  // 2. Process Infractions & Positive Conduct for this student
-  const studentIncidents = useMemo(() => {
-    return incidents
-      .filter((inc) => inc.studentId === student.id)
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [incidents, student.id]);
-
-  const studentInfractionsOnly = useMemo(() => {
-    return studentIncidents.filter((inc) => inc.type === 'infraction');
-  }, [studentIncidents]);
-
-  // 3. Process Justifications for this student
-  const studentJustifications = useMemo(() => {
-    return justifications
-      .filter((j) => j.studentId === student.id)
-      .sort((a, b) => b.absenceDate.localeCompare(a.absenceDate));
-  }, [justifications, student.id]);
-
-  // 4. Process Notifications for this student / guardian
-  const studentNotifications = useMemo(() => {
-    return notifications
-      .filter(
-        (n) => n.studentId === student.id || n.recipientPhone === student.guardianPhone
-      )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [notifications, student.id, student.guardianPhone]);
-
-  // 5. Build Unified Master Records List
-  const unifiedRecords: UnifiedRecordItem[] = useMemo(() => {
-    const items: UnifiedRecordItem[] = [];
-
-    // Add Absences and Lates
-    studentAbsenceAndLateRecords.forEach((item) => {
-      const isAbsent = item.status === 'absent';
-      const isLate = item.status === 'late';
-      const isExcused = item.status === 'excused_absence';
-
-      items.push({
-        id: `att-${item.sessionId}-${item.date}`,
-        date: item.date,
-        type: isLate ? 'late' : 'absence',
-        title: isAbsent
-          ? 'غياب عن الدوام المدرسي'
-          : isLate
-          ? `تأخر صباحي (${item.minutesLate || 15} دقيقة)`
-          : 'غياب بعذر معتمد',
-        subtitle: item.subject
-          ? `مادة ${item.subject} (الحصة ${item.periodNumber || 1})`
-          : item.sessionType === 'daily'
-          ? 'حضور يومي شامل'
-          : `الحصة ${item.periodNumber || 1}`,
-        statusBadge: isAbsent
-          ? item.justification
-            ? item.justification.status === 'approved'
-              ? { label: 'عذر معتمد ✅', variant: 'success' }
-              : item.justification.status === 'rejected'
-              ? { label: 'عذر مرفوض ❌', variant: 'danger' }
-              : { label: 'عذر قيد المراجعة ⏳', variant: 'warning' }
-            : { label: 'بدون عذر ❌', variant: 'danger' }
-          : isLate
-          ? { label: `متأخر ${item.minutesLate || 15} د`, variant: 'warning' }
-          : { label: 'عذر معتمد ✅', variant: 'success' },
-        details: item.note || 'تم الرصد الآلي في كشف التحضير المعتمد',
-        notes: item.teacherName ? `المعلم: ${item.teacherName}` : undefined,
-        actionRequired: isAbsent && !item.justification,
-        rawRecord: { type: 'absence_late', data: item },
-      });
-    });
-
-    // Add Infractions & Behaviour
-    studentIncidents.forEach((inc) => {
-      const isInfraction = inc.type === 'infraction';
-      items.push({
-        id: `inc-${inc.id}`,
-        date: inc.date,
-        time: inc.time,
-        type: isInfraction ? 'infraction' : 'positive',
-        title: inc.title,
-        subtitle: isInfraction
-          ? inc.severity === 'major'
-            ? 'مخالفة جسيمة (درجة 3)'
-            : inc.severity === 'moderate'
-            ? 'مخالفة متوسطة (درجة 2)'
-            : 'مخالفة بسيطة (درجة 1)'
-          : 'سلوك إيجابي وتميز (+)',
-        statusBadge: isInfraction
-          ? { label: `${inc.points} نقطة`, variant: 'danger' }
-          : { label: `+${inc.points} نقطة`, variant: 'success' },
-        details: inc.description,
-        notes: inc.actionTaken ? `الإجراء: ${inc.actionTaken}` : undefined,
-        rawRecord: { type: 'infraction', data: inc },
-      });
-    });
-
-    // Add Justifications
-    studentJustifications.forEach((just) => {
-      items.push({
-        id: `just-${just.id}`,
-        date: just.absenceDate,
-        type: 'justification',
-        title:
-          just.reasonType === 'medical'
-            ? 'عذر وتقرير طبي'
-            : just.reasonType === 'family'
-            ? 'عذر أسري'
-            : 'عذر سفر / آخر',
-        subtitle: just.attachmentName || 'طلب تبرير غياب',
-        statusBadge:
-          just.status === 'approved'
-            ? { label: 'معتمد ومقبول ✅', variant: 'success' }
-            : just.status === 'rejected'
-            ? { label: 'مرفوض ❌', variant: 'danger' }
-            : { label: 'قيد التدقيق ⏳', variant: 'warning' },
-        details: just.guardianExplanation,
-        notes: just.reviewedBy ? `المعتمد: ${just.reviewedBy}` : undefined,
-        rawRecord: { type: 'justification', data: just },
-      });
-    });
-
-    // Add Notifications
-    studentNotifications.forEach((notif) => {
-      items.push({
-        id: `notif-${notif.id}`,
-        date: notif.absenceDate || notif.createdAt.slice(0, 10),
-        time: new Date(notif.createdAt).toLocaleTimeString('ar-SA', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        type: 'notification',
-        title:
-          notif.category === 'warning'
-            ? 'إنذار أكاديمي رسمي'
-            : notif.statusType === 'absent'
-            ? 'إشعار غياب فوري'
-            : notif.statusType === 'late'
-            ? 'تنبيه تأخر صباحي'
-            : notif.category === 'excuse_approved'
-            ? 'اعتماد عذر رسمي'
-            : 'تعميم وإشعار مدرسي',
-        subtitle: `${notif.channel === 'WhatsApp' ? 'واتساب WhatsApp' : 'رسالة نصية SMS'} (${notif.recipientPhone})`,
-        statusBadge: { label: 'تم التسليم ✅', variant: 'info' },
-        details: notif.messageText,
-        rawRecord: { type: 'notification', data: notif },
-      });
-    });
-
-    return items.sort((a, b) => b.date.localeCompare(a.date));
-  }, [
-    studentAbsenceAndLateRecords,
-    studentIncidents,
-    studentJustifications,
-    studentNotifications,
-  ]);
+  const {
+    sessionRecords: studentAbsenceAndLateRecords,
+    incidents: studentIncidents,
+    infractionsOnly: studentInfractionsOnly,
+    justifications: studentJustifications,
+    notifications: studentNotifications,
+    items: unifiedRecords,
+  } = useMemo(
+    () => buildParentRecords({ student, sessions, justifications, incidents, notifications }),
+    [student, sessions, justifications, incidents, notifications]
+  );
 
   // Tab Filtering & Query Search
-  const filteredUnifiedRecords = useMemo(() => {
-    let result = unifiedRecords;
+  const filteredUnifiedRecords = useMemo(
+    () => filterParentRecords(unifiedRecords, { tab: activeTab, query: searchQuery, statusFilter }),
+    [unifiedRecords, activeTab, searchQuery, statusFilter]
+  );
 
-    if (activeTab === 'absences') {
-      result = result.filter((r) => r.type === 'absence' || r.type === 'late');
-    } else if (activeTab === 'infractions') {
-      result = result.filter((r) => r.type === 'infraction');
-    } else if (activeTab === 'justifications') {
-      result = result.filter((r) => r.type === 'justification');
-    } else if (activeTab === 'messages') {
-      result = result.filter((r) => r.type === 'notification');
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.details.toLowerCase().includes(q) ||
-          r.date.includes(q) ||
-          (r.subtitle && r.subtitle.toLowerCase().includes(q)) ||
-          (r.notes && r.notes.toLowerCase().includes(q))
-      );
-    }
-
-    if (statusFilter !== 'all' && (activeTab === 'all' || activeTab === 'absences')) {
-      if (statusFilter === 'unexcused') {
-        result = result.filter(
-          (r) => r.type === 'absence' && r.statusBadge.variant === 'danger'
-        );
-      } else if (statusFilter === 'excused') {
-        result = result.filter(
-          (r) =>
-            (r.type === 'absence' && r.statusBadge.variant === 'success') ||
-            r.type === 'justification'
-        );
-      } else if (statusFilter === 'late') {
-        result = result.filter((r) => r.type === 'late');
-      }
-    }
-
-    return result;
-  }, [unifiedRecords, activeTab, searchQuery, statusFilter]);
 
   // Print records handler
   const handlePrint = () => {

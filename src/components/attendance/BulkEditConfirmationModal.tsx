@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Student, AttendanceStatus } from '../../types/attendance';
-import { AlertTriangle, Users, CheckCircle2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface Props {

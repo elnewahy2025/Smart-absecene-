@@ -15,7 +15,18 @@ npx vitest run
 npm run audit
 ```
 
-## Current Test Coverage (27 Suites, 192 Passed Tests)
+## Current Test Coverage (69 Suites, 636 Passed Tests)
+
+The test suite covers full regression verification across roles, tenant isolation, Firestore security rules, server middleware, and component rendering:
+
+0. **`src/context/AttendanceContext.test.tsx` (56 tests)**:
+   - Complete harness for context hydration, role checks, session mutations, tenant settings, and offline caching.
+
+0a. **`server/authMiddleware.test.ts` (23 tests)**:
+   - Tests `authenticateRequest`, token verification, claim derivation, and role-based route guardrails on Express.
+
+0b. **`src/utils/roleSchoolIsolation.test.ts` (7 tests)**:
+   - Multi-tenant school boundary enforcement, platform owner test-switcher access, and prevention of cross-school URL hijacking.
 
 1. **`src/utils/parentPortalAudit.test.ts` (4 tests)**:
    - Verifies guardian privacy and parent-child isolation.

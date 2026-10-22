@@ -101,6 +101,9 @@ const MainAppContent: React.FC = () => {
   const handleLoginSuccess = (userProfile: any) => {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('school_user_authenticated', 'true');
+      if (userProfile?.role) {
+        localStorage.setItem('school_current_user_role', userProfile.role);
+      }
     }
     setUserRole(userProfile.role);
     if (userProfile.role === 'parent') {
@@ -295,7 +298,7 @@ const MainAppContent: React.FC = () => {
               <span className="mx-2">·</span>
               <span>{lang === 'ar' ? 'نظام الحضور والغياب المدرسي الذكي والتدقيق الإلزامي' : 'Smart school attendance & absence system with mandatory auditing'}</span>
             </div>
-            <div className="flex items-center gap-4 text-slate-400">
+            <div className="flex items-center gap-4 text-slate-600">
               <span>{lang === 'ar' ? 'مدعوم بنماذج Google Gemini للذكاء الاصطناعي' : 'Powered by Google Gemini AI models'}</span>
               <span>·</span>
               <span>{lang === 'ar' ? 'الإصدار 2.4.0 (2026)' : 'Version 2.4.0 (2026)'}</span>

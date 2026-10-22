@@ -12,7 +12,7 @@ Use this checklist to manually test and verify the Smart School Attendance Syste
   ```powershell
   npm test
   ```
-  *Result: 192 tests passed across 27 test suites (including `parentPortalAudit.test.ts`, `settingsComplianceAudit.test.ts`, `calculationsAudit.test.ts`, `rbac.test.ts`, `academicCalendarPersistence.test.ts`, `messagingProviders.test.ts`).*
+  *Result: 636 tests passed across 69 test files (including `roleSchoolIsolation.test.ts`, `parentPortalAudit.test.ts`, `settingsComplianceAudit.test.ts`, `studentFilters.test.ts`, `messagingProviders.test.ts`, `modalA11y.test.ts`, `serverIntegration.test.ts`).*
 - [x] **Local Security & Secret Compliance Audit**:
   ```powershell
   npm run audit
@@ -40,19 +40,19 @@ Use this checklist to manually test and verify the Smart School Attendance Syste
 
 ### 1. Health Endpoint (Public)
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/health" -Method Get
+Invoke-RestMethod -Uri "http://localhost:5050/api/health" -Method Get
 ```
 - **Expected**: `200 OK` with JSON `{ status: 'ok', appName: 'Smart School Attendance System' }`.
 
 ### 2. Unauthenticated AI Endpoint Block
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Body '{"messages":[{"role":"user","content":"test"}]}' -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:5050/api/chat" -Method Post -Body '{"messages":[{"role":"user","content":"test"}]}' -ContentType "application/json"
 ```
 - **Expected**: `401 Unauthorized` (`Bearer token is required`).
 
 ### 3. Authenticated Request
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Headers @{ Authorization = "Bearer dev-token-change-me" } -Body '{"messages":[{"role":"user","content":"اختبار"}]}' -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:5050/api/chat" -Method Post -Headers @{ Authorization = "Bearer dev-token-change-me" } -Body '{"messages":[{"role":"user","content":"اختبار"}]}' -ContentType "application/json"
 ```
 - **Expected**: Token accepted (passes authentication).
 
@@ -70,6 +70,8 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/chat" -Method Post -Headers @{
 
 - [x] **Arabic RTL Preservation**: App root maintains `<html dir="rtl" lang="ar">`, Cairo font, and proper mirrored layout.
 - [x] **Settings As Single Source of Truth**: Absence inquiries, month filters, timetable periods, classes, and warning thresholds strictly reflect `schoolProfile`.
+- [x] **Multi-School Isolation**: School switcher is restricted strictly to `super_admin` (The Owner). Staff credentials determine school binding automatically without manual tenant pickers.
+- [x] **Modal Accessibility (WCAG)**: Every dialog modal implements `useModalAccessibility`, focus trapping, escape key closure, and `role="dialog"`.
 - [x] **File Ingestion Rejection Engine**: Uploading a student roster CSV with unapproved classes rejects the records, displays an explanatory red regulatory banner, and disables the commit button if no valid records exist.
 - [x] **Medical Excuse Date Protection**: Excuses cannot be submitted for dates before Term 1 (Month 8), after Term 3, or on official off-days/weekends.
 - [x] **Offline Mode Indicator**: Disconnecting internet or using offline simulation displays the amber warning banner at the top of `App.tsx`.

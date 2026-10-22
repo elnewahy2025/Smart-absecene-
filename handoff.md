@@ -1,6 +1,6 @@
 # Handoff — Where to Continue
 
-**Updated:** 2026-10-18
+**Updated:** 2026-10-22
 **Read first:** `PROGRESS.md` (live status), `docs/PROJECT_AUDIT_2026-10-18.md` (evidence and severities).
 **Previous handoff:** `docs/archive/handoff-2026-10-15.md` (115 KB working memory from the feature-building phase — historical only; several of its claims are contradicted by the audit).
 
@@ -8,9 +8,17 @@
 
 ## 1. What changed in this session
 
-Security remediation started, focused on the four Critical findings. See `PROGRESS.md` for per-item status and the verification log.
+### A. Role & Multi-School Isolation (Platform Owner vs. School Manager & Staff)
+- **School testing switcher (`🧪 تجربة:`) locked to Platform Owner:** `HeaderNav.tsx` now enforces `{isSuperAdmin && devTenants.length > 1 && ...}`. School managers (`admin`), registrars, teachers, and parents never see or access the multi-school testing dropdown.
+- **Login page school picker removed:** `LoginPage.tsx` no longer allows manual selection of any school (`#dev-school-select` purged).
+- **Credentials-driven school determination:** In `useAuthActions.ts`, entering username/password determines the school from the user's profile (`userTenantId`). The session (`tenantId` & `apiTenantOverride`) automatically switches to their school.
+- **Platform Owner exemption:** Platform Owner (`super_admin`) is the only role that can log in to any school, switch schools, and open the Platform Owner hub (`PlatformOwnerModal.tsx`).
+- **URL tampering prevention:** In `useAuthStateSync.ts`, query parameters like `?tenant=` or `?school=` are strictly ignored for non-owners, forcing their session to remain pinned to their verified `accountTenantId`.
+- **PlatformOwnerModal defense-in-depth:** Hard gate `if (!isOpen || !isSuperAdmin) return null;` added inside `PlatformOwnerModal.tsx`.
+- **Automated isolation test suite:** Added `src/utils/roleSchoolIsolation.test.ts` (5 tests covering credential routing, owner multi-school access, test switcher isolation, URL pinning, and modal RBAC).
+- **Agent Beacon installed:** OpenTelemetry collector active at `C:\Users\ahmed\.beacon\bin\beacon.exe` with runtime harness.
 
-The shape of the fix:
+The shape of the security architecture:
 
 - **Identity is no longer taken from request headers.** `server.ts` resolves `role`/`tenantId` from the verified Firebase token's **custom claims only**; otherwise it denies with 403. `x-user-role`, `x-user-tenant`, and `x-tenant-id` no longer influence authorization. The Firestore profile is deliberately not trusted, because users can create their own profile document.
 - **Development auth is explicit and local.** The shared bearer token only works with `ALLOW_DEV_AUTH=true` outside production, and the role/tenant come from `DEV_AUTH_ROLE`/`DEV_AUTH_TENANT` in the environment.
@@ -24,7 +32,7 @@ The shape of the fix:
 | Check | Result |
 |---|---|
 | `npm run lint` | pass, 0 errors |
-| `npx vitest run` | pass, 27 files / 192 tests |
+| `npx vitest run` | pass, 69 files / 636 tests |
 | `npm run build` | pass; emits `dist/` + compiled `server.js` (esbuild) |
 | `npm start` (production) | pass: `NODE_ENV=production node server.js` serves `dist/` and `/api/health` → 200 with helmet CSP/HSTS headers |
 | `node scripts/security-probes.mjs` | pass, 16/16 checks (includes `/API/...` case variants) |
@@ -58,7 +66,7 @@ Files changed: `server.ts`, `src/lib/api.ts`, `src/utils/pdfExport.ts`, `src/com
 ```powershell
 npm install
 npm run lint          # tsc --noEmit
-npm test              # vitest, 27 files / 192 tests
+npm test              # vitest, 69 files / 636 tests
 npm run build         # vite build
 npm run audit         # repository scanner (see caveat below)
 npm run test:rules    # Firestore emulator tests (Java required; port 8099)

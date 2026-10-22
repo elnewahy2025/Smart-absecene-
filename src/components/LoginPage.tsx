@@ -10,8 +10,6 @@ import {
 
 import {
   isLocalDevelopmentHost,
-  getDevTestTenants,
-  switchDevTestTenant,
   resolveTenantFromHostname,
 } from '../config/tenantRegistry';
 
@@ -28,8 +26,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const search = typeof window !== 'undefined' ? window.location.search : '';
-  const isDevHost = isLocalDevelopmentHost(host);
-  const devTenants = isDevHost ? getDevTestTenants() : [];
 
   // The login screen always reflects the school requested by the address bar
   // (?tenant=... / ?school=... or the hostname), never a previous session.
@@ -88,42 +84,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      {/* [TESTING / DEV ONLY - TO BE REMOVED/DISABLED IN PRODUCTION] Mobile & Local LAN School Switcher */}
-      {isDevHost && (
-        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-          <div className="bg-amber-950/40 border border-amber-500/40 rounded-2xl p-3.5 backdrop-blur-md shadow-lg text-amber-200">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="font-bold text-xs flex items-center gap-1.5 text-amber-300">
-                <span>🧪</span>
-                <span>بيئة التجربة والاختبار المحلي (Dev Testing Only)</span>
-              </span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 font-mono px-2 py-0.5 rounded border border-amber-500/30">
-                LAN Wi-Fi
-              </span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-[11px] text-slate-300 shrink-0 font-medium">المدرسة:</label>
-                <select
-                  value={currentTenant.id}
-                  onChange={(e) => switchDevTestTenant(e.target.value)}
-                  className="bg-slate-900 border border-amber-500/40 rounded-xl px-2.5 py-1.5 text-white text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500 w-full cursor-pointer"
-                >
-                  {devTenants.map((t) => (
-                    <option key={t.tenantId} value={t.tenantId}>
-                      {t.nameAr} ({t.subdomain})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <p className="text-[10px] text-amber-400/80 mt-2 leading-relaxed">
-              * مخصص للتجربة واختبار الموبايل فقط، ويتم حذفه تلقائياً عند النشر السحابي الفعلي.
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-slate-800/90 border border-slate-700/90 py-8 px-6 sm:px-10 shadow-2xl rounded-2xl backdrop-blur-md">
@@ -145,7 +105,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             autoComplete="off"
           >
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label htmlFor="login-email" className="block text-xs font-medium text-slate-300 mb-1">
                 البريد الإلكتروني المعتمد
               </label>
               <div className="relative rounded-xl shadow-xs">
@@ -153,19 +113,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-email"
                   type="email"
                   required
                   autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={`user@${activeConfig?.subdomain || 'school'}.edu.sa`}
+                  aria-label="البريد الإلكتروني المعتمد"
                   className="block w-full pr-10 pl-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label htmlFor="login-password" className="block text-xs font-medium text-slate-300 mb-1">
                 كلمة المرور
               </label>
               <div className="relative rounded-xl shadow-xs">
@@ -173,11 +135,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-password"
                   type="password"
                   required
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  aria-label="كلمة المرور"
                   className="block w-full pr-10 pl-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>

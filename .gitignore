@@ -40,3 +40,7 @@ analize_extracted.txt
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Playwright & test runner outputs
+playwright-report/
+test-results/

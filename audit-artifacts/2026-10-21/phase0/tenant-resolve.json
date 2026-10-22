@@ -1,0 +1,28 @@
+{
+  "status": "resolved",
+  "tenantId": "school-1",
+  "config": {
+    "tenantId": "school-1",
+    "subdomain": "andalus",
+    "customDomains": [
+      "portal.andalus.edu",
+      "portal.andalus.edu.sa",
+      "attendance.andalus-school.edu.sa",
+      "andalus.smartschool.com",
+      "andalus.localhost",
+      "smart-absecene-drul.vercel.app"
+    ],
+    "nameAr": "مدرسة الأندلس الثانوية النموذجية",
+    "nameEn": "Al-Andalus Model High School",
+    "code": "ANDALUS-101",
+    "cityAr": "الرياض",
+    "cityEn": "Riyadh",
+    "academicYear": "1447-1448 هـ / 2026 م",
+    "currentTerm": "الفصل الدراسي الأول",
+    "schoolType": "boys",
+    "primaryColor": "#059669",
+    "logoText": "أ",
+    "isActive": true
+  },
+  "normalizedHostname": "127.0.0.1"
+}

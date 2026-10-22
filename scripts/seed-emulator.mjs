@@ -144,6 +144,40 @@ await db.doc('justifications/seed-justification-1').set(
   },
   { merge: true }
 );
+
+const today = new Date().toISOString().split('T')[0];
+await db.doc('attendance_sessions/seed-session-1').set(
+  {
+    id: 'seed-session-1',
+    tenantId: 'school-1',
+    date: today,
+    sessionType: 'daily',
+    subject: 'كشف الحضور الصباحي',
+    classId: 'class-1a',
+    className: '10 / أ',
+    grade: 'الصف العاشر',
+    teacherId: 'emulator-teacher',
+    teacherName: 'أ. فهد الزهراني',
+    status: 'draft',
+    totalStudents: 1,
+    presentCount: 1,
+    absentCount: 0,
+    lateCount: 0,
+    excusedCount: 0,
+    records: [
+      {
+        id: 'rec-seed-1',
+        sessionId: 'seed-session-1',
+        studentId: 'student1',
+        status: 'present',
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'أ. فهد الزهراني',
+      },
+    ],
+    updatedAt: new Date().toISOString(),
+  },
+  { merge: true }
+);
 await db.doc('tenants/firestore-demo').set(
   {
     tenantId: 'firestore-demo',

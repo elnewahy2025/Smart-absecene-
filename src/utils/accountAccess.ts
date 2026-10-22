@@ -20,6 +20,28 @@ export interface ExistingAccountInfo {
 export const isPlatformOwnerClaim = (actor: AccountActor | null | undefined): boolean =>
   Boolean(actor && actor.role === 'super_admin');
 
+export const canSwitchSchool = (role: string | null | undefined): boolean =>
+  role === 'super_admin';
+
+export const canAccessPlatformOwner = (isSuperAdmin: boolean, role: string | null | undefined): boolean =>
+  isSuperAdmin && role === 'super_admin';
+
+export function resolveEffectiveTenant(
+  role: string | null | undefined,
+  accountTenantId?: string,
+  requestedTenantId?: string | null
+): string {
+  if (role === 'super_admin') {
+    if (requestedTenantId) return requestedTenantId;
+    return accountTenantId || 'platform';
+  }
+  if (accountTenantId && accountTenantId !== 'platform') {
+    return accountTenantId;
+  }
+  // Fail closed: never invent a tenant for an unassigned school account.
+  return '';
+}
+
 /**
  * A school admin may manage accounts inside their own tenant. A registrar may
  * manage non-admin accounts, but must never be able to demote, deactivate or

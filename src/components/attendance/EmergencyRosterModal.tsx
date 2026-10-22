@@ -8,18 +8,11 @@ import {
   Printer,
   Download,
   Loader2,
-  CheckCircle2,
-  Users,
-  AlertTriangle,
-  Building,
-  Filter,
   Check,
   Search,
-  Sparkles,
   X,
   Phone,
-  MapPin,
-} from 'lucide-react';
+  } from 'lucide-react';
 
 interface EmergencyRosterModalProps {
   isOpen: boolean;

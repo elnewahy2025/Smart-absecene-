@@ -82,7 +82,8 @@ export function computeDailyDigestData(params: {
   students.forEach((st) => {
     let recentAbsenceHits = 0;
     sessions.forEach((sess) => {
-      const rec = sess.records.find((r) => r.studentId === st.id);
+      const records = Array.isArray(sess.records) ? sess.records : [];
+      const rec = records.find((r) => r && r.studentId === st.id);
       if (rec && (rec.status === 'absent' || rec.status === 'under_review')) {
         recentAbsenceHits++;
       }

@@ -309,18 +309,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 {!isCollapsed ? (
                   <button
                     onClick={() => toggleSection(sec.id)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-50 transition-colors text-[11px] font-bold cursor-pointer uppercase tracking-wider`}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors text-[11px] font-bold cursor-pointer uppercase tracking-wider`}
                   >
                     <div className="flex items-center gap-1.5 truncate">
                       {sec.icon}
                       <span>{isAr ? sec.titleAr : sec.titleEn}</span>
                     </div>
                     {isExpanded ? (
-                      <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-500 dark:text-slate-400" />
                     ) : isAr ? (
-                      <ChevronLeft className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <ChevronLeft className="w-3.5 h-3.5 shrink-0 text-slate-500 dark:text-slate-400" />
                     ) : (
-                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-500 dark:text-slate-400" />
                     )}
                   </button>
                 ) : (
@@ -405,16 +405,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 مدرستي حضور
               </span>
               <span
-                className="font-mono font-bold"
-                style={{ color: 'var(--app-primary)' }}
+                className="font-mono font-bold text-emerald-700 dark:text-emerald-400"
               >
                 v2.4.0
               </span>
             </div>
           ) : (
             <div
-              className="flex justify-center text-[10px] font-mono font-bold"
-              style={{ color: 'var(--app-primary)' }}
+              className="flex justify-center text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400"
             >
               PRO
             </div>

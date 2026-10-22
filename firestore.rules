@@ -178,9 +178,9 @@ service cloud.firestore {
       allow write: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
     }
 
-    // 1b. Tenant registry (public display config; platform admins write)
+    // 1b. Tenant registry (authenticated tenant members or platform admins only)
     match /tenants/{tenantId} {
-      allow read: if true;
+      allow read: if isSignedIn() && (isAdmin() || (hasActiveUserDoc() && getUserData().tenantId == tenantId));
       allow write: if isAdmin();
     }
     // 2. Users Collection (Profile & Role Management)

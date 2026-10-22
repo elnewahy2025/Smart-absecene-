@@ -1,27 +1,13 @@
 import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
-import { AttendanceSession, AttendanceStatus } from '../types/attendance';
+import { AttendanceStatus } from '../types/attendance';
 import {
   Calendar,
-  Clock,
   PlusCircle,
   CheckCircle2,
-  AlertTriangle,
-  RotateCcw,
-  Sparkles,
   Search,
   Filter,
-  Check,
   X,
-  FileSpreadsheet,
-  ChevronRight,
-  Info,
-  Scan,
-  Zap,
-  UserCheck,
-  Users,
-  CheckSquare,
-  Square,
   Palmtree,
   ShieldAlert,
 } from 'lucide-react';
@@ -30,7 +16,12 @@ import { BulkEditConfirmationModal } from './attendance/BulkEditConfirmationModa
 import { ClassCalendarView } from './attendance/ClassCalendarView';
 import { GamifiedCelebrationModal } from './attendance/GamifiedCelebrationModal';
 import { EmergencyRosterModal } from './attendance/EmergencyRosterModal';
-
+import { NewSessionModal } from './attendance/NewSessionModal';
+import { ReopenSessionModal } from './attendance/ReopenSessionModal';
+import { SessionRosterPanel } from './attendance/SessionRosterPanel';
+import { SessionKpiStats } from './attendance/SessionKpiStats';
+import { QuickMarkWorkflowBanner } from './attendance/QuickMarkWorkflowBanner';
+import { SessionOverviewHeader } from './attendance/SessionOverviewHeader';
 interface AttendanceSessionsViewProps {
   initialOpenEmergencyModal?: boolean;
 }
@@ -44,13 +35,11 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     currentUser,
     lang,
     updateRecord,
-    setAllPresentInDraft,
     quickMarkGroupAsPresent,
     submitSession,
     reopenSession,
     createNewSession,
     canEditSession,
-    canReopenSessions,
     classesStats,
     schoolProfile,
     isOffDay,
@@ -75,7 +64,6 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
   // Modals
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
   const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
-  const [reopenReason, setReopenReason] = useState('');
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
@@ -90,26 +78,11 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     }
   }, [initialOpenEmergencyModal]);
 
-  // Configured timetable periods & subjects from Settings
-  const configuredLessonPeriods = (schoolProfile?.timetablePeriods || []).filter(
-    (p) => p.type === 'lesson'
-  );
-  const configuredSubjects = (schoolProfile?.subjects || []).map((s) => s.name);
-
-  // New session form state bound to Settings defaults
-  const [newSessionType, setNewSessionType] = useState<'daily' | 'period'>('period');
-  const [newPeriodNum, setNewPeriodNum] = useState<number>(
-    configuredLessonPeriods[0]?.periodNumber || 1
-  );
-  const [newSubject, setNewSubject] = useState<string>(
-    configuredSubjects[0] || 'اللغة العربية'
-  );
-  const [newClass, setNewClass] = useState<string>(classesStats[0]?.className || '');
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || sessions[0];
 
   // Filtered session records (excludes transferred students from active roll-call)
-  const sessionStudents = selectedSession?.records.map((rec) => {
+  const sessionStudents = (selectedSession?.records ?? []).map((rec) => {
     const student = students.find((s) => s.id === rec.studentId);
     return {
       record: rec,
@@ -158,11 +131,35 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     updateRecord(selectedSession.id, studentId, status);
   };
 
+  const handleRestorePresent = (studentId: string) => {
+    if (!selectedSession) return;
+    updateRecord(selectedSession.id, studentId, 'present');
+  };
+
   const handleMinutesLateChange = (studentId: string, minutes: number) => {
     updateRecord(selectedSession.id, studentId, 'late', minutes);
   };
 
   // Quick Mark: Mark Whole Class as Present by Default
+  const handleToggleStudent = (studentId: string) => {
+    setSelectedStudentIdsForGroup((prev) => {
+      if (prev.includes(studentId)) {
+        return prev.filter((id) => id !== studentId);
+      }
+      return [...prev, studentId];
+    });
+  };
+
+  const handleNoteChange = (
+    studentId: string,
+    status: AttendanceStatus,
+    minutesLate: number | undefined,
+    note: string
+  ) => {
+    if (!selectedSession) return;
+    updateRecord(selectedSession.id, studentId, status, minutesLate, note);
+  };
+
   const handleQuickMarkWholeClass = () => {
     if (!selectedSession) return;
     if (selectedSession.status === 'submitted') {
@@ -294,59 +291,6 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     } else {
       alert(res.message);
     }
-  };
-
-  const handleConfirmReopen = () => {
-    if (!selectedSession) return;
-    const res = reopenSession(selectedSession.id, reopenReason);
-    if (res.success) {
-      setIsReopenModalOpen(false);
-      setReopenReason('');
-      setNotificationBanner(res.message);
-      setTimeout(() => setNotificationBanner(null), 6000);
-    } else {
-      alert(res.message);
-    }
-  };
-
-  const handleCreateSession = (e: React.FormEvent) => {
-    e.preventDefault();
-    const today = new Date().toISOString().split('T')[0];
-    const offCheck = isOffDay(today);
-    if (offCheck.isOff) {
-      const proceed = confirm(
-        lang === 'ar'
-          ? `تنبيه: اليوم يوافق ${offCheck.reason || 'إجازة رسمية'} المعتمد في صفحة الإعدادات. هل أنت متأكد من إنشاء كشف حضور في يوم إجازة رسمية؟`
-          : `Today is an official off-day (${offCheck.reason || 'official off-day'}). Are you sure you want to create a session?`
-      );
-      if (!proceed) return;
-    }
-
-    const matchedClass = classesStats.find((c) => c.className === newClass);
-    const targetClassId = matchedClass?.classId || `class-${newClass.replace(/[^a-zA-Z0-9]/g, '')}`;
-    const targetGrade = matchedClass?.grade || 'المرحلة الدراسية';
-
-    const created = createNewSession(
-      newSessionType,
-      newPeriodNum,
-      newSubject,
-      newClass,
-      targetClassId,
-      targetGrade
-    );
-    setIsNewSessionModalOpen(false);
-    setSelectedSessionId(created.id);
-  };
-
-  // Status badges config
-  const statusLabels: Record<AttendanceStatus, { ar: string; en: string; bg: string; text: string }> = {
-    present: { ar: 'حاضر', en: 'Present', bg: 'bg-emerald-50 border-emerald-300 text-emerald-800', text: 'text-emerald-700' },
-    absent: { ar: 'غائب', en: 'Absent', bg: 'bg-rose-50 border-rose-300 text-rose-800', text: 'text-rose-700' },
-    late: { ar: 'متأخر', en: 'Late', bg: 'bg-amber-50 border-amber-300 text-amber-800', text: 'text-amber-700' },
-    excused_leave: { ar: 'مستأذن', en: 'Leave', bg: 'bg-sky-50 border-sky-300 text-sky-800', text: 'text-sky-700' },
-    excused_absence: { ar: 'غياب بعذر', en: 'Excused', bg: 'bg-indigo-50 border-indigo-300 text-indigo-800', text: 'text-indigo-700' },
-    under_review: { ar: 'عذر قيد المراجعة', en: 'Under Review', bg: 'bg-violet-50 border-violet-300 text-violet-800', text: 'text-violet-700' },
-    rejected_excuse: { ar: 'مرفوض العذر', en: 'Rejected', bg: 'bg-stone-100 border-stone-300 text-stone-800', text: 'text-stone-700' },
   };
 
   return (
@@ -501,832 +445,107 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
       {viewMode === 'table' && selectedSession && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {/* Session Overview Header */}
-          <div className="p-5 border-b border-slate-200 bg-slate-50/70">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {selectedSession.subject || 'كشف الحضور الصباحي'}
-                  </h2>
-                  <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                      selectedSession.status === 'submitted'
-                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
-                        : selectedSession.status === 'draft'
-                        ? 'bg-amber-100 border-amber-300 text-amber-800'
-                        : 'bg-sky-100 border-sky-300 text-sky-800'
-                    }`}
-                  >
-                    {selectedSession.status === 'submitted'
-                      ? lang === 'ar' ? 'معتمد ومرسل رسميًا' : 'Submitted'
-                      : selectedSession.status === 'draft'
-                      ? lang === 'ar' ? 'مسودة قيد الإدخال' : 'Draft'
-                      : lang === 'ar' ? 'مُعاد فتحه للتصحيح' : 'Reopened'}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1.5">
-                  <span>
-                    <strong className="text-slate-700">{lang === 'ar' ? 'الفصل:' : 'Class:'}</strong> {selectedSession.className} ({selectedSession.grade})
-                  </span>
-                  <span>·</span>
-                  <span>
-                    <strong className="text-slate-700">{lang === 'ar' ? 'المعلم:' : 'Teacher:'}</strong> {selectedSession.teacherName}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    <strong className="text-slate-700">{lang === 'ar' ? 'التاريخ:' : 'Date:'}</strong> {selectedSession.date}
-                  </span>
-                  {selectedSession.submittedAt && (
-                    <>
-                      <span>·</span>
-                      <span>
-                        <strong className="text-slate-700">{lang === 'ar' ? 'اعتُمد في:' : 'Submitted at:'}</strong>{' '}
-                        {new Date(selectedSession.submittedAt).toLocaleTimeString('ar-SA')}
-                      </span>
-                    </>
-                  )}
-                  {selectedSession.reopenedReason && (
-                    <div className="w-full mt-1 text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded text-[11px]">
-                      <strong>{lang === 'ar' ? 'سبب إعادة الفتح الموثق:' : 'Reopened Reason:'}</strong> {selectedSession.reopenedReason} (بواسطة: {selectedSession.reopenedBy})
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setIsScannerOpen(true)}
-                  className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
-                  title="مسح بطاقات الطلاب بالكاميرا لتسجيل الحضور بدون لمس"
-                >
-                  <Scan className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{lang === 'ar' ? 'قارئ QR بدون لمس' : 'Scan QR'}</span>
-                </button>
-
-                {/* Primary Quick Mark Feature Button */}
-                <div className="relative">
-                  <button
-                    onClick={() => setIsQuickMarkMenuOpen(!isQuickMarkMenuOpen)}
-                    className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-all cursor-pointer shadow-xs border border-emerald-500/40"
-                    title="التحضير السريع: تعيين كامل الفصل أو مجموعة محددة كـ حاضر افتراضياً لتوفير الوقت"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-300" />
-                    <span>{lang === 'ar' ? 'التحضير السريع (Quick Mark)' : 'Quick Mark'}</span>
-                    <span className="bg-emerald-950/40 text-emerald-200 text-[10px] px-1.5 py-0.2 rounded font-normal">
-                      {selectedStudentIdsForGroup.length > 0
-                        ? `${selectedStudentIdsForGroup.length} محدد`
-                        : lang === 'ar' ? 'الفصل كامل' : 'Whole Class'}
-                    </span>
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {isQuickMarkMenuOpen && (
-                    <div className="absolute left-0 sm:right-0 sm:left-auto mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-2 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2.5 py-1.5 border-b border-slate-100 font-bold text-slate-800 flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{lang === 'ar' ? 'خيارات التحضير السريع:' : 'Quick Mark Options:'}</span>
-                        </span>
-                        <button
-                          onClick={() => setIsQuickMarkMenuOpen(false)}
-                          className="text-slate-400 hover:text-slate-600 p-0.5"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleQuickMarkWholeClass}
-                        className="w-full text-right px-2.5 py-2 hover:bg-emerald-50 rounded-lg text-slate-800 hover:text-emerald-950 transition-colors flex items-start gap-2.5 cursor-pointer"
-                      >
-                        <UserCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="block font-bold text-slate-900">
-                            {lang === 'ar' ? 'تعيين كامل الفصل حاضر (افتراضياً)' : 'Mark Whole Class Present'}
-                          </strong>
-                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                            {lang === 'ar'
-                              ? 'تعيين جميع الطلاب كـ حاضر فوراً لضبط الغائبين فقط يدوياً'
-                              : 'Default whole roster to Present and adjust absentees manually'}
-                          </span>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleQuickMarkSelectedGroup}
-                        disabled={selectedStudentIdsForGroup.length === 0}
-                        className="w-full text-right px-2.5 py-2 hover:bg-teal-50 rounded-lg text-slate-800 hover:text-teal-950 transition-colors flex items-start gap-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Users className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="block font-bold text-slate-900">
-                            {lang === 'ar'
-                              ? `تعيين المجموعة المحددة حاضر (${selectedStudentIdsForGroup.length})`
-                              : `Mark Selected Group Present (${selectedStudentIdsForGroup.length})`}
-                          </strong>
-                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                            {lang === 'ar'
-                              ? 'تطبيق الحضور فقط على الطلاب المحددين في مربعات الاختيار'
-                              : 'Apply presence only to checked students'}
-                          </span>
-                        </div>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {selectedSession.status === 'draft' || selectedSession.status === 'reopened' ? (
-                  <button
-                    onClick={handleSubmitSession}
-                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{lang === 'ar' ? 'تأكيد واعتماد الكشف نهائياً' : 'Submit & Confirm'}</span>
-                  </button>
-                ) : (
-                  <>
-                    <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                      <Check className="w-4 h-4" />
-                      <span>{lang === 'ar' ? 'كشف مقفل ومحمي من التعديل العشوائي' : 'Locked & Immutable'}</span>
-                    </div>
-
-                    {(currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin') && (
-                      <button
-                        onClick={() => setIsReopenModalOpen(true)}
-                        className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                        <span>{lang === 'ar' ? 'إعادة فتح الكشف للتصحيح' : 'Reopen with Audit'}</span>
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+          <SessionOverviewHeader
+            lang={lang}
+            session={selectedSession}
+            currentUserRole={currentUser.role}
+            isQuickMarkMenuOpen={isQuickMarkMenuOpen}
+            onToggleQuickMarkMenu={() => setIsQuickMarkMenuOpen(!isQuickMarkMenuOpen)}
+            onCloseQuickMarkMenu={() => setIsQuickMarkMenuOpen(false)}
+            selectedStudentIdsForGroup={selectedStudentIdsForGroup}
+            onQuickMarkWholeClass={handleQuickMarkWholeClass}
+            onQuickMarkSelectedGroup={handleQuickMarkSelectedGroup}
+            onOpenScanner={() => setIsScannerOpen(true)}
+            onSubmitSession={handleSubmitSession}
+            onOpenReopen={() => setIsReopenModalOpen(true)}
+          />
 
             {/* Quick KPI stats for this session - Prominent Percentages + Actual Headcounts + Instant Drilldown */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-slate-200">
-              {/* Total enrolled */}
-              <div
-                onClick={() => setStatusFilter('all')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-slate-100 border-slate-400 shadow-xs ring-1 ring-slate-400'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
-                title={lang === 'ar' ? 'انقر لعرض جميع طلاب الكشف' : 'Click to view all session students'}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-500">{lang === 'ar' ? 'إجمالي المقيدين' : 'Total'}</span>
-                  <span className="text-[10px] text-slate-400 hover:underline">عرض الكل ←</span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-slate-900 font-mono">
-                    {selectedSession.totalStudents}
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">
-                    {lang === 'ar' ? 'طالب' : 'students'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Present */}
-              <div
-                onClick={() => setStatusFilter(statusFilter === 'present' ? 'all' : 'present')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  statusFilter === 'present'
-                    ? 'bg-emerald-100/70 border-emerald-500 shadow-xs ring-2 ring-emerald-500/20'
-                    : 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300'
-                }`}
-                title={lang === 'ar' ? 'انقر لتصفية الحاضرين فقط' : 'Click to filter present students'}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-800">{lang === 'ar' ? 'نسبة الحضور' : 'Present %'}</span>
-                  <span className="text-[10px] text-emerald-700 font-bold hover:underline">تصفية ←</span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-emerald-800 font-mono">
-                    %{selectedSession.totalStudents > 0
-                      ? Math.round((selectedSession.presentCount / selectedSession.totalStudents) * 100)
-                      : 0}
-                  </span>
-                  <span className="text-xs text-emerald-700 font-semibold">
-                    ({selectedSession.presentCount})
-                  </span>
-                </div>
-              </div>
-
-              {/* Absent */}
-              <div
-                onClick={() => setStatusFilter(statusFilter === 'absent' ? 'all' : 'absent')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  statusFilter === 'absent'
-                    ? 'bg-rose-100/70 border-rose-500 shadow-xs ring-2 ring-rose-500/20'
-                    : 'bg-rose-50/60 border-rose-200 hover:border-rose-300'
-                }`}
-                title={lang === 'ar' ? 'انقر للتعمق في قائمة الغائبين للتدخل' : 'Click to drill down into absent students'}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-rose-800">{lang === 'ar' ? 'نسبة الغياب' : 'Absent %'}</span>
-                  <span className="text-[10px] text-rose-700 font-bold hover:underline">تدخل ←</span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-rose-800 font-mono">
-                    %{selectedSession.totalStudents > 0
-                      ? Math.round((selectedSession.absentCount / selectedSession.totalStudents) * 100)
-                      : 0}
-                  </span>
-                  <span className="text-xs text-rose-700 font-semibold">
-                    ({selectedSession.absentCount})
-                  </span>
-                </div>
-              </div>
-
-              {/* Late */}
-              <div
-                onClick={() => setStatusFilter(statusFilter === 'late' ? 'all' : 'late')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  statusFilter === 'late'
-                    ? 'bg-amber-100/70 border-amber-500 shadow-xs ring-2 ring-amber-500/20'
-                    : 'bg-amber-50/60 border-amber-200 hover:border-amber-300'
-                }`}
-                title={lang === 'ar' ? 'انقر لتصفية المتأخرين' : 'Click to filter late students'}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-amber-800">{lang === 'ar' ? 'نسبة التأخر' : 'Late %'}</span>
-                  <span className="text-[10px] text-amber-700 font-bold hover:underline">تصفية ←</span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-amber-800 font-mono">
-                    %{selectedSession.totalStudents > 0
-                      ? Math.round((selectedSession.lateCount / selectedSession.totalStudents) * 100)
-                      : 0}
-                  </span>
-                  <span className="text-xs text-amber-700 font-semibold">
-                    ({selectedSession.lateCount})
-                  </span>
-                </div>
-              </div>
-
-              {/* Excused */}
-              <div
-                onClick={() => setStatusFilter(statusFilter === 'excused_absence' ? 'all' : 'excused_absence')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
-                  statusFilter === 'excused_absence'
-                    ? 'bg-indigo-100/70 border-indigo-500 shadow-xs ring-2 ring-indigo-500/20'
-                    : 'bg-indigo-50/60 border-indigo-200 hover:border-indigo-300'
-                }`}
-                title={lang === 'ar' ? 'انقر لتصفية المستأذنين وذوي الأعذار' : 'Click to filter excused students'}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-indigo-800">{lang === 'ar' ? 'نسبة الأعذار' : 'Excused %'}</span>
-                  <span className="text-[10px] text-indigo-700 font-bold hover:underline">تصفية ←</span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-indigo-800 font-mono">
-                    %{selectedSession.totalStudents > 0
-                      ? Math.round((selectedSession.excusedCount / selectedSession.totalStudents) * 100)
-                      : 0}
-                  </span>
-                  <span className="text-xs text-indigo-700 font-semibold">
-                    ({selectedSession.excusedCount})
-                  </span>
-                </div>
-              </div>
-            </div>
+            <SessionKpiStats
+              lang={lang}
+              session={selectedSession}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+            />
 
             {/* Quick Mark Active Workflow Banner & Absentee Live Adjuster */}
-            {isQuickMarkActive && (
-              <div className="mt-4 bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white p-4 rounded-xl shadow-xs border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold shrink-0 mt-0.5">
-                      <Zap className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-emerald-200">
-                          {lang === 'ar' ? 'التحضير السريع مفعل: تم تعيين طلاب الفصل حاضرين افتراضياً' : 'Quick Mark Active: All Defaulted to Present'}
-                        </h4>
-                        <span className="bg-emerald-400 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {lang === 'ar' ? 'خطوة 1 مكتملة ✓' : 'Step 1 Complete ✓'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-200 mt-0.5 leading-relaxed">
-                        {lang === 'ar'
-                          ? 'الخطوة 2: قم بالنقر المباشر على زر "غائب" أو "متأخر" للطلاب غير الحاضرين فقط في الجدول أدناه لحفظ 80% من وقت الرصد للجلسات الكبيرة.'
-                          : 'Step 2: Click "Absent" or "Late" only for students who are not in class to save 80% of session roll-call time.'}
-                      </p>
-                    </div>
-                  </div>
+            <QuickMarkWorkflowBanner
+              isQuickMarkActive={isQuickMarkActive}
+              lang={lang}
+              session={selectedSession}
+              students={students}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              onClose={() => setIsQuickMarkActive(false)}
+              onRestorePresent={handleRestorePresent}
+            />
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter(statusFilter === 'absent' ? 'all' : 'absent')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                        statusFilter === 'absent'
-                          ? 'bg-amber-400 text-slate-950 border-amber-300'
-                          : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-                      }`}
-                    >
-                      <Filter className="w-3.5 h-3.5" />
-                      <span>
-                        {statusFilter === 'absent'
-                          ? (lang === 'ar' ? 'عرض كامل الفصل' : 'Show Full Class')
-                          : (lang === 'ar' ? `حصر وتدقيق الغائبين (${selectedSession.absentCount})` : `Inspect Absentees (${selectedSession.absentCount})`)}
-                      </span>
-                    </button>
+          {/* Filter & Search Bar, Students Roster Table & Bulk Actions */}
+          <SessionRosterPanel
+            lang={lang}
+            sessionStudents={sessionStudents}
+            canEdit={selectedSession ? canEditSession(selectedSession) : false}
+            sessionStatus={selectedSession?.status || 'draft'}
+            searchStudent={searchStudent}
+            onSearchChange={setSearchStudent}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            selectedStudentIdsForGroup={selectedStudentIdsForGroup}
+            onToggleStudent={handleToggleStudent}
+            onToggleSelectAll={handleToggleSelectAll}
+            onClearSelection={() => setSelectedStudentIdsForGroup([])}
+            onStatusChange={handleStatusChange}
+            onMinutesLateChange={handleMinutesLateChange}
+            onNoteChange={handleNoteChange}
+            onRequestQuickMarkPresent={handleRequestQuickMarkPresent}
+            onGroupMarkAsAbsent={handleGroupMarkAsAbsent}
+          />
+        </div>
+      )}
 
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickMarkActive(false)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
-                      title={lang === 'ar' ? 'إغلاق شريط الإرشاد' : 'Close banner'}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Live Absentee Adjustment Strip */}
-                {selectedSession.absentCount > 0 && (
-                  <div className="pt-2 border-t border-emerald-800/60 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-emerald-300 font-bold flex items-center gap-1 text-[11px]">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                      <span>{lang === 'ar' ? 'الطلاب المعدّلون كـ غائبين حالياً:' : 'Current Absentees:'}</span>
-                    </span>
-                    {selectedSession.records
-                      .filter((r) => r.status === 'absent' || r.status === 'rejected_excuse')
-                      .map((r) => {
-                        const st = students.find((s) => s.id === r.studentId);
-                        return (
-                          <span
-                            key={r.studentId}
-                            className="bg-rose-950/70 border border-rose-500/50 text-rose-200 px-2.5 py-0.5 rounded-md text-[11px] inline-flex items-center gap-1.5"
-                          >
-                            <span>{st?.fullName || 'طالب'}</span>
-                            <button
-                              type="button"
-                              onClick={() => updateRecord(selectedSession.id, r.studentId, 'present')}
-                              className="text-rose-400 hover:text-white cursor-pointer font-bold"
-                              title={lang === 'ar' ? 'إعادة إلى حاضر' : 'Restore to Present'}
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Filter & Search Bar */}
-          <div className="p-4 border-b border-slate-200 bg-white flex flex-wrap items-center gap-3">
-            {/* Search input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-              <input
-                type="text"
-                placeholder={lang === 'ar' ? 'بحث باسم الطالب أو السجل...' : 'Search student...'}
-                value={searchStudent}
-                onChange={(e) => setSearchStudent(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-9 pl-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-              />
-            </div>
-
-            {/* Filter by status directly beside the search box */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-              <span className="text-xs text-slate-500 shrink-0 flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5" />
-                {lang === 'ar' ? 'تصفية:' : 'Filter:'}
-              </span>
-              {[
-                { id: 'all', label: lang === 'ar' ? 'الكل' : 'All' },
-                { id: 'present', label: lang === 'ar' ? 'حاضر' : 'Present' },
-                { id: 'absent', label: lang === 'ar' ? 'غائب' : 'Absent' },
-                { id: 'late', label: lang === 'ar' ? 'متأخر' : 'Late' },
-                { id: 'excused_absence', label: lang === 'ar' ? 'بعذر' : 'Excused' },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setStatusFilter(f.id)}
-                  className={`text-xs px-2.5 py-1 rounded-md transition-colors cursor-pointer shrink-0 ${
-                    statusFilter === f.id
-                      ? 'bg-slate-800 text-white font-semibold'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Students Roster Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-3 w-10 text-center">
-                    <input
-                      type="checkbox"
-                      aria-label="تحديد الكل"
-                      checked={
-                        sessionStudents.length > 0 &&
-                        sessionStudents.every((s) => selectedStudentIdsForGroup.includes(s.record.studentId))
-                      }
-                      onChange={handleToggleSelectAll}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                      title={lang === 'ar' ? 'تحديد الكل للتحضير السريع كـ مجموعة' : 'Select all for group action'}
-                    />
-                  </th>
-                  <th className="py-3 px-4">#</th>
-                  <th className="py-3 px-4">{lang === 'ar' ? 'اسم الطالب / الرقم المدرسي' : 'Student'}</th>
-                  <th className="py-3 px-4">{lang === 'ar' ? 'السجل المدني' : 'ID'}</th>
-                  <th className="py-3 px-4">{lang === 'ar' ? 'حالة الحضور في هذه الحصة' : 'Status Toggle'}</th>
-                  <th className="py-3 px-4">{lang === 'ar' ? 'التأخر / ملاحظة المعلم' : 'Notes / Delay'}</th>
-                  <th className="py-3 px-4">{lang === 'ar' ? 'سجل المواظبة' : 'Total Absences'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sessionStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-slate-500">
-                      {lang === 'ar' ? 'لا يوجد طلاب مطابقين للبحث' : 'No students found'}
-                    </td>
-                  </tr>
-                ) : (
-                  sessionStudents.map(({ record, student }, index) => {
-                    const isSessionSubmitted = selectedSession.status === 'submitted';
-                    const canEdit = selectedSession ? canEditSession(selectedSession) : false;
-                    const isSelected = selectedStudentIdsForGroup.includes(record.studentId);
-
-                    return (
-                      <tr
-                        key={record.studentId}
-                        className={`hover:bg-slate-50/80 transition-colors ${
-                          isSelected ? 'bg-emerald-50/40' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            aria-label={`تحديد ${student.fullName}`}
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedStudentIdsForGroup((prev) => [...prev, record.studentId]);
-                              } else {
-                                setSelectedStudentIdsForGroup((prev) =>
-                                  prev.filter((id) => id !== record.studentId)
-                                );
-                              }
-                            }}
-                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{index + 1}</td>
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-slate-900">{student.fullName}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            {lang === 'ar' ? 'رقم:' : 'No:'} {student.studentNumber}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-slate-600">{student.nationalId}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(['present', 'absent', 'late', 'excused_leave'] as AttendanceStatus[]).map((st) => {
-                              const active = record.status === st;
-                              const cfg = statusLabels[st];
-                              return (
-                                <button
-                                  key={st}
-                                  disabled={!canEdit}
-                                  onClick={() => handleStatusChange(record.studentId, st)}
-                                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer ${
-                                    active
-                                      ? `${cfg.bg} font-bold ring-2 ring-emerald-500/20`
-                                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                                  } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                >
-                                  {lang === 'ar' ? cfg.ar : cfg.en}
-                                </button>
-                              );
-                            })}
-
-                            {/* Extra badge if excuse approved or under review */}
-                            {(record.status === 'excused_absence' || record.status === 'under_review') && (
-                              <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${statusLabels[record.status].bg}`}>
-                                {lang === 'ar' ? statusLabels[record.status].ar : statusLabels[record.status].en}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            {record.status === 'late' && (
-                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] text-amber-800">
-                                <span>{lang === 'ar' ? 'تأخر:' : 'Late:'}</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="45"
-                                  disabled={!canEdit}
-                                  value={record.minutesLate || 10}
-                                  onChange={(e) =>
-                                    handleMinutesLateChange(record.studentId, parseInt(e.target.value) || 10)
-                                  }
-                                  className="w-10 bg-white border border-amber-300 text-center rounded px-1 py-0.5 font-bold"
-                                />
-                                <span>{lang === 'ar' ? 'دقيقة' : 'm'}</span>
-                              </div>
-                            )}
-
-                            <input
-                              type="text"
-                              disabled={!canEdit}
-                              placeholder={lang === 'ar' ? 'ملاحظة خاصة...' : 'Note...'}
-                              value={record.note || ''}
-                              onChange={(e) =>
-                                updateRecord(
-                                  selectedSession.id,
-                                  record.studentId,
-                                  record.status,
-                                  record.minutesLate,
-                                  e.target.value
-                                )
-                              }
-                              className="bg-transparent border-b border-dashed border-slate-300 focus:border-emerald-500 focus:outline-hidden text-xs text-slate-700 px-1 py-0.5 w-36 sm:w-48 placeholder:text-slate-400"
-                            />
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xs font-bold ${
-                                student.totalAbsences >= 5 ? 'text-rose-600' : 'text-slate-700'
-                              }`}
-                            >
-                              {student.totalAbsences} {lang === 'ar' ? 'غياب' : 'absences'}
-                            </span>
-                            {student.totalAbsences >= 5 && (
-                              <span
-                                title="تنبيه: تجاوز حد الغياب المسموح"
-                                className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"
-                              />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Floating Group Bulk Actions Toolbar */}
-          {selectedStudentIdsForGroup.length > 0 && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 min-w-[320px] max-w-xl animate-in fade-in slide-in-from-bottom-3 duration-150">
-              <div className="flex items-center gap-2.5 text-xs font-semibold">
-                <span className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center">
-                  {selectedStudentIdsForGroup.length}
-                </span>
-                <span>{lang === 'ar' ? 'طالب محدد في المجموعة' : 'Students Selected'}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRequestQuickMarkPresent}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>{lang === 'ar' ? 'تعيين كـ حاضر (Quick Mark)' : 'Quick Mark Present'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleGroupMarkAsAbsent}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>{lang === 'ar' ? 'تعيين كـ غائب' : 'Mark Absent'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedStudentIdsForGroup([])}
-                  className="px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
-                >
-                  {lang === 'ar' ? 'إلغاء' : 'Clear'}
-                </button>
-              </div>
-            </div>
-          )}
+      {viewMode === 'table' && !selectedSession && (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
+          <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800 mb-1">
+            {lang === 'ar' ? 'لا توجد كشوف حضور مسجلة لهذا اليوم' : 'No attendance sessions found for this date'}
+          </h3>
+          <p className="text-xs text-slate-500 mb-4">
+            {lang === 'ar'
+              ? 'يمكنك إنشاء كشف حضور جديد لبدء رصد الحضور والغياب للطلاب.'
+              : 'You can create a new session to begin recording student attendance.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsNewSessionModalOpen(true)}
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'إنشاء كشف جديد' : 'Create New Session'}</span>
+          </button>
         </div>
       )}
 
       {/* Modal: Create New Session */}
-      {isNewSessionModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-base">
-                {lang === 'ar' ? 'إنشاء كشف حصة جديد' : 'New Attendance Session'}
-              </h3>
-              <button onClick={() => setIsNewSessionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSession} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  {lang === 'ar' ? 'نوع الكشف:' : 'Session Type:'}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewSessionType('period')}
-                    className={`py-2 px-3 rounded-lg border text-center font-medium cursor-pointer ${
-                      newSessionType === 'period'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold'
-                        : 'bg-slate-50 border-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {lang === 'ar' ? 'كشف حصة دراسية' : 'Period Session'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewSessionType('daily')}
-                    className={`py-2 px-3 rounded-lg border text-center font-medium cursor-pointer ${
-                      newSessionType === 'daily'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold'
-                        : 'bg-slate-50 border-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {lang === 'ar' ? 'كشف الحضور الصباحي اليومي' : 'Daily Roll-Call'}
-                  </button>
-                </div>
-              </div>
-
-              {newSessionType === 'period' && (
-                <>
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
-                      {lang === 'ar' ? 'الحصة الدراسية (وفق الجدول المعتمد بالإعدادات):' : 'Period:'}
-                    </label>
-                    <select
-                      value={newPeriodNum}
-                      onChange={(e) => setNewPeriodNum(parseInt(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
-                    >
-                      {configuredLessonPeriods.length > 0 ? (
-                        configuredLessonPeriods.map((p) => (
-                          <option key={p.id} value={p.periodNumber}>
-                            {p.nameAr || `الحصة ${p.periodNumber}`} ({p.startTime} - {p.endTime})
-                          </option>
-                        ))
-                      ) : (
-                        [1, 2, 3, 4, 5, 6, 7].map((num) => (
-                          <option key={num} value={num}>
-                            {lang === 'ar' ? `الحصة رقم (${num})` : `Period ${num}`}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
-                      {lang === 'ar' ? 'المادة الدراسية (المعتمدة بالإعدادات):' : 'Subject:'}
-                    </label>
-                    {configuredSubjects.length > 0 ? (
-                      <select
-                        value={newSubject}
-                        onChange={(e) => setNewSubject(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
-                      >
-                        {configuredSubjects.map((subj) => (
-                          <option key={subj} value={subj}>
-                            {subj}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        required
-                        value={newSubject}
-                        onChange={(e) => setNewSubject(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
-                        placeholder="مثال: الرياضيات، الأحياء، اللغة الإنجليزية..."
-                      />
-                    )}
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  {lang === 'ar' ? 'الفصل الدراسي:' : 'Class:'}
-                </label>
-                <select
-                  value={newClass}
-                  onChange={(e) => setNewClass(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
-                >
-                  {classesStats.map((c) => (
-                    <option key={c.className} value={c.className}>
-                      {c.className} ({c.grade}) - {c.activeStudents} {lang === 'ar' ? 'طالب' : 'students'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsNewSessionModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-                >
-                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  {lang === 'ar' ? 'إنشاء الكشف' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <NewSessionModal
+        isOpen={isNewSessionModalOpen}
+        lang={lang}
+        schoolProfile={schoolProfile}
+        classesStats={classesStats}
+        isOffDay={isOffDay}
+        createNewSession={createNewSession}
+        onClose={() => setIsNewSessionModalOpen(false)}
+        onCreated={setSelectedSessionId}
+      />
 
       {/* Modal: Reopen Session with Audit Reason */}
-      {isReopenModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
-            <div className="flex items-center gap-2 text-amber-600 border-b border-slate-100 pb-3">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <h3 className="font-bold text-slate-900 text-base">
-                {lang === 'ar' ? 'إعادة فتح كشف حضور معتمد' : 'Reopen Submitted Session'}
-              </h3>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {lang === 'ar'
-                ? 'وفق لوائح الحوكمة المدرسية، لا يمكن تعديل كشف حضور بعد اعتماده إلا بتوثيق سبب التعديل رسميًا وتدوينه في سجل التدقيق غير القابل للحذف.'
-                : 'According to governance regulations, submitted attendance sessions require a mandatory reason before reopening, which is stored in the audit trail.'}
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 mb-1">
-                {lang === 'ar' ? 'سبب إعادة الفتح (إلزامي):' : 'Reopen Reason (Required):'}
-              </label>
-              <textarea
-                rows={3}
-                required
-                value={reopenReason}
-                onChange={(e) => setReopenReason(e.target.value)}
-                placeholder={
-                  lang === 'ar'
-                    ? 'مثال: تصحيح حضور الطالب فهد بعد التأكد من حضوره متأخرًا بعذر مروري...'
-                    : 'Reason for modification...'
-                }
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsReopenModalOpen(false)}
-                className="px-3.5 py-2 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReopen}
-                disabled={reopenReason.trim().length < 5}
-                className="px-4 py-2 text-xs bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-semibold"
-              >
-                {lang === 'ar' ? 'تأكيد وإعادة الفتح' : 'Confirm & Reopen'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReopenSessionModal
+        isOpen={isReopenModalOpen}
+        lang={lang}
+        sessionId={selectedSession?.id}
+        reopenSession={reopenSession}
+        onClose={() => setIsReopenModalOpen(false)}
+        onNotify={setNotificationBanner}
+      />
       {/* Touchless QR Attendance Scanner Modal */}
       {isScannerOpen && (
         <QRScannerModal

@@ -9,6 +9,22 @@
       ]
     },
     {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "nationalId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "studentNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "attendance_records",
       "queryScope": "COLLECTION",
       "fields": [

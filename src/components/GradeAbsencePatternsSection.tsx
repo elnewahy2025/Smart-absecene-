@@ -9,58 +9,39 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
-  Cell,
+
 } from 'recharts';
 import {
   BarChart3,
   TrendingUp,
   AlertTriangle,
-  Award,
-  Layers,
-  Activity,
+
+
+
   FileCheck2,
-  Clock,
-  Sparkles,
-  HelpCircle,
-  ArrowUpRight,
-  ShieldCheck,
-  Filter,
+
+
+
+
+
+
 } from 'lucide-react';
 import { Student, Justification } from '../types/attendance';
+import {
+  buildGradeAbsencePatterns,
+  summarizeGradeAbsencePatterns,
+} from '../utils/gradeAbsencePatterns';
+import type { ChartMetricView, GradeAnalysisItem } from '../utils/gradeAbsencePatterns';
+import { GradeAbsenceSummaryCards } from './reports/GradeAbsenceSummaryCards';
+import { GradeComparisonMatrix } from './reports/GradeComparisonMatrix';
+
+export type { ChartMetricView } from '../utils/gradeAbsencePatterns';
 
 interface GradeAbsencePatternsSectionProps {
   students: Student[];
   justifications: Justification[];
   lang: 'ar' | 'en';
   onFilterByGrade?: (gradeName: string) => void;
-}
-
-export type ChartMetricView = 'excuses_breakdown' | 'risk_distribution' | 'averages_and_rates';
-
-interface GradeAnalysisItem {
-  gradeName: string;
-  shortGrade: string;
-  studentCount: number;
-  totalAbsenceDays: number;
-  avgAbsencesPerStudent: number;
-  averageAttendanceRate: number;
-  totalLates: number;
-  // Justification breakdown
-  excusedCount: number;
-  unexcusedCount: number;
-  pendingCount: number;
-  documentationRate: number;
-  // Risk tiers
-  normalCount: number;
-  tier1AlertCount: number; // 3-4 days
-  tier2WarningCount: number; // 5-7 days
-  tier3CriticalCount: number; // 8+ days
-  chronicCount: number; // 5+ days
-  chronicRate: number; // %
-  // Risk label
-  riskLevel: 'low' | 'moderate' | 'high';
-  // Top classes
-  classesCount: number;
 }
 
 export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionProps> = ({
@@ -73,125 +54,16 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
   const [selectedGradeFocus, setSelectedGradeFocus] = useState<string | null>(null);
 
   // Aggregation per Grade
-  const gradeData: GradeAnalysisItem[] = useMemo(() => {
-    const map: Record<string, {
-      students: Student[];
-      classes: Set<string>;
-    }> = {};
-
-    students.forEach((s) => {
-      const g = s.grade || (lang === 'ar' ? 'المرحلة غير محددة' : 'Unspecified');
-      if (!map[g]) {
-        map[g] = { students: [], classes: new Set() };
-      }
-      map[g].students.push(s);
-      if (s.className) map[g].classes.add(s.className);
-    });
-
-    const items: GradeAnalysisItem[] = Object.keys(map).map((gradeName) => {
-      const gStudents = map[gradeName].students;
-      const count = gStudents.length;
-      const totalAbsenceDays = gStudents.reduce((sum, s) => sum + s.totalAbsences, 0);
-      const totalLates = gStudents.reduce((sum, s) => sum + s.totalLates, 0);
-      const avgRate =
-        count > 0
-          ? parseFloat(
-              (gStudents.reduce((sum, s) => sum + s.attendanceRate, 0) / count).toFixed(1)
-            )
-          : 100;
-      const avgAbs = count > 0 ? parseFloat((totalAbsenceDays / count).toFixed(1)) : 0;
-
-      // Risk stratifications
-      const normalCount = gStudents.filter((s) => s.totalAbsences < 3).length;
-      const tier1AlertCount = gStudents.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5).length;
-      const tier2WarningCount = gStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8).length;
-      const tier3CriticalCount = gStudents.filter((s) => s.totalAbsences >= 8).length;
-      const chronicCount = tier2WarningCount + tier3CriticalCount;
-      const chronicRate = count > 0 ? parseFloat(((chronicCount / count) * 100).toFixed(1)) : 0;
-
-      // Calculate excuses from justifications
-      const studentIdSet = new Set(gStudents.map((s) => s.id));
-      const gradeJustifications = justifications.filter((j) => studentIdSet.has(j.studentId));
-      const approvedExcuses = gradeJustifications.filter((j) => j.status === 'approved').length;
-      const pendingExcuses = gradeJustifications.filter((j) => j.status === 'pending').length;
-
-      // Unexcused is total absences minus approved excuses
-      const unexcusedCount = Math.max(0, totalAbsenceDays - approvedExcuses);
-      const documentationRate =
-        totalAbsenceDays > 0
-          ? Math.min(100, Math.round(((approvedExcuses + pendingExcuses) / totalAbsenceDays) * 100))
-          : 100;
-
-      let riskLevel: 'low' | 'moderate' | 'high' = 'low';
-      if (tier3CriticalCount > 0 || chronicRate >= 20 || avgRate < 90) {
-        riskLevel = 'high';
-      } else if (chronicRate >= 10 || tier2WarningCount > 0 || avgRate < 94) {
-        riskLevel = 'moderate';
-      }
-
-      // Short label for chart x-axis
-      let shortGrade = gradeName
-        .replace('الصف ', '')
-        .replace('Grade ', '');
-
-      return {
-        gradeName,
-        shortGrade,
-        studentCount: count,
-        totalAbsenceDays,
-        avgAbsencesPerStudent: avgAbs,
-        averageAttendanceRate: avgRate,
-        totalLates,
-        excusedCount: approvedExcuses,
-        unexcusedCount,
-        pendingCount: pendingExcuses,
-        documentationRate,
-        normalCount,
-        tier1AlertCount,
-        tier2WarningCount,
-        tier3CriticalCount,
-        chronicCount,
-        chronicRate,
-        riskLevel,
-        classesCount: map[gradeName].classes.size,
-      };
-    });
-
-    // Natural sort by grade order if known (10, 11, 12, etc.)
-    return items.sort((a, b) => {
-      const order = ['السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر'];
-      const idxA = order.findIndex((o) => a.gradeName.includes(o));
-      const idxB = order.findIndex((o) => b.gradeName.includes(o));
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      return a.gradeName.localeCompare(b.gradeName);
-    });
-  }, [students, justifications, lang]);
+  const gradeData: GradeAnalysisItem[] = useMemo(
+    () => buildGradeAbsencePatterns(students, justifications, lang),
+    [students, justifications, lang]
+  );
 
   // Overall statistics for high-level insight cards
-  const bestGrade = useMemo(() => {
-    if (gradeData.length === 0) return null;
-    return [...gradeData].sort((a, b) => b.averageAttendanceRate - a.averageAttendanceRate)[0];
-  }, [gradeData]);
-
-  const mostVulnerableGrade = useMemo(() => {
-    if (gradeData.length === 0) return null;
-    return [...gradeData].sort((a, b) => b.chronicRate - a.chronicRate)[0];
-  }, [gradeData]);
-
-  const attendanceGap = useMemo(() => {
-    if (gradeData.length < 2) return 0;
-    const rates = gradeData.map((g) => g.averageAttendanceRate);
-    const max = Math.max(...rates);
-    const min = Math.min(...rates);
-    return parseFloat((max - min).toFixed(1));
-  }, [gradeData]);
-
-  const overallDocRate = useMemo(() => {
-    const totalAbs = gradeData.reduce((sum, g) => sum + g.totalAbsenceDays, 0);
-    const totalExcused = gradeData.reduce((sum, g) => sum + g.excusedCount + g.pendingCount, 0);
-    if (totalAbs === 0) return 100;
-    return Math.min(100, Math.round((totalExcused / totalAbs) * 100));
-  }, [gradeData]);
+  const { bestGrade, mostVulnerableGrade, attendanceGap, overallDocRate } = useMemo(
+    () => summarizeGradeAbsencePatterns(gradeData),
+    [gradeData]
+  );
 
   // Custom Recharts Tooltip
   const CustomChartTooltip = ({ active, payload, label }: any) => {
@@ -312,83 +184,13 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
       </div>
 
       {/* Analytical Callout Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Most Disciplined Grade */}
-        <div className="bg-primary/10 border border-primary/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
-          <div className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Award className="w-5 h-5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-primary">
-              {lang === 'ar' ? 'المرحلة الأكثر انضباطاً' : 'Most Disciplined Grade'}
-            </span>
-            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
-              {bestGrade ? bestGrade.gradeName : '—'}
-            </div>
-            <div className="text-[11px] text-primary font-semibold">
-              {bestGrade ? `${bestGrade.averageAttendanceRate}% حضور عام` : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* Most Vulnerable / Chronic Risk Grade */}
-        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
-          <div className="w-9 h-9 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
-              {lang === 'ar' ? 'الأعلى في مؤشر الخطر' : 'Highest Vulnerability'}
-            </span>
-            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
-              {mostVulnerableGrade ? mostVulnerableGrade.gradeName : '—'}
-            </div>
-            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
-              {mostVulnerableGrade
-                ? `${mostVulnerableGrade.chronicCount} طلاب (${mostVulnerableGrade.chronicRate}% خطورة)`
-                : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* Excuses Documentation Rate */}
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
-              {lang === 'ar' ? 'نسبة توثيق الأعذار' : 'Excuse Doc. Compliance'}
-            </span>
-            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
-              {overallDocRate}% {lang === 'ar' ? 'أعذار موثقة' : 'Documented'}
-            </div>
-            <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
-              {lang === 'ar' ? 'تحت التدقيق الإداري' : 'Under admin review'}
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Disparity Gap */}
-        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3.5 flex items-start gap-3 transition-colors">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Activity className="w-5 h-5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-              {lang === 'ar' ? 'فجوة التباين بين المراحل' : 'Grade Disparity Spread'}
-            </span>
-            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
-              {attendanceGap}% {lang === 'ar' ? 'فارق الانضباط' : 'Gap Spread'}
-            </div>
-            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
-              {attendanceGap <= 5
-                ? (lang === 'ar' ? 'تقارب إيجابي متوازن' : 'Balanced consistency')
-                : (lang === 'ar' ? 'تفاوت ملحوظ يستدعي تدخلاً' : 'Notable variance')}
-            </div>
-          </div>
-        </div>
-      </div>
+      <GradeAbsenceSummaryCards
+        lang={lang}
+        bestGrade={bestGrade}
+        mostVulnerableGrade={mostVulnerableGrade}
+        attendanceGap={attendanceGap}
+        overallDocRate={overallDocRate}
+      />
 
       {/* Main Bar Chart Container */}
       <div
@@ -618,196 +420,13 @@ export const GradeAbsencePatternsSection: React.FC<GradeAbsencePatternsSectionPr
       </div>
 
       {/* Comparative Grade Matrix Table */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs">
-          <h4 className="font-bold text-slate-800 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-slate-500" />
-            <span>{lang === 'ar' ? 'مصفوفة التحليل الإحصائي التفصيلي حسب المرحلة' : 'Detailed Grade Breakdown Matrix'}</span>
-          </h4>
-          <span className="text-slate-400">
-            {gradeData.length} {lang === 'ar' ? 'مراحل دراسية مقيدة' : 'grade levels monitored'}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-              <tr>
-                <th className="py-3 px-4">{lang === 'ar' ? 'المرحلة الدراسية' : 'Grade Level'}</th>
-                <th className="py-3 px-3 text-center">{lang === 'ar' ? 'الطلاب' : 'Students'}</th>
-                <th className="py-3 px-3 text-center">{lang === 'ar' ? 'إجمالي الغياب' : 'Total Days'}</th>
-                <th className="py-3 px-3 text-center">{lang === 'ar' ? 'متوسط الغياب/طالب' : 'Avg / Student'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'نمط التبرير (مبرر / غير مبرر)' : 'Justification Breakdown'}</th>
-                <th className="py-3 px-3 text-center">{lang === 'ar' ? 'حالات الخطر المزمن' : 'Chronic Cases'}</th>
-                <th className="py-3 px-4">{lang === 'ar' ? 'نسبة الحضور العامة' : 'Attendance Rate'}</th>
-                <th className="py-3 px-3 text-center">{lang === 'ar' ? 'الحالة الإجرائية' : 'Action Status'}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-800">
-              {gradeData.map((item) => {
-                const isSelected = selectedGradeFocus === item.gradeName;
-                const justifiedPercent =
-                  item.totalAbsenceDays > 0
-                    ? Math.round((item.excusedCount / item.totalAbsenceDays) * 100)
-                    : 100;
-
-                return (
-                  <tr
-                    key={item.gradeName}
-                    onClick={() => {
-                      setSelectedGradeFocus(isSelected ? null : item.gradeName);
-                      if (onFilterByGrade) onFilterByGrade(item.gradeName);
-                    }}
-                    className={`transition-colors cursor-pointer hover:bg-slate-50/80 ${
-                      isSelected ? 'bg-indigo-50/60 font-semibold' : ''
-                    }`}
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{item.gradeName}</span>
-                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {item.classesCount} {lang === 'ar' ? 'فصول' : 'classes'}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">
-                      {item.studentCount}
-                    </td>
-
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                      {item.totalAbsenceDays} {lang === 'ar' ? 'يوم' : 'd'}
-                    </td>
-
-                    <td className="py-3 px-3 text-center font-mono font-bold">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[11px] ${
-                          item.avgAbsencesPerStudent <= 2
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            : item.avgAbsencesPerStudent <= 4
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                            : 'bg-rose-50 text-rose-800 border border-rose-200 font-extrabold'
-                        }`}
-                      >
-                        {item.avgAbsencesPerStudent} {lang === 'ar' ? 'يوم' : 'd'}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-4 min-w-[170px]">
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-emerald-700 font-semibold">
-                            {item.excusedCount} {lang === 'ar' ? 'مبرر' : 'excused'}
-                          </span>
-                          <span className="text-rose-700 font-semibold">
-                            {item.unexcusedCount} {lang === 'ar' ? 'غير مبرر' : 'unexcused'}
-                          </span>
-                        </div>
-                        {/* Split progress bar */}
-                        <div className="w-full bg-rose-100 rounded-full h-2 overflow-hidden flex">
-                          <div
-                            className="bg-emerald-500 h-full transition-all"
-                            style={{ width: `${justifiedPercent}%` }}
-                            title={`مبرر: ${justifiedPercent}%`}
-                          />
-                          <div
-                            className="bg-rose-500 h-full transition-all"
-                            style={{ width: `${100 - justifiedPercent}%` }}
-                            title={`غير مبرر: ${100 - justifiedPercent}%`}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <span
-                          className={`font-mono font-bold text-xs ${
-                            item.chronicCount > 0 ? 'text-rose-700' : 'text-slate-400'
-                          }`}
-                        >
-                          {item.chronicCount} {lang === 'ar' ? 'طالب' : 'students'}
-                        </span>
-                        {item.tier3CriticalCount > 0 && (
-                          <span className="text-[10px] text-rose-600 font-bold">
-                            ({item.tier3CriticalCount} {lang === 'ar' ? 'حرج 8+' : 'critical'})
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-4 min-w-[140px]">
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-mono font-bold">
-                          <span
-                            className={
-                              item.averageAttendanceRate >= 95
-                                ? 'text-emerald-700'
-                                : item.averageAttendanceRate >= 90
-                                ? 'text-amber-700'
-                                : 'text-rose-700'
-                            }
-                          >
-                            {item.averageAttendanceRate}%
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-normal">
-                            {item.averageAttendanceRate >= 95
-                              ? (lang === 'ar' ? 'منضبط ممتاز' : 'Target met')
-                              : (lang === 'ar' ? 'أقل من المستهدف' : 'Below target')}
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              item.averageAttendanceRate >= 95
-                                ? 'bg-emerald-500'
-                                : item.averageAttendanceRate >= 90
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                            }`}
-                            style={{ width: `${Math.min(100, Math.max(10, item.averageAttendanceRate))}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          item.riskLevel === 'low'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : item.riskLevel === 'moderate'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-rose-100 text-rose-800 animate-pulse'
-                        }`}
-                      >
-                        {item.riskLevel === 'low'
-                          ? (lang === 'ar' ? 'مستقر / متابعة اعتيادية' : 'Stable')
-                          : item.riskLevel === 'moderate'
-                          ? (lang === 'ar' ? 'توجيه خطة وقائية' : 'Preventive')
-                          : (lang === 'ar' ? 'تدخل وإشعار عاجل' : 'Urgent Intervention')}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Analytical Guidance Note */}
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 flex items-start gap-2.5">
-          <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <span className="font-bold text-slate-900">
-              {lang === 'ar' ? 'توصية استرشادية لمدير المدرسة والمرشد الطلابي: ' : 'Administrative Guidance: '}
-            </span>
-            {lang === 'ar'
-              ? 'تُظهر المقارنة أن الصفوف ذات النسبة المرتفعة من الغياب غير المبرر تحتاج إلى تفعيل التحفيز الصباحي والتواصل المباشر مع أولياء الأمور قبل اكتمال نصاب الإنذار الثاني (5 أيام). يمكن الضغط على أي مرحلة في الجدول أعلاه لتركيز العرض.'
-              : 'Grades with elevated unexcused absence ratios should trigger immediate counselor check-ins and SMS alerts before crossing the 5-day warning threshold.'}
-          </div>
-        </div>
-      </div>
+      <GradeComparisonMatrix
+        lang={lang}
+        gradeData={gradeData}
+        selectedGradeFocus={selectedGradeFocus}
+        setSelectedGradeFocus={setSelectedGradeFocus}
+        onFilterByGrade={onFilterByGrade}
+      />
     </div>
   );
 };

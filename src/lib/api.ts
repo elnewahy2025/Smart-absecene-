@@ -8,6 +8,13 @@ import { auth } from './firebase';
  */
 let apiTenantOverride: string | null = null;
 
+/**
+ * Optional local development credential. It must be set explicitly at build
+ * time; there is no silently-enabled default and production builds never
+ * define it.
+ */
+const DEV_AUTH_TOKEN = ((import.meta as any).env?.VITE_DEV_AUTH_TOKEN || '') as string;
+
 export function setApiTenantOverride(tenantId: string | null): void {
   apiTenantOverride = tenantId && tenantId.trim() ? tenantId.trim() : null;
 }
@@ -62,20 +69,39 @@ export async function authenticatedFetch(
       if (credential) {
         headers.set('Authorization', `Bearer ${credential}`);
       }
-    } else {
-      // Optional local development credential. It must be set explicitly at
-      // build time; there is no silently-enabled default.
-      const devCredential = (import.meta as any).env?.VITE_DEV_AUTH_TOKEN;
-      if (devCredential && !headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${devCredential}`);
-      }
+    } else if (DEV_AUTH_TOKEN && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${DEV_AUTH_TOKEN}`);
     }
   } catch (err) {
     console.warn('[authenticatedFetch] Could not obtain a credential:', err);
   }
 
-  return fetch(target, {
+  const response = await fetch(target, {
     ...init,
     headers,
   });
+
+  // Local development without a Firebase Admin service account: the server
+  // cannot verify browser ID tokens and answers 503 AUTH_NOT_CONFIGURED. Retry
+  // once with the explicit dev credential so local API work keeps functioning.
+  const canRetryBody = init?.body == null || typeof init.body === 'string';
+  if (
+    response.status === 503 &&
+    DEV_AUTH_TOKEN &&
+    canRetryBody &&
+    headers.get('Authorization') !== `Bearer ${DEV_AUTH_TOKEN}`
+  ) {
+    try {
+      const payload = await response.clone().json();
+      if (payload?.code === 'AUTH_NOT_CONFIGURED') {
+        const retryHeaders = new Headers(headers);
+        retryHeaders.set('Authorization', `Bearer ${DEV_AUTH_TOKEN}`);
+        return fetch(target, { ...init, headers: retryHeaders });
+      }
+    } catch {
+      // Not a JSON auth error: fall through and return the original response.
+    }
+  }
+
+  return response;
 }

@@ -1,0 +1,441 @@
+{
+  "info": {
+    "name": "Smart School Attendance API Contracts (Phase 5)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1.1 Public - GET /api/health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Status is ok and services reporting\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.services.firebaseAdmin).to.be.true;",
+              "  pm.expect(json.services.pdfPuppeteer).to.be.true;",
+              "});",
+              "pm.test(\"Cache control headers enforced\", function () {",
+              "  pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1.2 Public - GET /api/readyz",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/readyz"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Service ready\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ready\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1.3 Public - GET /api/tenants (Sanitized Projection)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/tenants"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Sanitized projection strips sensitive metadata\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.tenants).to.be.an(\"array\");",
+              "  if (json.tenants.length > 0) {",
+              "    var first = json.tenants[0];",
+              "    pm.expect(first).to.have.property(\"tenantId\");",
+              "    pm.expect(first).to.not.have.property(\"code\");",
+              "    pm.expect(first).to.not.have.property(\"academicYear\");",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1.4 Public - GET /api/tenant/resolve",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/tenant/resolve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Resolution payload schema\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property(\"status\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2.1 Negative - POST /api/pdf/generate (Anonymous 401)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/pdf/generate",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"htmlContent\":\"<h1>Unauthenticated</h1>\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2.2 Negative - POST /api/chat (Anonymous 401)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/chat",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"message\":\"Hello AI\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2.3 Negative - POST /api/users (Anonymous 401)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/users",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"test@school.com\",\"role\":\"teacher\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2.4 Negative - POST /api/pdf/generate (Invalid Token 401)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/pdf/generate",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer invalid_tampered_token_xyz"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"htmlContent\":\"<h1>probe</h1>\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3.1 RBAC - Teacher hitting Owner-only /api/tenants/provision (403)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/tenants/provision",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{teacherToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tenantId\":\"rogue-tenant\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3.2 RBAC - Teacher hitting Owner-only /api/tenants/school-1/subscription (403)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/tenants/school-1/subscription",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{teacherToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3.3 RBAC - Teacher with header injection x-user-role: super_admin blocked (403)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/tenant/ai-config",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{teacherToken}}"
+          },
+          {
+            "key": "x-user-role",
+            "value": "super_admin"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });",
+              "pm.test(\"Error message verifies role is teacher, ignoring injected header\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.error).to.include(\"teacher\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4.1 Authenticated Teacher - POST /api/pdf/generate (200 Base64 JSON Payload)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/pdf/generate",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{teacherToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"htmlContent\":\"<!DOCTYPE html><html><body><h1>Contract Test PDF</h1></body></html>\",\"title\":\"contract-test\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Payload contains valid base64 PDF and metadata\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.success).to.be.true;",
+              "  pm.expect(json.pdfBase64).to.be.a(\"string\");",
+              "  pm.expect(json.pdfBase64.length).to.be.above(100);",
+              "  pm.expect(json).to.have.property(\"filename\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4.2 Authenticated Admin - POST /api/chat with empty body (400 Bad Request)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/chat",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 400 Bad Request\", function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4.3 Authenticated Admin - POST /api/students input validation (400 Bad Request on empty)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/students",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 400 Bad Request\", function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4.4 Authenticated Owner - GET /api/tenants/school-1/subscription (200 Schema Valid)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/tenants/school-1/subscription",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ownerToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200 OK\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Subscription schema fields present\", function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.success).to.be.true;",
+              "  pm.expect(json).to.have.property(\"subscription\");",
+              "  pm.expect(json).to.have.property(\"summary\");",
+              "  pm.expect(json.summary).to.have.property(\"plan\");",
+              "  pm.expect(json.summary).to.have.property(\"status\");",
+              "  pm.expect(json.summary).to.have.property(\"effectiveStatus\");",
+              "  pm.expect(json.summary).to.have.property(\"accessEnabled\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -146,7 +146,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               <h1 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight">
                 {lang === 'ar' ? currentTitle.ar : currentTitle.en}
               </h1>
-              <p className="text-[10px] text-slate-400 leading-none">
+              <p className="text-[10px] text-slate-600 leading-none">
                 {currentTenant.name} · {currentTenant.academicYear} ({currentTenant.currentTerm})
               </p>
             </div>
@@ -208,15 +208,16 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </>
           )}
 
-          {/* [TESTING / DEV ONLY - TO BE REMOVED IN PRODUCTION] Dev Tenant Quick Switcher */}
-          {isDevHost && devTenants.length > 1 && (
+          {/* [PLATFORM OWNER ONLY] Tenant Quick Switcher - strictly restricted to super_admin (The Owner) */}
+          {isSuperAdmin && devTenants.length > 1 && (
             <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg text-amber-300 text-xs">
               <span className="font-bold hidden md:inline">🧪 تجربة:</span>
               <select
                 value={currentTenant.id}
                 onChange={(e) => switchDevTestTenant(e.target.value)}
                 className="bg-transparent text-amber-300 dark:text-amber-200 text-xs font-bold border-none focus:outline-hidden cursor-pointer"
-                title="تبديل المدرسة للاختبار والتطوير (للتجربة فقط)"
+                title={lang === 'ar' ? 'تبديل المدرسة للاختبار (مخصص لمالك المنصة فقط)' : 'Switch school for testing (Platform Owner only)'}
+                aria-label={lang === 'ar' ? 'تبديل المدرسة لمالك المنصة' : 'Switch school for platform owner'}
               >
                 {devTenants.map((t) => (
                   <option key={t.tenantId} value={t.tenantId} className="bg-slate-800 text-white">

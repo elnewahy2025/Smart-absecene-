@@ -61,6 +61,80 @@ export async function fetchNativePdfBlob(options: {
 }
 
 /**
+ * Fallback used when the server PDF engine is unavailable (local development
+ * without a service account or Chromium, rate limits, busy engine). Renders the
+ * same report HTML in a hidden iframe and opens the browser print dialog, where
+ * "Save as PDF" produces the document.
+ */
+export function printHtmlFallback(options: { htmlContent: string; title: string }): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const printDocument = `<!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>${options.title}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          body {
+            font-family: 'Cairo', 'Amiri', 'Segoe UI', Tahoma, Arial, sans-serif;
+            direction: rtl;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color: #0f172a;
+            background-color: #ffffff;
+            padding: 0;
+            margin: 0;
+          }
+          table { border-collapse: collapse; width: 100%; }
+          .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+        </style>
+      </head>
+      <body>${options.htmlContent}</body>
+    </html>`;
+
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.srcdoc = printDocument;
+
+    let printed = false;
+    const triggerPrint = () => {
+      if (printed) return;
+      printed = true;
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.warn('Browser print fallback failed:', err);
+      }
+    };
+
+    iframe.onload = () => setTimeout(triggerPrint, 400);
+    document.body.appendChild(iframe);
+
+    setTimeout(() => {
+      try {
+        document.body.removeChild(iframe);
+      } catch {}
+    }, 120000);
+
+    return true;
+  } catch (err) {
+    console.error('Browser print fallback could not be prepared:', err);
+    return false;
+  }
+}
+
+/**
  * Generates and downloads native vector PDF with selectable Arabic text and Cairo/Amiri fonts.
  */
 export async function downloadNativePdfFromHtml(options: {
@@ -89,11 +163,8 @@ export async function downloadNativePdfFromHtml(options: {
 
     return true;
   } catch (err: any) {
-    console.error('Puppeteer vector PDF export failed:', err);
-    alert(
-      `تعذر إنشاء مستند PDF حالياً: ${err?.message || 'خطأ غير معروف'}.\nيرجى التأكد من تشغيل الخادم والمحاولة مرة أخرى.`
-    );
-    return false;
+    console.warn('Server vector PDF export unavailable, using browser print:', err);
+    return printHtmlFallback(options);
   }
 }
 
@@ -160,8 +231,7 @@ export async function printNativePdfFromHtml(options: {
 
     return true;
   } catch (err: any) {
-    console.error('Vector PDF print generation failed:', err);
-    alert(`تعذر تجهيز مستند الطباعة: ${err?.message || 'خطأ غير معروف'}`);
-    return false;
+    console.warn('Server vector PDF print unavailable, using browser print:', err);
+    return printHtmlFallback({ htmlContent: options.htmlContent, title: options.title });
   }
 }

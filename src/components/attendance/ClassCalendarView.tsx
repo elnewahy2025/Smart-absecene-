@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AttendanceSession } from '../../types/attendance';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, CheckCircle2, AlertCircle, Palmtree } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 
 interface Props {

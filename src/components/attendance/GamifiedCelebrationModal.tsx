@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PartyPopper, Sparkles, CheckCircle2, Award } from 'lucide-react';
+import { PartyPopper, Sparkles, Award } from 'lucide-react';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 interface Props {

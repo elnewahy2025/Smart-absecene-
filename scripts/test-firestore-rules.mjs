@@ -472,7 +472,9 @@ await expectDenied('parent cannot read another parent notification', getDoc(doc(
 await expectAllowed('parent reads own child justification', getDoc(doc(parentDb, 'justifications', 'just1')));
 await expectDenied('parent cannot read another child justification', getDoc(doc(parentDb, 'justifications', 'just2')));
 
-await expectAllowed('tenant registry is publicly readable', getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'tenants', 'school-1')));
+await expectDenied('anonymous cannot read tenant registry', getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'tenants', 'school-1')));
+await expectAllowed('same-school admin can read tenant registry', getDoc(doc(adminDb, 'tenants', 'school-1')));
+await expectDenied('school-1 admin cannot read school-2 tenant registry', getDoc(doc(adminDb, 'tenants', 'school-2')));
 await expectDenied('parent cannot write tenant registry', setDoc(doc(parentDb, 'tenants', 'school-1'), { nameAr: 'hijacked' }, { merge: true }));
 
 // Profiles are provisioned server-side; the client can only create one as the

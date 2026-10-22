@@ -70,6 +70,7 @@ describe('server.ts integration (real app, real routes)', () => {
     expect(Array.isArray(body.tenants)).toBe(true);
     expect(res.headers['cache-control']).toContain('no-store');
     for (const tenant of body.tenants) {
+      expect(tenant).not.toHaveProperty('subscription');
       expect(Object.keys(tenant).sort()).toEqual(
         [
           'customDomains',
@@ -79,7 +80,6 @@ describe('server.ts integration (real app, real routes)', () => {
           'nameEn',
           'primaryColor',
           'subdomain',
-          'subscription',
           'tenantId',
         ].sort()
       );
@@ -104,11 +104,17 @@ describe('server.ts integration (real app, real routes)', () => {
   });
 
   it('protects the subscription control-plane endpoints', async () => {
+    expect((await request('/api/tenants/subscriptions')).status).toBe(401);
     expect((await request('/api/tenants/school-1/subscription')).status).toBe(401);
     expect((await request('/api/tenants/school-1/subscription/suspend', { method: 'POST' })).status).toBe(401);
     expect((await request('/api/tenants/school-1/subscription/reactivate', { method: 'POST' })).status).toBe(401);
     expect((await request('/api/tenants/school-1/subscription/renew', { method: 'POST' })).status).toBe(401);
     expect((await request('/api/tenants/school-1/subscription', { method: 'PATCH' })).status).toBe(401);
+  });
+
+  it('requires authentication for the PDF engine and image analysis routes', async () => {
+    expect((await request('/api/pdf/generate', { method: 'POST' })).status).toBe(401);
+    expect((await request('/api/analyze-image', { method: 'POST' })).status).toBe(401);
   });
 
   it('accepts an explicit ?tenant= selection on the public tenant resolver', async () => {

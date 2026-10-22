@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "count": 3,
+  "tenants": [
+    {
+      "tenantId": "school-1",
+      "subdomain": "andalus",
+      "customDomains": [
+        "portal.andalus.edu",
+        "portal.andalus.edu.sa",
+        "attendance.andalus-school.edu.sa",
+        "andalus.smartschool.com",
+        "andalus.localhost",
+        "smart-absecene-drul.vercel.app"
+      ],
+      "nameAr": "مدرسة الأندلس الثانوية النموذجية",
+      "nameEn": "Al-Andalus Model High School",
+      "logoText": "أ",
+      "primaryColor": "#059669",
+      "isActive": true,
+      "subscription": {
+        "plan": "legacy",
+        "billingCycle": "annual",
+        "effectiveStatus": "active",
+        "accessEnabled": true,
+        "gracePeriodDays": 7,
+        "currentPeriodEnd": null,
+        "daysRemaining": null,
+        "graceDaysRemaining": null
+      }
+    },
+    {
+      "tenantId": "school-2",
+      "subdomain": "falah",
+      "customDomains": [
+        "portal.falah.edu",
+        "portal.falah.edu.sa",
+        "attendance.falah-school.edu.sa",
+        "falah.smartschool.com",
+        "falah.localhost"
+      ],
+      "nameAr": "مدرسة الفلاح المتوسطة الحديثة",
+      "nameEn": "Al-Falah Modern Intermediate School",
+      "logoText": "ف",
+      "primaryColor": "#2563eb",
+      "isActive": true,
+      "subscription": {
+        "plan": "legacy",
+        "billingCycle": "annual",
+        "effectiveStatus": "active",
+        "accessEnabled": true,
+        "gracePeriodDays": 7,
+        "currentPeriodEnd": null,
+        "daysRemaining": null,
+        "graceDaysRemaining": null
+      }
+    },
+    {
+      "tenantId": "school-majd",
+      "subdomain": "majd",
+      "customDomains": [
+        "portal.majd.edu",
+        "attendance.majd-school.edu.sa",
+        "majd.smartschool.com",
+        "majd.localhost"
+      ],
+      "nameAr": "مدارس المجد الأهلية النموذجية",
+      "nameEn": "Al-Majd Model School",
+      "logoText": "م",
+      "primaryColor": "#059669",
+      "isActive": true,
+      "subscription": {
+        "plan": "legacy",
+        "billingCycle": "annual",
+        "effectiveStatus": "active",
+        "accessEnabled": true,
+        "gracePeriodDays": 7,
+        "currentPeriodEnd": null,
+        "daysRemaining": null,
+        "graceDaysRemaining": null
+      }
+    }
+  ]
+}

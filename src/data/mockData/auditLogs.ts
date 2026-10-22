@@ -1,0 +1,42 @@
+import type { AuditLog } from '../../types/attendance';
+
+export const INITIAL_AUDIT_LOGS: AuditLog[] = [
+  {
+    id: 'audit-001',
+    tenantId: 'school-1',
+    entityType: 'session',
+    entityId: 'sess-today-p1',
+    action: 'submit',
+    performerId: 'user-teacher',
+    performerName: 'أ. فهد بن ناصر القحطاني',
+    performerRole: 'teacher',
+    details: 'اعتماد كشف الحضور للحصة الأولى (الرياضيات) للصف 10/أ',
+    timestamp: '2026-10-10T07:45:00Z',
+  },
+  {
+    id: 'audit-002',
+    tenantId: 'school-1',
+    entityType: 'justification',
+    entityId: 'just-001',
+    action: 'create',
+    performerId: 'user-parent',
+    performerName: 'د. خالد بن سعود المطيري',
+    performerRole: 'parent',
+    details: 'تقديم طلب عذر طبي مدعوم بتقرير مستشفى للطالب يوسف المطيري',
+    timestamp: '2026-10-10T08:15:00Z',
+  },
+  {
+    id: 'audit-003',
+    tenantId: 'school-1',
+    entityType: 'justification',
+    entityId: 'just-002',
+    action: 'update',
+    performerId: 'user-registrar',
+    performerName: 'أ. ماجد بن عبد العزيز الخالدي',
+    performerRole: 'registrar',
+    details: 'اعتماد العذر الطبي وتحديث حالة غياب الطالب ريان الدوسري إلى "غياب بعذر معتمد"',
+    previousValue: 'قيد المراجعة',
+    newValue: 'معتمد',
+    timestamp: '2026-10-09T10:15:00Z',
+  },
+];
