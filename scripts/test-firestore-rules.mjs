@@ -61,6 +61,15 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     phone: '+966500000002',
     status: 'active',
   });
+  await setDoc(doc(db, 'users', 'parent-email'), {
+    userId: 'parent-email',
+    tenantId: 'school-1',
+    name: 'Email Parent',
+    email: 'email-parent@example.com',
+    role: 'parent',
+    phone: '',
+    status: 'active',
+  });
   // Legacy self-registered profiles never received the server-owned `status`
   // field. They must be denied even if their phone matches a student.
   await setDoc(doc(db, 'users', 'legacy1'), {
@@ -170,6 +179,15 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     guardianPhone: '+966500000002',
     guardianEmail: 'p2@example.com',
   });
+  await setDoc(doc(db, 'students', 'student-email'), {
+    studentNumber: 'SE',
+    fullName: 'Email Linked Child',
+    className: '10 / ج',
+    classId: 'class-1a',
+    tenantId: 'school-1',
+    guardianPhone: '',
+    guardianEmail: 'email-parent@example.com',
+  });
 
   await setDoc(doc(db, 'attendance_sessions', 'draft1'), {
     tenantId: 'school-1',
@@ -272,6 +290,19 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     status: 'present',
     updatedAt: '2026-10-10T08:00:00.000Z',
   });
+  await setDoc(doc(db, 'attendance_records', 'record-email'), {
+    tenantId: 'school-1',
+    sessionId: 'draft1',
+    studentId: 'student-email',
+    guardianPhone: '',
+    guardianEmail: 'email-parent@example.com',
+    date: '2026-10-10',
+    sessionType: 'daily',
+    classId: 'class-1a',
+    className: '10 / ج',
+    status: 'present',
+    updatedAt: '2026-10-10T08:00:00.000Z',
+  });
 
   // school-2 mirrors, split across two classes to prove teacher class scope.
   await setDoc(doc(db, 'attendance_records', 'record4'), {
@@ -339,6 +370,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
 });
 
 const parentDb = testEnv.authenticatedContext('parent1').firestore();
+const emailParentDb = testEnv.authenticatedContext('parent-email').firestore();
 const teacherDb = testEnv.authenticatedContext('teacher1').firestore();
 const adminDb = testEnv.authenticatedContext('admin1').firestore();
 const registrarDb = testEnv.authenticatedContext('registrar1').firestore();
@@ -375,6 +407,9 @@ async function expectDenied(name, operation) {
 // Existing guardian/student boundary (should already hold).
 await expectAllowed('parent reads own child', getDoc(doc(parentDb, 'students', 'student1')));
 await expectDenied('parent cannot read another child', getDoc(doc(parentDb, 'students', 'student2')));
+await expectAllowed('email-only parent reads linked student', getDoc(doc(emailParentDb, 'students', 'student-email')));
+await expectAllowed('email-only parent reads linked attendance mirror', getDoc(doc(emailParentDb, 'attendance_records', 'record-email')));
+await expectDenied('email-only parent cannot read another child mirror', getDoc(doc(emailParentDb, 'attendance_records', 'record1')));
 
 // H-2: approval is staff-only.
 await expectDenied('parent cannot self-approve an excuse', addDoc(collection(parentDb, 'justifications'), {
@@ -470,6 +505,20 @@ await expectAllowed('parent reads own notification', getDoc(doc(parentDb, 'notif
 await expectDenied('parent cannot read another parent notification', getDoc(doc(parentDb, 'notification_outbox', 'notif2')));
 
 await expectAllowed('parent reads own child justification', getDoc(doc(parentDb, 'justifications', 'just1')));
+await testEnv.withSecurityRulesDisabled(async (context) => {
+  await setDoc(doc(context.firestore(), 'justifications', 'just-email'), {
+    tenantId: 'school-1',
+    studentId: 'student-email',
+    guardianEmail: 'email-parent@example.com',
+    studentName: 'Email Linked Child',
+    className: '10 / ج',
+    absenceDate: '2026-10-10',
+    reasonType: 'medical',
+    guardianExplanation: 'Email parent fixture',
+    status: 'pending',
+  });
+});
+await expectAllowed('email-only parent reads linked justification', getDoc(doc(emailParentDb, 'justifications', 'just-email')));
 await expectDenied('parent cannot read another child justification', getDoc(doc(parentDb, 'justifications', 'just2')));
 
 await expectDenied('anonymous cannot read tenant registry', getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'tenants', 'school-1')));
