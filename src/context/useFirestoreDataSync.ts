@@ -114,7 +114,7 @@ export function useFirestoreDataSync({
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'students');
       }
-    );
+    ));
 
     // 2. Attendance Sessions sync
     const qSessions = query(collection(db, 'attendance_sessions'), where('tenantId', '==', tenantId));
@@ -189,7 +189,7 @@ export function useFirestoreDataSync({
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'justifications');
       }
-    );
+    ));
 
     // 4. Notification outbox sync
     const qNotifications = isParentUser
