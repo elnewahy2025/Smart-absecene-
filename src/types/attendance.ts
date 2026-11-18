@@ -453,6 +453,21 @@ export interface TimetablePeriod {
   type: 'assembly' | 'lesson' | 'recess' | 'prayer';
 }
 
+export interface TimetableScheduleConfig {
+  assemblyStartTime: string;
+  assemblyDurationMinutes: number;
+  assemblyNameAr?: string;
+  lessonCount: number;
+  lessonDurationMinutes: number;
+  betweenLessonsMinutes: number;
+  firstRecessDurationMinutes: number;
+  firstRecessAfterLesson: number;
+  secondRecessDurationMinutes: number;
+  secondRecessAfterLesson: number;
+  secondRecessType?: 'recess' | 'prayer';
+  secondRecessNameAr?: string;
+}
+
 export interface AssemblyPointConfig {
   id: string;
   name: string; // e.g. "نقطة تجمع أ (الساحة الرئيسية)"
@@ -511,6 +526,7 @@ export interface TenantSchoolProfile {
   // Academic Calendar & Periods
   academicYear: AcademicYearConfig;
   timetablePeriods: TimetablePeriod[];
+  timetableConfig?: TimetableScheduleConfig;
   // School Classes, Sections & Subjects
   educationalGrades?: string[]; // e.g. ["الصف السادس", "الصف السابع", "الصف العاشر"]
   classes?: SchoolClassConfig[];

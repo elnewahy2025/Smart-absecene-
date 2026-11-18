@@ -462,7 +462,7 @@ export const AuditSettingsView: React.FC = () => {
           onSave={updateMessagingGateway}
           isSuperAdmin={isSuperAdmin}
           schoolName={schoolProfile.schoolName || currentTenant.name}
-          defaultCallingCode={schoolProfile.countryCallingCode || schoolProfile.address?.countryCallingCode || '+966'}
+          defaultCallingCode={schoolProfile.countryCallingCode || schoolProfile.address?.countryCallingCode || '+965'}
         />
       )}
 

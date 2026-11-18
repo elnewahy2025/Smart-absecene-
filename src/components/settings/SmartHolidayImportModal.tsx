@@ -38,7 +38,7 @@ interface SmartHolidayImportModalProps {
 export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = ({
   isOpen,
   onClose,
-  initialCountry = 'المملكة العربية السعودية',
+  initialCountry = 'دولة الكويت',
   initialAcademicYear = '1446-1447 هـ (2026-2027 م)',
   onApplyHolidays,
 }) => {
@@ -63,7 +63,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   // Sync initial props when modal opens
   useEffect(() => {
     if (isOpen) {
-      const activeCountry = initialCountry || 'المملكة العربية السعودية';
+      const activeCountry = initialCountry || 'دولة الكويت';
       setCountry(activeCountry);
       setAcademicYear(initialAcademicYear || '1446-1447 هـ (2026-2027 م)');
       // Pre-load verified preset for instantaneous feedback

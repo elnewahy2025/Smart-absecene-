@@ -174,7 +174,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
           <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 text-xs">
             <div className="space-y-1 text-right">
               <div className="font-bold text-sm text-slate-900 whitespace-pre-line leading-relaxed">
-                {schoolProfile.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
+                {schoolProfile.ministryHeaderAr || 'دولة الكويت\nوزارة التربية'}
               </div>
               <div className="text-slate-800 font-bold text-sm mt-1">{schoolProfile.schoolName || currentTenant.name}</div>
               <div className="text-[11px] text-slate-500">كود المنشأة: {schoolProfile.schoolCode || currentTenant.code}</div>

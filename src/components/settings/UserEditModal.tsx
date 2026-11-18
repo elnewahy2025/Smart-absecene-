@@ -38,7 +38,7 @@ export const UserEditModal: React.FC<Props> = ({
   lang,
 }) => {
   const { schoolProfile } = useAttendance();
-  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+966';
+  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
 
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -178,7 +178,7 @@ export const UserEditModal: React.FC<Props> = ({
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder={`${dialCode}500000000`}
+                placeholder={`${dialCode}90001234`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>

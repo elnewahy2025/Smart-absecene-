@@ -85,7 +85,7 @@ export const PlatformRootView: React.FC<PlatformRootViewProps> = ({ onSelectLoca
                   <div className="space-y-2 text-xs text-slate-300 border-t border-slate-800/80 pt-4 mb-6">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{tenant.cityAr} - المملكة العربية السعودية</span>
+                      <span>{tenant.cityAr} - دولة الكويت</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-slate-500" />

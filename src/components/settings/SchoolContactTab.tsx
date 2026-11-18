@@ -20,13 +20,13 @@ interface Props {
 export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const { lang } = useAttendance();
   const address = profile.address || ({} as Partial<TenantSchoolProfile['address']>);
-  const currentCountry = address.country || profile.address?.country || 'المملكة العربية السعودية';
+  const currentCountry = address.country || profile.address?.country || 'دولة الكويت';
   const preset = getCountryPreset(currentCountry);
   const currentDialCode =
     profile.countryCallingCode ||
     address.countryCallingCode ||
     preset.callingCode ||
-    getCallingCodeForCountry(currentCountry, '+966');
+    getCallingCodeForCountry(currentCountry, '+965');
 
   const matchedCountry: CountryInfo | undefined = findCountryByName(currentCountry);
 
@@ -132,7 +132,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
                 onChange={(e) => handleDialCodeChange(e.target.value)}
                 dir="ltr"
                 className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono font-bold text-emerald-600 dark:text-emerald-400 text-left focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                placeholder="+966"
+                placeholder="+965"
               />
             </div>
           </div>

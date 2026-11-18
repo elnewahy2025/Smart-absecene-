@@ -388,7 +388,7 @@ export const NotificationOutboxView: React.FC = () => {
                                 openWhatsAppDirect(
                                   notif.recipientPhone,
                                   notif.messageText,
-                                  schoolProfile?.countryCallingCode || '+966'
+                                  schoolProfile?.countryCallingCode || '+965'
                                 );
                               }}
                               className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"

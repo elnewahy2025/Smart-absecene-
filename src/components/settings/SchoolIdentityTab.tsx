@@ -3,6 +3,11 @@ import { TenantSchoolProfile } from '../../types/attendance';
 import { Building, ShieldCheck, Award } from 'lucide-react';
 import { getCountryPreset } from '../../config/countryPresets';
 import { useAttendance } from '../../context/AttendanceContext';
+import {
+  KUWAIT_EDUCATIONAL_STAGES,
+  generateTimetablePeriods,
+  matchTimetablePresetForStage,
+} from '../../utils/timetableCalculator';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -12,8 +17,25 @@ interface Props {
 
 export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const { lang } = useAttendance();
-  const currentCountry = profile.address?.country || 'المملكة العربية السعودية';
+  const currentCountry = profile.address?.country || 'دولة الكويت';
   const preset = getCountryPreset(currentCountry);
+
+  const handleStageChange = (newStage: string) => {
+    const matched = matchTimetablePresetForStage(newStage);
+    if (matched?.fixedPeriods) {
+      onChange({ stageAr: newStage, timetablePeriods: matched.fixedPeriods });
+      return;
+    }
+    if (matched?.config) {
+      onChange({
+        stageAr: newStage,
+        timetableConfig: matched.config,
+        timetablePeriods: generateTimetablePeriods(matched.config),
+      });
+      return;
+    }
+    onChange({ stageAr: newStage });
+  };
 
   return (
     <div className="space-y-4 text-xs">
@@ -92,15 +114,22 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المرحلة الدراسية:' : 'Educational Stage:'}</label>
-          <input
-            type="text"
+          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المرحلة الدراسية (يُضبط التوقيت آلياً حسبها):' : 'Educational Stage (auto-syncs timetable):'}</label>
+          <select
             disabled={disabled}
             value={profile.stageAr}
-            onChange={(e) => onChange({ stageAr: e.target.value })}
+            onChange={(e) => handleStageChange(e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={lang === 'ar' ? 'المرحلة الثانوية' : 'Secondary Stage'}
-          />
+          >
+            {!(KUWAIT_EDUCATIONAL_STAGES as readonly string[]).includes(profile.stageAr) && profile.stageAr && (
+              <option value={profile.stageAr}>{profile.stageAr}</option>
+            )}
+            {KUWAIT_EDUCATIONAL_STAGES.map((stage) => (
+              <option key={stage} value={stage}>
+                {stage}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

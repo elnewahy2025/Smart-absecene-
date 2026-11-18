@@ -74,7 +74,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
     Boolean(attendanceCtx?.isSuperAdmin || attendanceCtx?.currentUser?.role === 'super_admin');
 
   const effectiveCountry =
-    country || attendanceCtx?.schoolProfile?.address?.country || 'المملكة العربية السعودية';
+    country || attendanceCtx?.schoolProfile?.address?.country || 'دولة الكويت';
   const activePreset = getCountryPreset(effectiveCountry);
 
   const triggerAutoSave = async (

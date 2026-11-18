@@ -25,7 +25,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   const { schoolProfile } = useAttendance();
-  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+966';
+  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
 
   const availableGrades = React.useMemo(() => {
     if (educationalGrades && educationalGrades.length > 0) {

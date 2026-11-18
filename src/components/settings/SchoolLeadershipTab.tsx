@@ -12,7 +12,7 @@ interface Props {
 export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const { lang } = useAttendance();
   const leadership = profile.leadership || ({} as Partial<TenantSchoolProfile['leadership']>);
-  const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+966';
+  const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+965';
 
   const handleLeadershipChange = (key: string, value: string) => {
     onChange({
