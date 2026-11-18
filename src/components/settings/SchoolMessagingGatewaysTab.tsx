@@ -163,6 +163,7 @@ export const SchoolMessagingGatewaysTab: React.FC<Props> = ({
         lang={lang}
         isSuperAdmin={isSuperAdmin}
         schoolName={schoolName}
+        defaultCallingCode={defaultCallingCode}
       />
 
       <MessagingGatewayAuditFooter

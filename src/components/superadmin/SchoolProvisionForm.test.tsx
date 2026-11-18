@@ -11,7 +11,7 @@ const NAME_AR = 'مثال: مدرسة المجد الثانوية الأهلية
 const CODE = 'MAJD-303';
 const SUBDOMAIN = 'majd';
 const SCHOOL_ID = 'school-majd';
-const PRINCIPAL_EMAIL = 'principal@majd-school.edu.sa';
+const PRINCIPAL_EMAIL = 'principal@majd-school.edu.kw';
 const COUNTRY = 'دولة الكويت / السعودية / مصر / الإمارات...';
 const CITY = 'مدينة الكويت / حولي / السالمية / الفروانية';
 
@@ -57,7 +57,7 @@ describe('SchoolProvisionForm', () => {
     expect((screen.getByPlaceholderText(SUBDOMAIN) as HTMLInputElement).value).toBe('al-majd99');
     expect((screen.getByPlaceholderText(SCHOOL_ID) as HTMLInputElement).value).toBe('school-al-majd99');
     expect((screen.getByPlaceholderText(PRINCIPAL_EMAIL) as HTMLInputElement).value).toBe(
-      'principal@al-majd99-school.edu.sa'
+      'principal@al-majd99-school.edu.kw'
     );
   });
 

@@ -103,6 +103,6 @@ describe('SmsGatewaySection', () => {
     expect(screen.getByText('Approved sender name (Sender ID):')).toBeTruthy();
     expect(
       Array.from((screen.getByRole('combobox') as HTMLSelectElement).options).map((o) => o.textContent)
-    ).toContain('Taqnyat (Taqnyat - approved Saudi gateway)');
+    ).toContain('Taqnyat (Taqnyat - approved SMS gateway)');
   });
 });

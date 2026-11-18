@@ -393,11 +393,11 @@ describe('Comprehensive Calculations, KPIs & Data Lineage Audit Suite', () => {
       expect(monday.isOff).toBe(false);
     });
 
-    it('Identifies Official National Holidays as off-days (e.g. Saudi National Day 2026-09-23)', () => {
-      const nationalDay = isSchoolOffDay('2026-09-23', DEFAULT_WEEKEND_DAYS, DEFAULT_OFFICIAL_HOLIDAYS);
+    it('Identifies Official National Holidays as off-days (e.g. Kuwait National Day 2027-02-25)', () => {
+      const nationalDay = isSchoolOffDay('2027-02-25', DEFAULT_WEEKEND_DAYS, DEFAULT_OFFICIAL_HOLIDAYS);
       expect(nationalDay.isOff).toBe(true);
       expect(nationalDay.type).toBe('holiday');
-      expect(nationalDay.holidayName).toContain('اليوم الوطني');
+      expect(nationalDay.holidayName).toContain('العيد الوطني');
     });
 
     it('Generates the complete 5 standard school days (Sunday to Thursday) for reference date', () => {
@@ -422,10 +422,10 @@ describe('Comprehensive Calculations, KPIs & Data Lineage Audit Suite', () => {
     });
 
     it('Correctly counts active school days excluding weekends and official holidays', () => {
-      // Between Sunday 2026-10-11 and Thursday 2026-10-15:
-      // Wednesday 2026-10-14 and Thursday 2026-10-15 are defined as extended weekend holidays in DEFAULT_OFFICIAL_HOLIDAYS
-      // Active days: Sunday, Monday, Tuesday = 3 days
-      const activeDays = countActiveSchoolDays('2026-10-11', '2026-10-15', DEFAULT_WEEKEND_DAYS, DEFAULT_OFFICIAL_HOLIDAYS);
+      // Between Monday 2027-02-22 and Thursday 2027-02-25:
+      // Thursday 2027-02-25 is Kuwait National Day in DEFAULT_OFFICIAL_HOLIDAYS
+      // Active days: Monday, Tuesday, Wednesday = 3 days
+      const activeDays = countActiveSchoolDays('2027-02-22', '2027-02-25', DEFAULT_WEEKEND_DAYS, DEFAULT_OFFICIAL_HOLIDAYS);
       expect(activeDays).toBe(3);
     });
 

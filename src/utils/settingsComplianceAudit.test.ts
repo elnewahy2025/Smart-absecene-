@@ -23,12 +23,12 @@ describe('Strict Settings Compliance & Data Validation Engine', () => {
     expect(isOutside).toBe(true);
   });
 
-  it('strictly rejects official school holidays defined in Settings (e.g. Saudi National Day 2026-09-23)', () => {
-    const holidayDate = '2026-09-23';
+  it('strictly rejects official school holidays defined in Settings (e.g. Kuwait National Day 2027-02-25)', () => {
+    const holidayDate = '2027-02-25';
     const offCheck = isSchoolOffDay(holidayDate, profile.weekendDays, profile.officialHolidays);
     expect(offCheck.isOff).toBe(true);
     expect(offCheck.type).toBe('holiday');
-    expect(offCheck.holidayName).toContain('اليوم الوطني');
+    expect(offCheck.holidayName).toContain('العيد الوطني');
   });
 
   it('strictly rejects weekend days defined in Settings (Friday / Saturday)', () => {

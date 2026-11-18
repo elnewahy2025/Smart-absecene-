@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail } from 'lucide-react';
 import type { EmailGatewayProvider, SchoolMessagingGatewayConfig } from '../../types/attendance';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface EmailGatewaySectionProps {
   form: SchoolMessagingGatewayConfig;
@@ -11,6 +12,7 @@ interface EmailGatewaySectionProps {
   lang: 'ar' | 'en';
   isSuperAdmin: boolean;
   schoolName: string;
+  defaultCallingCode?: string;
 }
 
 // SECTION 3: EMAIL TRANSPORT (used by the daily executive digest)
@@ -20,9 +22,12 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
   lang,
   isSuperAdmin,
   schoolName,
+  defaultCallingCode,
 }) => {
   const [showSmtpPass, setShowSmtpPass] = useState(false);
   const [showEmailApiKey, setShowEmailApiKey] = useState(false);
+  const { domainSuffix } = getCountryIdentitySpec(defaultCallingCode);
+  const defaultDomain = `school${domainSuffix}`;
 
   return (
   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
@@ -82,7 +87,7 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
           disabled={!isSuperAdmin}
           value={form.fromEmail || ''}
           onChange={(e) => handleFieldChange('fromEmail', e.target.value)}
-          placeholder="no-reply@school.sa"
+          placeholder={`no-reply@${defaultDomain}`}
           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
@@ -114,7 +119,7 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
             disabled={!isSuperAdmin}
             value={form.smtpHost || ''}
             onChange={(e) => handleFieldChange('smtpHost', e.target.value)}
-            placeholder="smtp.school.sa"
+            placeholder={`smtp.${defaultDomain}`}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </div>
@@ -151,7 +156,7 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
             disabled={!isSuperAdmin}
             value={form.smtpUser || ''}
             onChange={(e) => handleFieldChange('smtpUser', e.target.value)}
-            placeholder="no-reply@school.sa"
+            placeholder={`no-reply@${defaultDomain}`}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </div>

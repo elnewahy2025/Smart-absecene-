@@ -126,10 +126,10 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
   const applyPreset = async (preset: 'saudi' | 'intl' | 'fridayOnly') => {
     if (disabled || isSaving) return;
     let days = [5, 6];
-    let label = lang === 'ar' ? 'الجمعة والسبت (المملكة)' : 'Friday and Saturday (Kingdom)';
+    let label = lang === 'ar' ? 'الجمعة والسبت (النمط الخليجي والعربي)' : 'Friday and Saturday (Gulf / Arab)';
     if (preset === 'saudi') {
       days = [5, 6];
-      label = lang === 'ar' ? 'الجمعة والسبت (النمط السعودي المعتمد)' : 'Friday and Saturday (approved Saudi pattern)';
+      label = lang === 'ar' ? 'الجمعة والسبت (النمط الخليجي والعربي المعتمد)' : 'Friday and Saturday (approved Gulf / Arab pattern)';
     } else if (preset === 'intl') {
       days = [6, 0];
       label = lang === 'ar' ? 'السبت والأحد (النمط الدولي)' : 'Saturday and Sunday (international pattern)';

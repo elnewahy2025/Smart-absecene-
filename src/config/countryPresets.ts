@@ -766,3 +766,105 @@ export function getLocalPhonePlaceholder(countryNameOrCode?: string): string {
     .trim();
   return stripped || '91234567';
 }
+
+export interface CountryIdentitySpec {
+  callingCode: string;
+  domainSuffix: string;
+  nationalIdLabelAr: string;
+  nationalIdLabelEn: string;
+  nationalIdLength: number;
+  nationalIdExample: string;
+}
+
+const IDENTITY_SPEC_BY_DIAL: Record<string, CountryIdentitySpec> = {
+  '+965': {
+    callingCode: '+965',
+    domainSuffix: '.edu.kw',
+    nationalIdLabelAr: 'الرقم المدني',
+    nationalIdLabelEn: 'Civil ID',
+    nationalIdLength: 12,
+    nationalIdExample: '299010100000',
+  },
+  '+966': {
+    callingCode: '+966',
+    domainSuffix: '.edu.sa',
+    nationalIdLabelAr: 'السجل المدني',
+    nationalIdLabelEn: 'National ID',
+    nationalIdLength: 10,
+    nationalIdExample: '10XXXXXXXX',
+  },
+  '+20': {
+    callingCode: '+20',
+    domainSuffix: '.edu.eg',
+    nationalIdLabelAr: 'الرقم القومي',
+    nationalIdLabelEn: 'National ID',
+    nationalIdLength: 14,
+    nationalIdExample: '29901010100000',
+  },
+  '+971': {
+    callingCode: '+971',
+    domainSuffix: '.edu.ae',
+    nationalIdLabelAr: 'رقم الهوية الإماراتية',
+    nationalIdLabelEn: 'Emirates ID',
+    nationalIdLength: 15,
+    nationalIdExample: '784199900000000',
+  },
+  '+974': {
+    callingCode: '+974',
+    domainSuffix: '.edu.qa',
+    nationalIdLabelAr: 'الرقم الشخصي',
+    nationalIdLabelEn: 'Qatar ID',
+    nationalIdLength: 11,
+    nationalIdExample: '29963400000',
+  },
+  '+968': {
+    callingCode: '+968',
+    domainSuffix: '.edu.om',
+    nationalIdLabelAr: 'الرقم المدني',
+    nationalIdLabelEn: 'Civil ID',
+    nationalIdLength: 8,
+    nationalIdExample: '12345678',
+  },
+  '+973': {
+    callingCode: '+973',
+    domainSuffix: '.edu.bh',
+    nationalIdLabelAr: 'الرقم الشخصي',
+    nationalIdLabelEn: 'CPR Number',
+    nationalIdLength: 9,
+    nationalIdExample: '990100000',
+  },
+  '+962': {
+    callingCode: '+962',
+    domainSuffix: '.edu.jo',
+    nationalIdLabelAr: 'الرقم الوطني',
+    nationalIdLabelEn: 'National ID',
+    nationalIdLength: 10,
+    nationalIdExample: '9991000000',
+  },
+  '+212': {
+    callingCode: '+212',
+    domainSuffix: '.edu.ma',
+    nationalIdLabelAr: 'رقم البطاقة الوطنية',
+    nationalIdLabelEn: 'CIN',
+    nationalIdLength: 8,
+    nationalIdExample: 'AB123456',
+  },
+};
+
+/**
+ * Returns country-specific ID label, digit length, and domain suffix
+ * based on the selected country name or calling code (defaults to Kuwait).
+ */
+export function getCountryIdentitySpec(countryNameOrCode?: string): CountryIdentitySpec {
+  const preset = getCountryPreset(countryNameOrCode);
+  return (
+    IDENTITY_SPEC_BY_DIAL[preset.callingCode] || {
+      callingCode: preset.callingCode,
+      domainSuffix: '.edu',
+      nationalIdLabelAr: 'الرقم الوطني / المدني',
+      nationalIdLabelEn: 'National / Civil ID',
+      nationalIdLength: 0,
+      nationalIdExample: 'XXXXXXXXXX',
+    }
+  );
+}

@@ -3,7 +3,7 @@ import { Student, SchoolClassSummary } from '../../types/attendance';
 import { UserPlus, X, Check } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
-import { getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { getCountryIdentitySpec, getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const { schoolProfile } = useAttendance();
   const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
   const localPhoneExample = getLocalPhonePlaceholder(schoolProfile?.address?.country || dialCode);
+  const idSpec = getCountryIdentitySpec(schoolProfile?.address?.country || dialCode);
 
   const availableGrades = React.useMemo(() => {
     if (educationalGrades && educationalGrades.length > 0) {
@@ -64,8 +65,12 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       return;
     }
 
-    if (nationalId.trim().length !== 10) {
-      setError(isAr ? 'السجل المدني يجب أن يتكون من 10 أرقام' : 'National ID must be 10 digits');
+    if (idSpec.nationalIdLength > 0 && nationalId.trim().length !== idSpec.nationalIdLength) {
+      setError(
+        isAr
+          ? `${idSpec.nationalIdLabelAr} يجب أن يتكون من ${idSpec.nationalIdLength} أرقام`
+          : `${idSpec.nationalIdLabelEn} must be ${idSpec.nationalIdLength} digits`
+      );
       return;
     }
 
@@ -142,21 +147,25 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder={isAr ? 'مثال: عبد العزيز بن ناصر العتيبي' : 'e.g. Abdulaziz Nasser'}
+              placeholder={isAr ? 'مثال: عبد الله بن محمد العنزي' : 'e.g. Abdullah Mohammed'}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-xs"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'السجل المدني (10 أرقام) *' : 'National ID *'}</label>
+              <label className="font-semibold text-slate-700">
+                {isAr
+                  ? `${idSpec.nationalIdLabelAr}${idSpec.nationalIdLength > 0 ? ` (${idSpec.nationalIdLength} أرقام)` : ''} *`
+                  : `${idSpec.nationalIdLabelEn} *`}
+              </label>
               <input
                 type="text"
                 required
-                maxLength={10}
+                maxLength={idSpec.nationalIdLength > 0 ? idSpec.nationalIdLength : 20}
                 value={nationalId}
                 onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
-                placeholder="10XXXXXXXX"
+                placeholder={idSpec.nationalIdExample}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:bg-white"
               />
             </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Building2, Sparkles, Palette, Globe, User } from 'lucide-react';
 import { SchoolProvisionInput } from '../../types/attendance';
 import { COUNTRIES_LIST, findCountryByName } from '../../config/countryCodes';
-import { getCountryPreset, getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { getCountryIdentitySpec, getCountryPreset, getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface SchoolProvisionFormProps {
   onProvision: (input: SchoolProvisionInput) => Promise<{ success: boolean; message: string }>;
@@ -56,7 +56,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
       setSchoolId(`school-${sanitized}`);
     }
     if (!principalEmail && sanitized) {
-      setPrincipalEmail(`principal@${sanitized}-school.edu.sa`);
+      setPrincipalEmail(`principal@${sanitized}-school${domainSuffix}`);
     }
   };
 
@@ -69,6 +69,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
 
   const countryPreset = getCountryPreset(countryAr);
   const localPhonePlaceholder = getLocalPhonePlaceholder(countryAr);
+  const { domainSuffix } = getCountryIdentitySpec(countryAr);
 
   const handleCountryChange = (val: string) => {
     setCountryAr(val);
@@ -334,7 +335,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 required
                 value={principalEmail}
                 onChange={(e) => setPrincipalEmail(e.target.value)}
-                placeholder="principal@majd-school.edu.sa"
+                placeholder={`principal@majd-school${domainSuffix}`}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 dir="ltr"
               />

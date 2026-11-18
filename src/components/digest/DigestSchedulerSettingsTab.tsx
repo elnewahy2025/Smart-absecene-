@@ -115,7 +115,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
               type="email"
               value={newRecipientEmail}
               onChange={(e) => onNewRecipientEmailChange(e.target.value)}
-              placeholder="name@andalus-school.edu.sa"
+              placeholder="name@school.edu.kw"
               className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500"
             />
             <button

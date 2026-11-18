@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../../types/attendance';
 import { useAttendance } from '../../context/AttendanceContext';
-import { getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { getCountryIdentitySpec, getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +41,7 @@ export const UserEditModal: React.FC<Props> = ({
   const { schoolProfile } = useAttendance();
   const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
   const localPhoneExample = getLocalPhonePlaceholder(schoolProfile?.address?.country || dialCode);
+  const { domainSuffix } = getCountryIdentitySpec(schoolProfile?.address?.country || dialCode);
 
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -165,7 +166,7 @@ export const UserEditModal: React.FC<Props> = ({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="teacher@andalus-school.edu.sa"
+                placeholder={`teacher@school${domainSuffix}`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>

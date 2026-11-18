@@ -167,7 +167,7 @@ export const DigestSettingsModal: React.FC<DigestSettingsModalProps> = ({ isOpen
                 type="email"
                 value={newRecipientEmail}
                 onChange={(e) => setNewRecipientEmail(e.target.value)}
-                placeholder={isAr ? 'أدخل البريد الإلكتروني (مثال: principal@school.edu.sa)' : 'Enter email address...'}
+                placeholder={isAr ? 'أدخل البريد الإلكتروني (مثال: principal@school.edu.kw)' : 'Enter email address...'}
                 className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <button

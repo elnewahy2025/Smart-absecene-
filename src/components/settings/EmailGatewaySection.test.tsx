@@ -42,11 +42,11 @@ describe('EmailGatewaySection', () => {
     renderSection();
 
     expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('smtp');
-    expect((screen.getAllByPlaceholderText('no-reply@school.sa')[0] as HTMLInputElement).value).toBe(
+    expect((screen.getAllByPlaceholderText('no-reply@school.edu.kw')[0] as HTMLInputElement).value).toBe(
       'no-reply@school.sa'
     );
     expect((screen.getByPlaceholderText('مدرسة المجد') as HTMLInputElement).value).toBe('مدرسة المجد');
-    expect((screen.getByPlaceholderText('smtp.school.sa') as HTMLInputElement).value).toBe(
+    expect((screen.getByPlaceholderText('smtp.school.edu.kw') as HTMLInputElement).value).toBe(
       'smtp.school.sa'
     );
     expect(checkboxes()[0].checked).toBe(true);
@@ -72,7 +72,7 @@ describe('EmailGatewaySection', () => {
   it('emits sender and SMTP field changes', () => {
     const { props } = renderSection();
 
-    fireEvent.change(screen.getAllByPlaceholderText('no-reply@school.sa')[0], {
+    fireEvent.change(screen.getAllByPlaceholderText('no-reply@school.edu.kw')[0], {
       target: { value: 'digest@school.sa' },
     });
     fireEvent.change(screen.getByPlaceholderText('مدرسة المجد'), { target: { value: 'اسم جديد' } });
@@ -101,7 +101,7 @@ describe('EmailGatewaySection', () => {
   it('renders API credentials instead of SMTP fields for API providers', () => {
     renderSection({ form: makeForm({ emailProvider: 'sendgrid', emailApiKey: 'key-123' }) });
 
-    expect(screen.queryByPlaceholderText('smtp.school.sa')).toBeNull();
+    expect(screen.queryByPlaceholderText('smtp.school.edu.kw')).toBeNull();
     expect((screen.getByPlaceholderText('أدخل مفتاح الـ API...') as HTMLInputElement).value).toBe(
       'key-123'
     );

@@ -64,9 +64,9 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
           onChange={(e) => handleFieldChange('smsProvider', e.target.value as SmsGatewayProvider)}
           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <option value="taqnyat">{lang === 'ar' ? 'تقنيات (Taqnyat - بوابة سعودية معتمدة)' : 'Taqnyat (Taqnyat - approved Saudi gateway)'}</option>
+          <option value="taqnyat">{lang === 'ar' ? 'تقنيات (Taqnyat - بوابة رسائل معتمدة)' : 'Taqnyat (Taqnyat - approved SMS gateway)'}</option>
           <option value="unifonic">{lang === 'ar' ? 'يونيفونك (Unifonic - معتمد)' : 'Unifonic (Unifonic - approved)'}</option>
-          <option value="msegat">{lang === 'ar' ? 'مسجات (Msegat - بوابة سعودية)' : 'Msegat (Msegat - Saudi gateway)'}</option>
+          <option value="msegat">{lang === 'ar' ? 'مسجات (Msegat - بوابة رسائل نصية)' : 'Msegat (Msegat - SMS gateway)'}</option>
           <option value="twilio">{lang === 'ar' ? 'تويليو (Twilio - مزود دولي)' : 'Twilio (Twilio - international provider)'}</option>
         </select>
       </div>
