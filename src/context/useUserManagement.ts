@@ -20,7 +20,9 @@ export function useUserManagement({
   setAllUsers,
   addAuditLog,
 }: UseUserManagementParams) {
-  const createUser = async (userData: Omit<UserProfile, 'id' | 'tenantId'>): Promise<UserAccountResult> => {
+  const createUser = async (
+    userData: Omit<UserProfile, 'id' | 'tenantId'> & { password?: string }
+  ): Promise<UserAccountResult> => {
     if (!userData.email || !userData.email.includes('@')) {
       return { success: false, message: 'البريد الإلكتروني مطلوب لإنشاء حساب دخول صالح.' };
     }
@@ -40,6 +42,7 @@ export function useUserManagement({
           status: userData.status || 'active',
           assignedClasses: userData.assignedClasses,
           assignedSubjects: userData.assignedSubjects,
+          password: userData.password,
           tenantId,
         }),
       });
@@ -66,8 +69,9 @@ export function useUserManagement({
       return { success: false, message: 'تعذّر إنشاء حساب الدخول على الخادم.' };
     }
 
+    const { password: _omitPassword, ...safeProfileData } = userData;
     const newUser: UserProfile = {
-      ...userData,
+      ...safeProfileData,
       ...serverUser,
       id: serverUser.id,
       tenantId,

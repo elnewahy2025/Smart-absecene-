@@ -19,7 +19,7 @@ import { UserEditModal } from './UserEditModal';
 
 interface Props {
   users: UserProfile[];
-  onCreateUser: (data: Omit<UserProfile, 'id' | 'tenantId'>) => Promise<{
+  onCreateUser: (data: Omit<UserProfile, 'id' | 'tenantId'> & { password?: string }) => Promise<{
     success: boolean;
     message: string;
     temporaryPassword?: string;
@@ -98,7 +98,7 @@ export const UserManagementTab: React.FC<Props> = ({
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleSaveModal = async (data: Omit<UserProfile, 'id' | 'tenantId'>) => {
+  const handleSaveModal = async (data: Omit<UserProfile, 'id' | 'tenantId'> & { password?: string }) => {
     setIsSaving(true);
     try {
       const res = editingUser ? await onUpdateUser(editingUser.id, data) : await onCreateUser(data);

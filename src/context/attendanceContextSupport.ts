@@ -158,7 +158,7 @@ export interface AttendanceContextType {
   settings: SchoolSettings;
 
   // User & RBAC Management
-  createUser: (user: Omit<UserProfile, 'id' | 'tenantId'>) => Promise<UserAccountResult>;
+  createUser: (user: Omit<UserProfile, 'id' | 'tenantId'> & { password?: string }) => Promise<UserAccountResult>;
   updateUser: (userId: string, updates: Partial<UserProfile>) => Promise<UserAccountResult>;
   deleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
 
