@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { collection, onSnapshot, or, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import type {
   AttendanceSession,
   AuditLog,
@@ -70,19 +70,13 @@ export function useFirestoreDataSync({
 
     // 1. Students sync
     const qStudents = isParentUser
-      ? parentPhone && parentEmail
-        ? query(collection(db, 'students'), where('tenantId', '==', tenantId), or(
-            where('guardianPhone', '==', parentPhone),
-            where('guardianEmail', '==', parentEmail)
-          ))
-        : query(
-            collection(db, 'students'),
-            where('tenantId', '==', tenantId),
-            where(parentPhone ? 'guardianPhone' : 'guardianEmail', '==', parentPhone || parentEmail)
-          )
-      : query(collection(db, 'students'), where('tenantId', '==', tenantId));
-    const unsubStudents = onSnapshot(
-      qStudents,
+      ? [
+          ...(parentPhone ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))] : []),
+          ...(parentEmail ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))] : []),
+        ]
+      : [query(collection(db, 'students'), where('tenantId', '==', tenantId))];
+    const unsubStudents = qStudents.map((studentQuery) => onSnapshot(
+      studentQuery,
       (snapshot) => {
         if (!snapshot.empty) {
           const remoteStudents: Student[] = [];
@@ -168,19 +162,13 @@ export function useFirestoreDataSync({
 
     // 3. Justifications sync
     const qJustifications = isParentUser
-      ? parentPhone && parentEmail
-        ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), or(
-            where('guardianPhone', '==', parentPhone),
-            where('guardianEmail', '==', parentEmail)
-          ))
-        : query(
-            collection(db, 'justifications'),
-            where('tenantId', '==', tenantId),
-            where(parentPhone ? 'guardianPhone' : 'guardianEmail', '==', parentPhone || parentEmail)
-          )
-      : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
-    const unsubJustifications = onSnapshot(
-      qJustifications,
+      ? [
+          ...(parentPhone ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))] : []),
+          ...(parentEmail ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))] : []),
+        ]
+      : [query(collection(db, 'justifications'), where('tenantId', '==', tenantId))];
+    const unsubJustifications = qJustifications.map((justificationQuery) => onSnapshot(
+      justificationQuery,
       (snapshot) => {
         if (!snapshot.empty) {
           const remoteJustifications: Justification[] = [];
@@ -264,9 +252,9 @@ export function useFirestoreDataSync({
     );
 
     return () => {
-      unsubStudents();
+      unsubStudents.forEach((unsubscribe) => unsubscribe());
       unsubSessions();
-      unsubJustifications();
+      unsubJustifications.forEach((unsubscribe) => unsubscribe());
       unsubNotifications();
       unsubAudit();
     };
