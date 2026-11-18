@@ -57,5 +57,5 @@ export function useParentAttendanceRecords({
     );
 
     return () => unsubscribe();
-  }, [firebaseUser, currentUserRole, currentUserPhone, tenantId, authenticatedPhone]);
+  }, [firebaseUser, firebaseUser?.email, currentUserRole, currentUserPhone, tenantId, authenticatedPhone]);
 }
