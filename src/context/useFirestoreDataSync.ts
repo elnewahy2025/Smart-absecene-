@@ -91,6 +91,7 @@ export function useFirestoreDataSync({
               classId: data.classId || 'class-1a',
               guardianName: data.guardianName || 'ولي أمر معتمد',
               guardianPhone: data.guardianPhone || '',
+              guardianEmail: data.guardianEmail || '',
               guardianRelationship: data.guardianRelationship || '',
               bloodType: data.bloodType || '',
               totalAbsences: data.totalAbsences || 0,
