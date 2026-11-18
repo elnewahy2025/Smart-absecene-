@@ -538,6 +538,15 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
   });
 });
 await expectAllowed('email-only parent reads linked justification', getDoc(doc(emailParentDb, 'justifications', 'just-email')));
+await expectAllowed('email-only parent can submit excuse for linked child', addDoc(collection(emailParentDb, 'justifications'), {
+  tenantId: 'school-1',
+  studentId: 'student-email',
+  guardianEmail: 'email-parent@example.com',
+  absenceDate: '2026-10-11',
+  reasonType: 'family',
+  guardianExplanation: 'Email-only guardian submission',
+  status: 'pending',
+}));
 await expectDenied('parent cannot read another child justification', getDoc(doc(parentDb, 'justifications', 'just2')));
 
 await expectDenied('anonymous cannot read tenant registry', getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'tenants', 'school-1')));
