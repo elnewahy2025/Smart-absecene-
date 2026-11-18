@@ -24,25 +24,41 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Submitted sessions sorted chronologically descending for streak computation
-  const submittedSessionsDesc = useMemo(() => {
-    return sessions
-      .filter((s) => s.status === 'submitted')
-      .sort((a, b) => b.date.localeCompare(a.date));
+  // Submitted sessions grouped by date descending for daily streak computation
+  const submittedDatesDesc = useMemo(() => {
+    const byDate = new Map<string, typeof sessions>();
+    sessions.forEach((s) => {
+      if (s.status !== 'submitted') return;
+      const list = byDate.get(s.date) ?? [];
+      list.push(s);
+      byDate.set(s.date, list);
+    });
+    return Array.from(byDate.entries()).sort(([a], [b]) => b.localeCompare(a));
   }, [sessions]);
 
   // Calculate engagement metrics per student from actual session data
   const engagementList: StudentEngagementMetrics[] = students.map((std) => {
-    // Calculate actual consecutive attended sessions (streak)
+    // Calculate consecutive attended school days (1 point per unique date)
     let streakDays = 0;
-    for (const session of submittedSessionsDesc) {
-      const rec = session.records?.find((r) => r.studentId === std.id);
-      if (rec) {
-        if (rec.status === 'present' || rec.status === 'excused_absence' || rec.status === 'excused_leave') {
-          streakDays += 1;
+    for (const [, daySessions] of submittedDatesDesc) {
+      let hasAttended = false;
+      let hasBreakStatus = false;
+
+      for (const session of daySessions) {
+        const rec = session.records?.find((r) => r.studentId === std.id);
+        if (!rec) continue;
+        if (rec.status === 'present' || rec.status === 'excused_leave') {
+          hasAttended = true;
         } else {
-          break; // Streak ends on unexcused absence or tardiness
+          // Streak ends on absent, excused_absence, or late
+          hasBreakStatus = true;
+          break;
         }
+      }
+
+      if (hasBreakStatus) break;
+      if (hasAttended) {
+        streakDays += 1;
       }
     }
 

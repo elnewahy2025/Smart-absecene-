@@ -36,7 +36,7 @@ export const ReportsView: React.FC = () => {
   } = useAttendance();
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
-  const [reportType, setReportType] = useState<'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical' | 'sessions'>('full');
+  const [reportType, setReportType] = useState<'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical'>('full');
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isBatchPrintModalOpen, setIsBatchPrintModalOpen] = useState(false);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
@@ -45,27 +45,30 @@ export const ReportsView: React.FC = () => {
 
   // Active students only (excluding transferred students from active calculations)
   const activeStudents = students.filter((s) => s.enrollmentStatus !== 'transferred');
+  const classScopedStudents = activeStudents.filter(
+    (s) => selectedClass === 'all' || s.className === selectedClass
+  );
 
   // Filtered dataset
-  const filteredStudents = activeStudents.filter((s) => {
-    if (selectedClass !== 'all' && s.className !== selectedClass) return false;
+  const filteredStudents = classScopedStudents.filter((s) => {
     if (reportType === 'chronic_only') return s.totalAbsences >= 3;
     if (reportType === 'tier2_warning') return s.totalAbsences >= 5 && s.totalAbsences < 8;
     if (reportType === 'tier3_critical') return s.totalAbsences >= 8;
     return true;
   });
 
-  // Calculate overall metrics from active students
+  // Calculate KPI metrics scoped to active students in the selected class
   const totalStudents = activeStudents.length;
+  const scopedCount = classScopedStudents.length;
   const averageAttendanceRate =
-    totalStudents > 0
-      ? (activeStudents.reduce((acc, s) => acc + s.attendanceRate, 0) / totalStudents).toFixed(1)
+    scopedCount > 0
+      ? (classScopedStudents.reduce((acc, s) => acc + s.attendanceRate, 0) / scopedCount).toFixed(1)
       : '100';
 
-  // Chronic absence risk tiers (active students only)
-  const tier3Plus = activeStudents.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5);
-  const tier5Plus = activeStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8);
-  const tier8Plus = activeStudents.filter((s) => s.totalAbsences >= 8);
+  // Chronic absence risk tiers (active students in the selected class)
+  const tier3Plus = classScopedStudents.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5);
+  const tier5Plus = classScopedStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8);
+  const tier8Plus = classScopedStudents.filter((s) => s.totalAbsences >= 8);
 
   // Group by Class (Active students)
   const classBreakdown: Record<string, { total: number; rateSum: number; avgRate: number }> = {};
@@ -82,11 +85,19 @@ export const ReportsView: React.FC = () => {
     item.avgRate = item.total > 0 ? parseFloat((item.rateSum / item.total).toFixed(1)) : 100;
   });
 
+  const filteredAverageRate =
+    filteredStudents.length > 0
+      ? (
+          filteredStudents.reduce((acc, s) => acc + s.attendanceRate, 0) /
+          filteredStudents.length
+        ).toFixed(1)
+      : '100';
+
   // 1. Download formatted Excel Workbook (.xls with native styling & RTL)
   const handleDownloadExcelWorkbook = () => {
     const today = new Date().toISOString().split('T')[0];
     downloadReportFile(
-      buildExcelReportHtml(filteredStudents, currentTenant, averageAttendanceRate, today),
+      buildExcelReportHtml(filteredStudents, currentTenant, filteredAverageRate, today),
       'application/vnd.ms-excel;charset=utf-8;',
       `تقرير_حضور_${currentTenant.code}_${today}.xls`
     );
@@ -106,15 +117,6 @@ export const ReportsView: React.FC = () => {
     setDownloadSuccessMsg('تم تنزيل ملف CSV المعتمد بترميز UTF-8 بنجاح.');
     setTimeout(() => setDownloadSuccessMsg(null), 5000);
   };
-
-
-  const avgRate =
-    filteredStudents.length > 0
-      ? (
-          filteredStudents.reduce((acc, s) => acc + s.attendanceRate, 0) /
-          filteredStudents.length
-        ).toFixed(1)
-      : '100';
 
   return (
     <div className="space-y-6">
@@ -152,7 +154,7 @@ export const ReportsView: React.FC = () => {
                 <option value="all" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                   {lang === 'ar' ? 'جميع الفصول' : 'All Classes'}
                 </option>
-                {Array.from(new Set(students.map((s) => s.className).filter(Boolean)))
+                {Array.from(new Set(activeStudents.map((s) => s.className).filter(Boolean)))
                   .sort()
                   .map((cName) => (
                     <option key={cName} value={cName} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
@@ -166,7 +168,9 @@ export const ReportsView: React.FC = () => {
               <span className="text-slate-500 dark:text-slate-400 font-bold">{lang === 'ar' ? 'نوع الكشف:' : 'Report Type:'}</span>
               <select
                 value={reportType}
-                onChange={(e: any) => setReportType(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setReportType(e.target.value as 'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical')
+                }
                 className="bg-transparent font-bold focus:outline-none cursor-pointer"
                 style={{ color: 'var(--app-text-main)' }}
               >
@@ -175,6 +179,12 @@ export const ReportsView: React.FC = () => {
                 </option>
                 <option value="chronic_only" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                   {lang === 'ar' ? 'حالات الغياب المتكرر والإنذارات فقط' : 'Chronic Absences & Warnings Only'}
+                </option>
+                <option value="tier2_warning" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                  {lang === 'ar' ? 'إنذار مرحلة ثانية (5–7 أيام غياب)' : 'Tier 2 Warning (5–7 Absence Days)'}
+                </option>
+                <option value="tier3_critical" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                  {lang === 'ar' ? 'الحالات الحرجة (8+ أيام غياب)' : 'Critical Cases (8+ Absence Days)'}
                 </option>
               </select>
             </div>
@@ -241,7 +251,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-primary">%{averageAttendanceRate}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({totalStudents} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({scopedCount} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
             <span>{lang === 'ar' ? 'من المستهدف الوزاري 95%' : 'From 95% Target'}</span>
@@ -294,7 +304,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-amber-600 dark:text-amber-400">
-              %{totalStudents > 0 ? ((tier5Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
+              %{scopedCount > 0 ? ((tier5Plus.length / scopedCount) * 100).toFixed(1) : '0.0'}
             </span>
             <span className="text-xs text-amber-700 dark:text-amber-300 font-semibold">({tier5Plus.length} {lang === 'ar' ? 'طالب' : 'students'})</span>
           </div>
@@ -328,7 +338,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-rose-600 dark:text-rose-400">
-              %{totalStudents > 0 ? ((tier8Plus.length / totalStudents) * 100).toFixed(1) : '0.0'}
+              %{scopedCount > 0 ? ((tier8Plus.length / scopedCount) * 100).toFixed(1) : '0.0'}
             </span>
             <span className="text-xs text-rose-700 dark:text-rose-300 font-semibold">({tier8Plus.length} {lang === 'ar' ? 'طالب' : 'students'})</span>
           </div>
@@ -343,12 +353,12 @@ export const ReportsView: React.FC = () => {
 
       {/* Grade-Level Absence Patterns Comparative Analysis (Bar Chart Visualization) */}
       <GradeAbsencePatternsSection
-        students={students}
+        students={activeStudents}
         justifications={justifications}
         lang={lang}
         onFilterByGrade={(gradeName) => {
           // If clicked grade has classes, find first matching class
-          const matchingStudent = students.find((s) => s.grade === gradeName);
+          const matchingStudent = activeStudents.find((s) => s.grade === gradeName);
           if (matchingStudent && selectedClass !== matchingStudent.className) {
             setSelectedClass(matchingStudent.className);
           } else {
@@ -361,7 +371,7 @@ export const ReportsView: React.FC = () => {
       <AbsenceHeatmapCard />
 
       {/* Feature #1: Student Engagement & Gamified Streaks Hub */}
-      <StudentEngagementSection students={students} lang={lang} />
+      <StudentEngagementSection students={activeStudents} lang={lang} />
 
       {/* Class Comparison and Risk Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -415,7 +425,7 @@ export const ReportsView: React.FC = () => {
               <p className="text-[11px] text-slate-500">{lang === 'ar' ? 'حسب لائحة المواظبة وقواعد الإشعار الرسمية' : 'Per the attendance bylaw and official notification rules'}</p>
             </div>
 
-            {students.filter((s) => s.totalAbsences >= 3).length > 0 && (
+            {classScopedStudents.filter((s) => s.totalAbsences >= 3).length > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -444,7 +454,7 @@ export const ReportsView: React.FC = () => {
           )}
 
           <div className="divide-y divide-slate-100 text-xs">
-            {students
+            {classScopedStudents
               .filter((s) => s.totalAbsences >= 3)
               .sort((a, b) => b.totalAbsences - a.totalAbsences)
               .map((s) => {

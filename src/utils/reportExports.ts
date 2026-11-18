@@ -74,7 +74,7 @@ export function buildExcelReportHtml(
           <tr class="summary-card">
             <td colspan="3">إجمالي الطلاب: ${sortedStudents.length}</td>
             <td colspan="4">متوسط الحضور: ${averageAttendanceRate}%</td>
-            <td colspan="3">إنذار 5+ أيام: ${sortedStudents.filter((s) => s.totalAbsences >= 5).length}</td>
+            <td colspan="3">إنذار 5+ أيام: ${sortedStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8).length}</td>
             <td colspan="3">إنذار نهائي 8+ أيام: ${sortedStudents.filter((s) => s.totalAbsences >= 8).length}</td>
           </tr>
           <tr><td colspan="13"></td></tr>

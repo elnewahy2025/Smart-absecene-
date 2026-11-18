@@ -77,8 +77,9 @@ let durableStore: TenantSecretsStore | null = null;
  * Attach a durable store and hydrate the in-memory cache from it. Reads stay
  * synchronous against the cache; writes are written through to the store.
  */
-export async function attachTenantSecretsStore(store: TenantSecretsStore): Promise<void> {
+export async function attachTenantSecretsStore(store: TenantSecretsStore | null): Promise<void> {
   durableStore = store;
+  if (!store) return;
   try {
     const remote = await store.loadAll();
     secretsCache = { ...secretsCache, ...remote };
@@ -137,14 +138,15 @@ export function maskApiKey(plainKey: string): string {
 
 /**
  * Save / Update an AI key for a specific school (Tenant).
+ * Awaits durable storage completion before updating the in-memory cache so
+ * callers never report success when persistence fails.
  */
-export function setTenantApiKey(tenantId: string, plainKey: string, preferredModel?: string): TenantAIConfig {
+export async function setTenantApiKey(tenantId: string, plainKey: string, preferredModel?: string): Promise<TenantAIConfig> {
   const trimmed = plainKey.trim();
   const encrypted = encryptKey(trimmed);
   const maskedKey = maskApiKey(trimmed);
   const updatedAt = new Date().toISOString();
-
-  secretsCache[tenantId] = {
+  const nextPayload: EncryptedPayload = {
     ...encrypted,
     maskedKey,
     updatedAt,
@@ -152,10 +154,10 @@ export function setTenantApiKey(tenantId: string, plainKey: string, preferredMod
   };
 
   if (durableStore) {
-    durableStore
-      .put(tenantId, secretsCache[tenantId])
-      .catch((err) => console.error('[SECURITY] Failed to persist tenant AI key:', err));
+    await durableStore.put(tenantId, nextPayload);
+    secretsCache[tenantId] = nextPayload;
   } else {
+    secretsCache[tenantId] = nextPayload;
     persistSecretsToDisk();
   }
 
@@ -164,7 +166,7 @@ export function setTenantApiKey(tenantId: string, plainKey: string, preferredMod
     hasCustomKey: true,
     maskedKey,
     updatedAt,
-    preferredModel: secretsCache[tenantId].preferredModel,
+    preferredModel: nextPayload.preferredModel,
   };
 }
 
@@ -183,14 +185,13 @@ export function getTenantApiKey(tenantId: string): string | null {
 /**
  * Remove / Clear custom key for a tenant (reverts to system default/fallback).
  */
-export function removeTenantApiKey(tenantId: string): boolean {
+export async function removeTenantApiKey(tenantId: string): Promise<boolean> {
   if (secretsCache[tenantId]) {
-    delete secretsCache[tenantId];
     if (durableStore) {
-      durableStore
-        .remove(tenantId)
-        .catch((err) => console.error('[SECURITY] Failed to remove tenant AI key:', err));
+      await durableStore.remove(tenantId);
+      delete secretsCache[tenantId];
     } else {
+      delete secretsCache[tenantId];
       persistSecretsToDisk();
     }
     return true;

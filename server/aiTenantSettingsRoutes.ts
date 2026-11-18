@@ -63,7 +63,7 @@ export function registerAiTenantSettingsRoutes({
         return res.status(400).json({ error: 'مفتاح Gemini API غير صالح أو قصير جداً.' });
       }
 
-      const savedConfig = setTenantApiKey(tenantId, newKey.trim(), preferredModel);
+      const savedConfig = await setTenantApiKey(tenantId, newKey.trim(), preferredModel);
       console.log(`[TENANT-AI:${tenantId}] Successfully updated and encrypted Gemini API key with AES-256-GCM.`);
 
       res.json({
@@ -78,10 +78,10 @@ export function registerAiTenantSettingsRoutes({
   });
 
   // DELETE /api/tenant/ai-config - Clears custom key (reverts to system trial key / fallback)
-  app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, (req, res) => {
+  app.delete('/api/tenant/ai-config', requireRole(['admin']), requireTenant, async (req, res) => {
     try {
       const tenantId = resolveTargetTenantId(req);
-      removeTenantApiKey(tenantId);
+      await removeTenantApiKey(tenantId);
       console.log(`[TENANT-AI:${tenantId}] Custom Gemini API key removed.`);
 
       res.json({

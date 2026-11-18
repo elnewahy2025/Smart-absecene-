@@ -15,7 +15,7 @@ npx vitest run
 npm run audit
 ```
 
-## Current Test Coverage (69 Suites, 636 Passed Tests)
+## Current Test Coverage (71 Suites, 647 Passed Tests)
 
 The test suite covers full regression verification across roles, tenant isolation, Firestore security rules, server middleware, and component rendering:
 

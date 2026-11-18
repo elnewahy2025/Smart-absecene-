@@ -9,7 +9,7 @@ npm install
 # 2. Run TypeScript lint check (zero errors)
 npm run lint
 
-# 3. Run automated tests (192 tests across 27 suites)
+# 3. Run automated tests
 npm test
 
 # 4. Run local security audit

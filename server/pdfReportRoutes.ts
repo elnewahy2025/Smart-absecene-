@@ -33,6 +33,22 @@ export function getSystemChromePath(): string | undefined {
   return undefined;
 }
 
+// Only the Arabic webfonts and data: documents are reachable from the renderer.
+// External scripts (including cdn.tailwindcss.com), file://, loopback, and
+// internal network targets are aborted.
+export const isAllowedPdfRequest = (url: string): boolean =>
+  url.startsWith('data:') ||
+  url.startsWith('https://fonts.googleapis.com/') ||
+  url.startsWith('https://fonts.gstatic.com/');
+
+const MAX_PDF_HTML_BYTES = 2 * 1024 * 1024;
+
+export function sanitizePdfHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+}
+
 export function registerPdfReportRoutes({ app, authenticateRequest, requireRole, requireTenant }: PdfReportRoutesDeps) {
 
 // Chromium's sandbox is enabled by default. Some container hosts (e.g. hardened
@@ -139,13 +155,6 @@ const escapeHtmlText = (value: unknown, fallback: string): string => {
   }[char] as string));
 };
 
-// Only the print stylesheet, the Arabic webfonts and data: documents are reachable
-// from the renderer. file:// and internal network targets are aborted.
-const isAllowedPdfRequest = (url: string): boolean =>
-  url.startsWith('data:') ||
-  url.startsWith('https://fonts.googleapis.com/') ||
-  url.startsWith('https://fonts.gstatic.com/') ||
-  url.startsWith('https://cdn.tailwindcss.com/');
 /**
  * Native Vector PDF Generator Route with Full Arabic RTL Typography Support.
  * Uses headless Chromium / Puppeteer to guarantee true selectable text,
@@ -173,9 +182,13 @@ app.post(
     const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename } = req.body;
     const safeTitle = escapeHtmlText(title, 'تقرير الحضور والانضباط المدرسي');
 
-    if (!htmlContent) {
+    if (typeof htmlContent !== 'string' || !htmlContent.trim()) {
       return res.status(400).json({ error: 'htmlContent is required' });
     }
+    if (Buffer.byteLength(htmlContent, 'utf8') > MAX_PDF_HTML_BYTES) {
+      return res.status(413).json({ error: 'htmlContent exceeds maximum allowed size (2 MB)' });
+    }
+    const sanitizedHtml = sanitizePdfHtml(htmlContent);
 
     const executablePath = getSystemChromePath();
     const browser = await getSharedPdfBrowser(executablePath);
@@ -195,6 +208,7 @@ app.post(
 
     page.setDefaultTimeout(20000);
     page.setDefaultNavigationTimeout(20000);
+    await page.setJavaScriptEnabled(false);
 
     await page.setRequestInterception(true);
     page.on('request', (request: any) => {
@@ -215,12 +229,12 @@ app.post(
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-          <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page {
               size: A4 portrait;
               margin: 10mm 10mm 12mm 10mm;
             }
+            *, *::before, *::after { box-sizing: border-box; }
             body {
               font-family: 'Cairo', 'Amiri', 'Segoe UI', Tahoma, Arial, sans-serif;
               direction: rtl;
@@ -229,21 +243,53 @@ app.post(
               print-color-adjust: exact !important;
               color: #0f172a;
               background-color: #ffffff;
-              padding: 0;
+              padding: 8px;
               margin: 0;
             }
-            table {
-              border-collapse: collapse;
-              width: 100%;
-            }
-            .break-inside-avoid {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border-color: #e2e8f0; }
+            .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+            .bg-white { background-color: #ffffff; }
+            .bg-slate-50 { background-color: #f8fafc; }
+            .bg-slate-100 { background-color: #f1f5f9; }
+            .text-slate-500 { color: #64748b; }
+            .text-slate-600 { color: #475569; }
+            .text-slate-700 { color: #334155; }
+            .text-slate-800 { color: #1e293b; }
+            .text-slate-900 { color: #0f172a; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .text-left { text-align: left; }
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+            .font-black { font-weight: 900; }
+            .text-xs { font-size: 0.75rem; line-height: 1rem; }
+            .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+            .text-base { font-size: 1rem; line-height: 1.5rem; }
+            .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+            .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+            .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+            .p-2 { padding: 0.5rem; }
+            .p-3 { padding: 0.75rem; }
+            .p-4 { padding: 1rem; }
+            .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+            .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mt-4 { margin-top: 1rem; }
+            .border { border: 1px solid #e2e8f0; }
+            .rounded { border-radius: 0.25rem; }
+            .rounded-lg { border-radius: 0.5rem; }
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .justify-between { justify-content: space-between; }
+            .gap-2 { gap: 0.5rem; }
+            .gap-4 { gap: 1rem; }
+            .w-full { width: 100%; }
           </style>
         </head>
         <body class="p-2 bg-white">
-          ${htmlContent}
+          ${sanitizedHtml}
         </body>
       </html>
     `;

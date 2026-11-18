@@ -143,10 +143,10 @@ describe('isChildOfGuardian', () => {
     ).toBe(true);
   });
 
-  it('rejects unrelated parents', () => {
+  it('rejects unrelated parents even if guardianName or surname matches', () => {
     expect(
       isChildOfGuardian(
-        makeUser({ role: 'parent', phone: '+966500000000', email: 'other@example.com', name: 'أحمد' }),
+        makeUser({ role: 'parent', phone: '+966500000000', email: 'other@example.com', name: 'محمد المطيري' }),
         student
       )
     ).toBe(false);

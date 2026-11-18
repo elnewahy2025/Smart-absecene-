@@ -249,6 +249,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
   });
 
   await setDoc(doc(db, 'attendance_records', 'record1'), {
+    id: 'record1',
     tenantId: 'school-1',
     sessionId: 'draft1',
     studentId: 'student1',
@@ -261,6 +262,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     updatedAt: '2026-10-10T08:00:00.000Z',
   });
   await setDoc(doc(db, 'attendance_records', 'record2'), {
+    id: 'record2',
     tenantId: 'school-1',
     sessionId: 'draft1',
     studentId: 'student2',
@@ -275,6 +277,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
 
   // school-2 mirrors, split across two classes to prove teacher class scope.
   await setDoc(doc(db, 'attendance_records', 'record4'), {
+    id: 'record4',
     tenantId: 'school-2',
     sessionId: 'draft2',
     studentId: 'student3',
@@ -287,6 +290,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     updatedAt: '2026-10-10T08:00:00.000Z',
   });
   await setDoc(doc(db, 'attendance_records', 'record5'), {
+    id: 'record5',
     tenantId: 'school-2',
     sessionId: 'draft2',
     studentId: 'student4',
@@ -454,6 +458,7 @@ await expectAllowed('parent reads own child attendance record', getDoc(doc(paren
 await expectDenied('parent cannot read another child attendance record', getDoc(doc(parentDb, 'attendance_records', 'record2')));
 await expectAllowed('teacher reads attendance records', getDoc(doc(teacherDb, 'attendance_records', 'record1')));
 await expectAllowed('teacher can write an attendance record', setDoc(doc(teacherDb, 'attendance_records', 'record3'), {
+  id: 'record3',
   tenantId: 'school-1',
   sessionId: 'draft1',
   studentId: 'student1',
@@ -639,6 +644,91 @@ await expectAllowed('future access boundary: teacher allowed', getDoc(doc(teache
 
 await setSchool2Subscription({ status: 'active', manuallySuspended: false, accessUntilMs: 0 });
 await expectAllowed('reactivated school: teacher allowed', getDoc(doc(teacher2Db, 'students', 'student3')));
+
+// --- F-03: attendance_records schema & immutability validation --------------
+await expectDenied('attendance_records rejects invalid status on create', setDoc(doc(teacherDb, 'attendance_records', 'record-bad-status'), {
+  id: 'record-bad-status',
+  tenantId: 'school-1',
+  sessionId: 'draft1',
+  studentId: 'student1',
+  date: '2026-10-10',
+  sessionType: 'daily',
+  classId: 'class-1a',
+  className: '10 / أ',
+  status: 'invalid_status',
+}));
+await expectDenied('attendance_records rejects invalid status on update', updateDoc(doc(teacherDb, 'attendance_records', 'record1'), {
+  status: 'invalid_status',
+}));
+await expectDenied('attendance_records rejects missing required fields on create', setDoc(doc(teacherDb, 'attendance_records', 'record-missing-fields'), {
+  id: 'record-missing-fields',
+  tenantId: 'school-1',
+  studentId: 'student1',
+  classId: 'class-1a',
+  status: 'present',
+}));
+await expectDenied('attendance_records rejects studentId tampering on update', updateDoc(doc(adminDb, 'attendance_records', 'record1'), {
+  studentId: 'student2',
+}));
+await expectDenied('attendance_records rejects tenantId tampering on update', updateDoc(doc(adminDb, 'attendance_records', 'record1'), {
+  tenantId: 'school-2',
+}));
+
+// --- F-01 & F-07: Email-only parent (no phone) & guardianUid access ---------
+await testEnv.withSecurityRulesDisabled(async (context) => {
+  const db = context.firestore();
+  await setDoc(doc(db, 'users', 'parent-email-only'), {
+    userId: 'parent-email-only',
+    tenantId: 'school-1',
+    name: 'Email Only Parent',
+    email: 'emailonly@example.com',
+    role: 'parent',
+    phone: '',
+    status: 'active',
+  });
+  await setDoc(doc(db, 'students', 'student-email'), {
+    studentNumber: 'SE1',
+    fullName: 'Email Child',
+    className: '10 / أ',
+    classId: 'class-1a',
+    tenantId: 'school-1',
+    guardianPhone: '',
+    guardianEmail: 'emailonly@example.com',
+  });
+  await setDoc(doc(db, 'attendance_records', 'record-email'), {
+    id: 'record-email',
+    tenantId: 'school-1',
+    sessionId: 'draft1',
+    studentId: 'student-email',
+    guardianPhone: '',
+    guardianEmail: 'emailonly@example.com',
+    date: '2026-10-10',
+    sessionType: 'daily',
+    classId: 'class-1a',
+    className: '10 / أ',
+    status: 'absent',
+  });
+  await setDoc(doc(db, 'justifications', 'just-email'), {
+    tenantId: 'school-1',
+    studentId: 'student-email',
+    guardianPhone: '',
+    guardianEmail: 'emailonly@example.com',
+    studentName: 'Email Child',
+    className: '10 / أ',
+    absenceDate: '2026-10-10',
+    reasonType: 'medical',
+    guardianExplanation: 'Email parent excuse',
+    status: 'pending',
+  });
+});
+
+const emailParentDb = testEnv.authenticatedContext('parent-email-only').firestore();
+await expectAllowed('email-only parent reads own child student doc', getDoc(doc(emailParentDb, 'students', 'student-email')));
+await expectAllowed('email-only parent reads own child attendance record', getDoc(doc(emailParentDb, 'attendance_records', 'record-email')));
+await expectAllowed('email-only parent reads own child justification', getDoc(doc(emailParentDb, 'justifications', 'just-email')));
+await expectDenied('email-only parent cannot read another child student doc', getDoc(doc(emailParentDb, 'students', 'student2')));
+await expectDenied('email-only parent cannot read another child attendance record', getDoc(doc(emailParentDb, 'attendance_records', 'record2')));
+await expectDenied('email-only parent cannot read another child justification', getDoc(doc(emailParentDb, 'justifications', 'just2')));
 
 await testEnv.cleanup();
 

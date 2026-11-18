@@ -69,11 +69,24 @@ export function buildGradeAbsencePatterns(
       const chronicCount = tier2WarningCount + tier3CriticalCount;
       const chronicRate = count > 0 ? parseFloat(((chronicCount / count) * 100).toFixed(1)) : 0;
 
-      // Calculate excuses from justifications
+      // Calculate excuses from justifications (deduplicated per student + absenceDate)
       const studentIdSet = new Set(gStudents.map((s) => s.id));
-      const gradeJustifications = justifications.filter((j) => studentIdSet.has(j.studentId));
-      const approvedExcuses = gradeJustifications.filter((j) => j.status === 'approved').length;
-      const pendingExcuses = gradeJustifications.filter((j) => j.status === 'pending').length;
+      const coveredDays = new Map<string, 'approved' | 'pending'>();
+      justifications.forEach((j) => {
+        if (!studentIdSet.has(j.studentId)) return;
+        if (j.status !== 'approved' && j.status !== 'pending') return;
+        const key = j.absenceDate ? `${j.studentId}::${j.absenceDate}` : `${j.studentId}::${j.id}`;
+        const existing = coveredDays.get(key);
+        if (!existing || j.status === 'approved') {
+          coveredDays.set(key, j.status);
+        }
+      });
+      let approvedExcuses = 0;
+      let pendingExcuses = 0;
+      coveredDays.forEach((status) => {
+        if (status === 'approved') approvedExcuses += 1;
+        else pendingExcuses += 1;
+      });
 
       // Unexcused is total absences minus approved excuses
       const unexcusedCount = Math.max(0, totalAbsenceDays - approvedExcuses);

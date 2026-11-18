@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.21-lightgrey.svg)](https://expressjs.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth-orange.svg)](https://firebase.google.com/)
-[![Tests](https://img.shields.io/badge/Tests-636%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-647%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![Security Audit](https://img.shields.io/badge/Security%20Audit-Zero%20Secrets%20%7C%20Clean-success.svg)](#security-policy)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
@@ -113,7 +113,7 @@ The repository enforces automated quality and security gates:
 # 1. TypeScript type checking (zero errors required)
 npm run lint
 
-# 2. Run the automated Vitest test suite (636 tests across 69 test files)
+# 2. Run the automated Vitest test suite (647 tests across 71 test files)
 npm test
 
 # 3. Security and secret audit scanner

@@ -98,6 +98,21 @@ describe('buildGradeAbsencePatterns', () => {
     expect(grade.documentationRate).toBe(100);
   });
 
+  it('deduplicates multiple justifications for the same student and absenceDate', () => {
+    const students = [makeStudent({ id: 'a', grade: 'G', totalAbsences: 3 })];
+    const justifications = [
+      makeJustification({ id: 'j1', studentId: 'a', absenceDate: '2026-10-01', status: 'pending' }),
+      makeJustification({ id: 'j2', studentId: 'a', absenceDate: '2026-10-01', status: 'approved' }),
+      makeJustification({ id: 'j3', studentId: 'a', absenceDate: '2026-10-02', status: 'pending' }),
+    ];
+
+    const [grade] = buildGradeAbsencePatterns(students, justifications, 'en');
+    expect(grade.excusedCount).toBe(1);
+    expect(grade.pendingCount).toBe(1);
+    expect(grade.unexcusedCount).toBe(2);
+    expect(grade.documentationRate).toBe(67);
+  });
+
   it('falls back to a localized label when the grade is missing', () => {
     const students = [makeStudent({ id: 'a', grade: undefined, className: '' })];
 

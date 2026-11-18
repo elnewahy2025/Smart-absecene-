@@ -11,12 +11,12 @@ steps that remain need **your** Google account, because they create secrets only
 
 ## Step 0 — Vercel (recommended)
 
-`vercel.json`, `api/[...path].ts` and serverless Chromium support are already committed, so
+`vercel.json`, `api/handler.ts` and serverless Chromium support are already committed, so
 Vercel needs no code changes.
 
 1. Sign up at <https://vercel.com/signup> with GitHub (Hobby needs no credit card).
 2. **Add New → Project** → import `elnewahy2025/Smart-absecene-`. Vercel reads `vercel.json`:
-   build `npm run build`, output `dist`, function `api/[...path].ts`.
+   build `npm run build`, output `dist`, function `api/handler.ts` (`/api/:path*` → `/api/handler?__apipath=...`).
 3. Add the environment variables from `.env.production`, plus these two:
    - `PUPPETEER_SKIP_DOWNLOAD=1` — build-time only; stops Chromium downloading during install.
    - `TRUST_PROXY=1` — Vercel proxies every request.

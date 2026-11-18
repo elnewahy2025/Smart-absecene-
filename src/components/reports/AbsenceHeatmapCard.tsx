@@ -45,10 +45,15 @@ export const AbsenceHeatmapCard: React.FC = () => {
     });
 
     sessions.forEach((s) => {
+      if (s.status !== 'submitted') return;
+      if (s.sessionType === 'daily' || !s.periodNumber || s.periodNumber < 1 || s.periodNumber > 7) return;
       if (selectedClass !== 'all' && s.className !== selectedClass) return;
-      const d = new Date(s.date);
+
+      const dateStr = s.date.includes('T') ? s.date : `${s.date}T12:00:00`;
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return;
       const dayIdx = d.getDay(); // 0 is Sunday
-      const periodNum = s.periodNumber || 1;
+      const periodNum = s.periodNumber;
 
       if (grid[`${dayIdx}-${periodNum}`]) {
         s.records.forEach((rec) => {
@@ -70,7 +75,14 @@ export const AbsenceHeatmapCard: React.FC = () => {
     return 'bg-rose-500 text-white border-rose-600 font-bold hover:bg-rose-600';
   };
 
-  const classNames = Array.from(new Set(students.map((s) => s.className).filter(Boolean))).sort();
+  const classNames = Array.from(
+    new Set(
+      students
+        .filter((s) => s.enrollmentStatus !== 'transferred')
+        .map((s) => s.className)
+        .filter(Boolean)
+    )
+  ).sort();
 
   return (
     <div

@@ -91,7 +91,7 @@ describe('buildExcelReportHtml', () => {
     );
     expect(html).toContain('إجمالي الطلاب: 3');
     expect(html).toContain('متوسط الحضور: 88.3%');
-    expect(html).toContain('إنذار 5+ أيام: 2');
+    expect(html).toContain('إنذار 5+ أيام: 1');
     expect(html).toContain('إنذار نهائي 8+ أيام: 1');
   });
 

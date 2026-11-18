@@ -57,57 +57,68 @@ export function useFirestoreDataSync({
     const parentProfile = isParentUser
       ? allUsers.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
       : undefined;
-    const parentPhone = authenticatedPhone || parentProfile?.phone;
+    const parentPhone = authenticatedPhone || parentProfile?.phone || '';
+    const parentEmail = (firebaseUser.email || parentProfile?.email || '').trim().toLowerCase();
 
-    // Authorization barrier: parents must only query records matching their own guardian phone.
-    // If the phone has not resolved yet, defer query attachment until the next render cycle.
-    if (isParentUser && !parentPhone) {
+    // Authorization barrier: parents must only query records matching their own verified phone or email.
+    if (isParentUser && !parentPhone && !parentEmail) {
       return;
     }
 
     // 1. Students sync
-    const qStudents = isParentUser
-      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
-      : query(collection(db, 'students'), where('tenantId', '==', tenantId));
-    const unsubStudents = onSnapshot(
-      qStudents,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteStudents: Student[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            remoteStudents.push({
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              studentNumber: data.studentNumber || '',
-              nationalId: data.nationalId || '',
-              fullName: data.fullName || '',
-              grade: data.grade || 'الصف العاشر',
-              className: data.className || '',
-              classId: data.classId || 'class-1a',
-              guardianName: data.guardianName || 'ولي أمر معتمد',
-              guardianPhone: data.guardianPhone || '',
-              guardianRelationship: data.guardianRelationship || '',
-              bloodType: data.bloodType || '',
-              totalAbsences: data.totalAbsences || 0,
-              totalLates: data.totalLates || 0,
-              attendanceRate: data.attendanceRate || 100,
+    const studentQueries = isParentUser
+      ? [
+          ...(parentPhone
+            ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))]
+            : []),
+          ...(parentEmail
+            ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))]
+            : []),
+        ]
+      : [query(collection(db, 'students'), where('tenantId', '==', tenantId))];
+    const unsubStudentsList = studentQueries.map((qStudents) =>
+      onSnapshot(
+        qStudents,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const remoteStudents: Student[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              remoteStudents.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                studentNumber: data.studentNumber || '',
+                nationalId: data.nationalId || '',
+                fullName: data.fullName || '',
+                grade: data.grade || 'الصف العاشر',
+                className: data.className || '',
+                classId: data.classId || 'class-1a',
+                guardianName: data.guardianName || 'ولي أمر معتمد',
+                guardianPhone: data.guardianPhone || '',
+                guardianEmail: data.guardianEmail || '',
+                guardianRelationship: data.guardianRelationship || '',
+                bloodType: data.bloodType || '',
+                totalAbsences: data.totalAbsences || 0,
+                totalLates: data.totalLates || 0,
+                attendanceRate: data.attendanceRate || 100,
+              });
             });
-          });
-          if (remoteStudents.length > 0) {
-            setAllStudents((prev) => {
-              const map = new Map<string, Student>();
-              prev.forEach((s) => map.set(s.id, s));
-              remoteStudents.forEach((s) => map.set(s.id, s));
-              return Array.from(map.values());
-            });
+            if (remoteStudents.length > 0) {
+              setAllStudents((prev) => {
+                const map = new Map<string, Student>();
+                prev.forEach((s) => map.set(s.id, s));
+                remoteStudents.forEach((s) => map.set(s.id, s));
+                return Array.from(map.values());
+              });
+            }
           }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, 'students');
         }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, 'students');
-      }
+      )
     );
+    const unsubStudents = () => unsubStudentsList.forEach((unsub) => unsub());
 
     // 2. Attendance Sessions sync
     const qSessions = query(collection(db, 'attendance_sessions'), where('tenantId', '==', tenantId));
@@ -154,38 +165,52 @@ export function useFirestoreDataSync({
     );
 
     // 3. Justifications sync
-    const qJustifications = isParentUser
-      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
-      : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
-    const unsubJustifications = onSnapshot(
-      qJustifications,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteJustifications: Justification[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as Justification;
-            remoteJustifications.push({ ...data, id: docSnap.id });
-          });
-          if (remoteJustifications.length > 0) {
-            setAllJustifications((prev) => {
-              const map = new Map<string, Justification>();
-              prev.forEach((j) => map.set(j.id, j));
-              remoteJustifications.forEach((j) => map.set(j.id, j));
-              return Array.from(map.values());
+    const justificationQueries = isParentUser
+      ? [
+          ...(parentPhone
+            ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))]
+            : []),
+          ...(parentEmail
+            ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))]
+            : []),
+        ]
+      : [query(collection(db, 'justifications'), where('tenantId', '==', tenantId))];
+    const unsubJustificationsList = justificationQueries.map((qJustifications) =>
+      onSnapshot(
+        qJustifications,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const remoteJustifications: Justification[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as Justification;
+              remoteJustifications.push({ ...data, id: docSnap.id });
             });
+            if (remoteJustifications.length > 0) {
+              setAllJustifications((prev) => {
+                const map = new Map<string, Justification>();
+                prev.forEach((j) => map.set(j.id, j));
+                remoteJustifications.forEach((j) => map.set(j.id, j));
+                return Array.from(map.values());
+              });
+            }
           }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, 'justifications');
         }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, 'justifications');
-      }
+      )
     );
+    const unsubJustifications = () => unsubJustificationsList.forEach((unsub) => unsub());
 
     // 4. Notification outbox sync
     const qNotifications = isParentUser
-      ? query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId), where('recipientPhone', '==', parentPhone))
+      ? parentPhone
+        ? query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId), where('recipientPhone', '==', parentPhone))
+        : null
       : query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId));
-    const unsubNotifications = onSnapshot(
+    const unsubNotifications = !qNotifications
+      ? () => {}
+      : onSnapshot(
       qNotifications,
       (snapshot) => {
         if (!snapshot.empty) {

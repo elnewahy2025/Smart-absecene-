@@ -71,6 +71,23 @@ service cloud.firestore {
              (!('presentCount' in data) || data.presentCount is number);
     }
 
+    function isValidAttendanceRecord(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'sessionId', 'studentId', 'date', 'sessionType', 'className', 'status']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 200 &&
+             data.tenantId is string && data.tenantId.size() > 0 && data.tenantId.size() <= 50 &&
+             data.sessionId is string && data.sessionId.size() > 0 && data.sessionId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() > 0 && data.studentId.size() <= 128 &&
+             data.date is string && data.date.size() > 0 && data.date.size() <= 30 &&
+             data.sessionType in ['daily', 'period'] &&
+             data.className is string && data.className.size() <= 30 &&
+             data.status in ['present', 'absent', 'late', 'excused_absence', 'excused_leave'] &&
+             (!('guardianPhone' in data) || (data.guardianPhone is string && data.guardianPhone.size() <= 30)) &&
+             (!('guardianEmail' in data) || (data.guardianEmail is string && data.guardianEmail.size() <= 120)) &&
+             (!('guardianUid' in data) || (data.guardianUid is string && data.guardianUid.size() <= 128)) &&
+             (!('minutesLate' in data) || (data.minutesLate is number && data.minutesLate >= 0 && data.minutesLate <= 600)) &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 500));
+    }
+
     function isValidJustification(data) {
       return data.keys().hasAll(['tenantId', 'studentId', 'absenceDate', 'reasonType', 'guardianExplanation', 'status']) &&
              data.tenantId is string && data.tenantId.size() <= 50 &&
@@ -157,7 +174,7 @@ service cloud.firestore {
     }
 
     // A parent may only file an excuse for a student who is actually their
-    // child in the same tenant (phone or email on the student record).
+    // child in the same tenant (phone, email, or guardianUid on the student record).
     function isGuardianOfStudentInTenant(studentId, tenantId) {
       return exists(/databases/$(database)/documents/students/$(studentId))
         && get(/databases/$(database)/documents/students/$(studentId)).data.tenantId == tenantId
@@ -166,6 +183,8 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianPhone', '') == getUserData().get('phone', ''))
           || (get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianEmail', '') != ''
             && get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianEmail', '') == getUserData().get('email', ''))
+          || (get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianUid', '') != ''
+            && get(/databases/$(database)/documents/students/$(studentId)).data.get('guardianUid', '') == request.auth.uid)
         );
     }
 
@@ -233,6 +252,7 @@ service cloud.firestore {
             (getUserData().role == 'parent' && (
               (resource.data.get('guardianPhone', '') != '' && resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
               (resource.data.get('guardianEmail', '') != '' && resource.data.get('guardianEmail', '') == getUserData().get('email', '')) ||
+              (resource.data.get('guardianUid', '') != '' && resource.data.get('guardianUid', '') == request.auth.uid) ||
               ('id' in resource.data && resource.data.id == request.auth.uid)
             ))
           )
@@ -278,14 +298,22 @@ service cloud.firestore {
         isAdmin() || (
           hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
-            (getUserData().role == 'parent' &&
-              resource.data.get('guardianPhone', '') != '' &&
-              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
+            (getUserData().role == 'parent' && (
+              (resource.data.get('guardianPhone', '') != '' && resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
+              (resource.data.get('guardianEmail', '') != '' && resource.data.get('guardianEmail', '') == getUserData().get('email', '')) ||
+              (resource.data.get('guardianUid', '') != '' && resource.data.get('guardianUid', '') == request.auth.uid)
+            ))
           )
         )
       );
-      allow create: if isSignedIn() && isTeacherAssigned(request.resource.data);
-      allow update: if isSignedIn() && isTeacherAssigned(resource.data) && isTeacherAssigned(request.resource.data);
+      allow create: if isSignedIn() && isValidId(recordId) && isValidAttendanceRecord(incoming()) &&
+                    isTeacherAssigned(incoming());
+      allow update: if isSignedIn() && isValidId(recordId) && isValidAttendanceRecord(incoming()) &&
+                    incoming().tenantId == existing().tenantId &&
+                    incoming().sessionId == existing().sessionId &&
+                    incoming().studentId == existing().studentId &&
+                    incoming().get('classId', '') == existing().get('classId', '') &&
+                    isTeacherAssigned(existing());
       allow delete: if isSignedIn() && isTenantRole(resource.data.tenantId, ['admin']);
     }
     // 5. Justifications & Medical Excuses Collection
@@ -295,9 +323,11 @@ service cloud.firestore {
           hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             ('studentId' in resource.data && resource.data.studentId == request.auth.uid) ||
-            (getUserData().role == 'parent' &&
-              resource.data.get('guardianPhone', '') != '' &&
-              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
+            (getUserData().role == 'parent' && (
+              (resource.data.get('guardianPhone', '') != '' && resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
+              (resource.data.get('guardianEmail', '') != '' && resource.data.get('guardianEmail', '') == getUserData().get('email', '')) ||
+              (resource.data.get('guardianUid', '') != '' && resource.data.get('guardianUid', '') == request.auth.uid)
+            ))
           )
         )
       );

@@ -52,22 +52,16 @@ export function canEditSession({
   return false;
 }
 
-/** A student belongs to a parent when phone, email, or name matches. */
+/** A student belongs to a parent when guardianUid, verified phone, or email matches. */
 export function isChildOfGuardian(user: UserProfile, student: Student): boolean {
   if (user.role !== 'parent') return true;
+  const guardianUid = (student as Student & { guardianUid?: string }).guardianUid;
+  if (guardianUid && user.id && guardianUid === user.id) return true;
   const cleanUserPhone = (user.phone || '').replace(/[^\d]/g, '');
   const cleanGuardianPhone = (student.guardianPhone || '').replace(/[^\d]/g, '');
   if (cleanUserPhone && cleanGuardianPhone && cleanUserPhone === cleanGuardianPhone) return true;
   if (user.email && student.guardianEmail && user.email.toLowerCase() === student.guardianEmail.toLowerCase()) {
     return true;
-  }
-  if (user.name && student.guardianName) {
-    const userName = user.name.trim();
-    const guardianName = student.guardianName.trim();
-    if (guardianName === userName) return true;
-    // Legacy surname aliases retained for continuity with existing guardian records.
-    if (userName.includes('المطيري') && guardianName.includes('المطيري')) return true;
-    if (userName.includes('الصاعدي') && guardianName.includes('الصاعدي')) return true;
   }
   return false;
 }

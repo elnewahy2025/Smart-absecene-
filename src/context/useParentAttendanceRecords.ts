@@ -28,25 +28,39 @@ export function useParentAttendanceRecords({
       return;
     }
     const phone = authenticatedPhone || currentUserPhone;
-    if (!phone) return;
+    const email = (firebaseUser.email || '').trim().toLowerCase();
+    if (!phone && !email) return;
 
-    const recordsQuery = query(
-      collection(db, 'attendance_records'),
-      where('tenantId', '==', tenantId),
-      where('guardianPhone', '==', phone)
-    );
-    const unsubscribe = onSnapshot(
-      recordsQuery,
-      (snapshot) => {
-        const rows: StudentAttendanceRecord[] = [];
-        snapshot.forEach((docSnap) => {
-          rows.push({ ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id });
-        });
-        setParentAttendanceRecords(rows.filter((row) => row.tenantId === tenantId));
-      },
-      (error) => console.error('[PARENT] Could not load attendance records:', error?.code)
-    );
+    const mergedById = new Map<string, StudentAttendanceRecord>();
+    const unsubscribes: Array<() => void> = [];
 
-    return () => unsubscribe();
+    const attachQuery = (field: 'guardianPhone' | 'guardianEmail', value: string) => {
+      const recordsQuery = query(
+        collection(db, 'attendance_records'),
+        where('tenantId', '==', tenantId),
+        where(field, '==', value)
+      );
+      const unsub = onSnapshot(
+        recordsQuery,
+        (snapshot) => {
+          snapshot.forEach((docSnap) => {
+            const row = { ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id };
+            if (row.tenantId === tenantId) {
+              mergedById.set(docSnap.id, row);
+            }
+          });
+          setParentAttendanceRecords(Array.from(mergedById.values()));
+        },
+        (error) => console.error('[PARENT] Could not load attendance records:', error?.code)
+      );
+      unsubscribes.push(unsub);
+    };
+
+    if (phone) attachQuery('guardianPhone', phone);
+    if (email) attachQuery('guardianEmail', email);
+
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
   }, [firebaseUser, currentUserRole, currentUserPhone, tenantId, authenticatedPhone]);
 }
