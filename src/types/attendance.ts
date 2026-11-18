@@ -152,6 +152,7 @@ export interface StudentAttendanceRecord {
   sessionId: string;
   studentId: string;
   guardianPhone: string;
+  guardianEmail?: string;
   date: string;
   sessionType: 'daily' | 'period';
   periodNumber?: number;
@@ -169,6 +170,7 @@ export interface Justification {
   tenantId: string;
   studentId: string;
   guardianPhone?: string;
+  guardianEmail?: string;
   studentName: string;
   className: string;
   absenceDate: string;
