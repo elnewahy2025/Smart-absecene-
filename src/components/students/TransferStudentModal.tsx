@@ -123,7 +123,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
               required
               value={destinationSchool}
               onChange={(e) => setDestinationSchool(e.target.value)}
-              placeholder={isAr ? 'مثال: ثانوية الملك فهد، مدارس الرواد الأهلية...' : 'e.g. King Fahd High School'}
+              placeholder={isAr ? 'أدخل اسم المدرسة المنقول إليها الطالب...' : 'Enter destination school name...'}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-xs"
             />
           </div>

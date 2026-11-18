@@ -147,7 +147,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder={isAr ? 'مثال: عبد الله بن محمد العنزي' : 'e.g. Abdullah Mohammed'}
+              placeholder={isAr ? 'أدخل اسم الطالب الرباعي...' : 'Enter student full name...'}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-xs"
             />
           </div>

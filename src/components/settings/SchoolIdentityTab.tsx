@@ -58,7 +58,7 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
             value={profile.schoolName}
             onChange={(e) => onChange({ schoolName: e.target.value })}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={lang === 'ar' ? 'مثال: ثانوية الأندلس الأهلية للبنين' : 'Example: Andalus Private Secondary School for Boys'}
+            placeholder={lang === 'ar' ? 'أدخل اسم المدرسة الرسمي...' : 'Enter official school name...'}
           />
         </div>
 
@@ -70,7 +70,7 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
             value={profile.schoolCode}
             onChange={(e) => onChange({ schoolCode: e.target.value })}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500"
-            placeholder={lang === 'ar' ? 'مثال: ANDALUS-SEC-101' : 'Example: ANDALUS-SEC-101'}
+            placeholder={lang === 'ar' ? 'أدخل الكود أو الرقم الإحصائي للمدرسة...' : 'Enter school code or ministry number...'}
           />
         </div>
 

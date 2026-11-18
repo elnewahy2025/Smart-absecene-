@@ -164,7 +164,7 @@ export const UserEditModal: React.FC<Props> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} autoComplete="off" className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
           {/* Basic Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -172,9 +172,10 @@ export const UserEditModal: React.FC<Props> = ({
               <input
                 type="text"
                 required
+                autoComplete="off"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={lang === 'ar' ? 'أ. محمد أحمد الغامدي' : 'Mr. Mohammed Ahmed Al-Ghamdi'}
+                placeholder={lang === 'ar' ? 'أدخل الاسم الكامل...' : 'Enter full name...'}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>
@@ -183,9 +184,10 @@ export const UserEditModal: React.FC<Props> = ({
               <label className="font-semibold text-slate-700">{lang === 'ar' ? 'المسمى الوظيفي:' : 'Job Title:'}</label>
               <input
                 type="text"
+                autoComplete="off"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                placeholder={lang === 'ar' ? 'معلم أول / موجه طلابي' : 'Senior Teacher / Student Counselor'}
+                placeholder={lang === 'ar' ? 'أدخل المسمى الوظيفي (مثال: معلم / وكيل)...' : 'Enter job title (e.g. Teacher / Counselor)...'}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>
@@ -195,9 +197,10 @@ export const UserEditModal: React.FC<Props> = ({
               <input
                 type="email"
                 required
+                autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={`teacher@school${domainSuffix}`}
+                placeholder={lang === 'ar' ? `أدخل البريد الإلكتروني (name@school${domainSuffix})` : `Enter email (name@school${domainSuffix})`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>
@@ -210,9 +213,11 @@ export const UserEditModal: React.FC<Props> = ({
               </label>
               <input
                 type="tel"
+                name="user-phone"
+                autoComplete="new-password"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder={`${dialCode}${localPhoneExample}`}
+                placeholder={lang === 'ar' ? `أدخل رقم الهاتف (${dialCode}${localPhoneExample})` : `Enter phone number (${dialCode}${localPhoneExample})`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               />
             </div>

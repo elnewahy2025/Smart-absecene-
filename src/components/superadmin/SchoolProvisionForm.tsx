@@ -324,7 +324,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 required
                 value={principalName}
                 onChange={(e) => setPrincipalName(e.target.value)}
-                placeholder="أ. عبد العزيز بن إبراهيم السعدي"
+                placeholder="أدخل الاسم الكامل لمدير المدرسة..."
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
               />
             </div>

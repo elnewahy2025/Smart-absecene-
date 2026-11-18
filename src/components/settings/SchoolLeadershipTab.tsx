@@ -54,7 +54,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.principalName || ''}
               onChange={(e) => handleLeadershipChange('principalName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder={lang === 'ar' ? 'أ. عبد الرحمن السعدي' : 'Mr. Abdulrahman Al-Saadi'}
+              placeholder={lang === 'ar' ? 'أدخل اسم مدير المدرسة...' : 'Enter principal full name...'}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -100,7 +100,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.vicePrincipalStudentAffairsName || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalStudentAffairsName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder={lang === 'ar' ? 'أ. فهد بن إبراهيم المنصور' : 'Mr. Fahd bin Ibrahim Al-Mansour'}
+              placeholder={lang === 'ar' ? 'أدخل اسم وكيل شؤون الطلبة...' : 'Enter student affairs vice principal name...'}
             />
           </div>
           <div>
@@ -133,7 +133,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.vicePrincipalAcademicAffairsName || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalAcademicAffairsName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder={lang === 'ar' ? 'أ. سلطان بن خالد القحطاني' : 'Mr. Sultan bin Khalid Al-Qahtani'}
+              placeholder={lang === 'ar' ? 'أدخل اسم وكيل الشؤون التعليمية...' : 'Enter academic affairs vice principal name...'}
             />
           </div>
           <div>
@@ -166,7 +166,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.socialWorkerName || ''}
               onChange={(e) => handleLeadershipChange('socialWorkerName', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900"
-              placeholder={lang === 'ar' ? 'أ. ماجد بن عبد العزيز التميمي' : 'Mr. Majed bin Abdulaziz Al-Tamimi'}
+              placeholder={lang === 'ar' ? 'أدخل اسم الأخصائي الاجتماعي / الموجه...' : 'Enter social worker / counselor name...'}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">

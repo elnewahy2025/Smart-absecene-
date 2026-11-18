@@ -68,7 +68,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
         <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
         <input
           type="text"
-          placeholder={lang === 'ar' ? 'بحث باسم الطالب أو السجل...' : 'Search student...'}
+          placeholder={lang === 'ar' ? 'بحث باسم الطالب أو الرقم...' : 'Search student...'}
           value={searchStudent}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-9 pl-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
