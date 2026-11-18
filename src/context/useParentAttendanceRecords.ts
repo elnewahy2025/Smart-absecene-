@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { collection, onSnapshot, or, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { StudentAttendanceRecord, UserRole } from '../types/attendance';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -34,32 +34,38 @@ export function useParentAttendanceRecords({
       return;
     }
 
-    const recordsQuery = phone && email
-      ? query(
-          collection(db, 'attendance_records'),
-          where('tenantId', '==', tenantId),
-          or(
-            where('guardianPhone', '==', phone),
-            where('guardianEmail', '==', email)
-          )
-        )
-      : query(
-          collection(db, 'attendance_records'),
-          where('tenantId', '==', tenantId),
-          where(phone ? 'guardianPhone' : 'guardianEmail', '==', phone || email)
-        );
-    const unsubscribe = onSnapshot(
+    const recordsQueries = [
+      ...(phone ? [query(
+        collection(db, 'attendance_records'),
+        where('tenantId', '==', tenantId),
+        where('guardianPhone', '==', phone)
+      )] : []),
+      ...(email ? [query(
+        collection(db, 'attendance_records'),
+        where('tenantId', '==', tenantId),
+        where('guardianEmail', '==', email)
+      )] : []),
+    ];
+    // Firestore v10's TypeScript declarations do not expose OR filters as
+    // QueryConstraint. Subscribe to each indexed equality query and merge by ID.
+    const queryResults = new Map<number, Map<string, StudentAttendanceRecord>>();
+    const unsubscribes = recordsQueries.map((recordsQuery, index) => onSnapshot(
       recordsQuery,
       (snapshot) => {
-        const rows: StudentAttendanceRecord[] = [];
+        const rows = new Map<string, StudentAttendanceRecord>();
         snapshot.forEach((docSnap) => {
-          rows.push({ ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id });
+          rows.set(docSnap.id, { ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id });
         });
-        setParentAttendanceRecords(rows.filter((row) => row.tenantId === tenantId));
+        queryResults.set(index, rows);
+        const merged = new Map<string, StudentAttendanceRecord>();
+        queryResults.forEach((resultRows) => resultRows.forEach((row, id) => merged.set(id, row)));
+        setParentAttendanceRecords(
+          Array.from(merged.values()).filter((row) => row.tenantId === tenantId)
+        );
       },
       (error) => console.error('[PARENT] Could not load attendance records:', error?.code)
-    );
+    ));
 
-    return () => unsubscribe();
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
   }, [firebaseUser, firebaseUser?.email, currentUserRole, currentUserPhone, tenantId, authenticatedPhone]);
 }
