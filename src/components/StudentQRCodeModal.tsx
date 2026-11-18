@@ -15,6 +15,7 @@ import {
   Scan,
 } from 'lucide-react';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
+import { getCountryIdentitySpec } from '../config/countryPresets';
 
 interface StudentQRCodeModalProps {
   student: Student;
@@ -146,7 +147,7 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
 
     ctx.fillStyle = '#475569';
     ctx.font = '16px Cairo, sans-serif';
-    ctx.fillText(`الرقم المدرسي: ${student.studentNumber} | السجل المدني: ${student.nationalId}`, 300, 345);
+    ctx.fillText(`الرقم المدرسي: ${student.studentNumber} | ${getCountryIdentitySpec(schoolProfile.address?.country).nationalIdLabelAr}: ${student.nationalId}`, 300, 345);
 
     // Draw QR Code onto canvas
     if (canvasRef.current) {
@@ -268,7 +269,7 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
                 <span className="font-mono">رقم الطالب: {student.studentNumber}</span>
               </div>
               <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                السجل المدني: {student.nationalId}
+                {getCountryIdentitySpec(schoolProfile.address?.country).nationalIdLabelAr}: {student.nationalId}
               </div>
             </div>
 

@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Student } from '../../types/attendance';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
+import { useAttendance } from '../../context/AttendanceContext';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface DeleteStudentConfirmationModalProps {
   isOpen: boolean;
@@ -19,6 +21,8 @@ export const DeleteStudentConfirmationModal: React.FC<DeleteStudentConfirmationM
   lang,
 }) => {
   const isAr = lang === 'ar';
+  const { schoolProfile } = useAttendance();
+  const idLabelAr = getCountryIdentitySpec(schoolProfile?.address?.country).nationalIdLabelAr;
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -73,7 +77,7 @@ export const DeleteStudentConfirmationModal: React.FC<DeleteStudentConfirmationM
               <p className="font-bold">{isAr ? 'تحذير: هذا الإجراء نهائي وغير قابل للتراجع!' : 'Warning: This action is permanent!'}</p>
               <p className="text-[11px] text-red-700 leading-relaxed">
                 {isAr
-                  ? `سيتم حذف سجل الطالب (${student.fullName}) ذو السجل المدني (${student.nationalId}) وجميع بيانات قيده من قاعدة البيانات المدرسية.`
+                  ? `سيتم حذف سجل الطالب (${student.fullName}) ذو ${idLabelAr} (${student.nationalId}) وجميع بيانات قيده من قاعدة البيانات المدرسية.`
                   : `Student record (${student.fullName}) will be permanently wiped.`}
               </p>
             </div>

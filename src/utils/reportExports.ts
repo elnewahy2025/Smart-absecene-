@@ -1,11 +1,13 @@
 import type { Student, Tenant } from '../types/attendance';
+import { getCountryIdentitySpec } from '../config/countryPresets';
 
 // Excel-compatible HTML workbook (RTL, styled) for the filtered student list.
 export function buildExcelReportHtml(
   students: Student[],
   tenant: Pick<Tenant, 'name' | 'academicYear' | 'currentTerm'>,
   averageAttendanceRate: string,
-  date: string
+  date: string,
+  nationalIdLabel: string = getCountryIdentitySpec().nationalIdLabelAr
 ): string {
 
     const sortedStudents = [...students].sort((a, b) => b.totalAbsences - a.totalAbsences);
@@ -81,7 +83,7 @@ export function buildExcelReportHtml(
               <th>#</th>
               <th>الرقم المدرسي</th>
               <th>اسم الطالب</th>
-              <th>السجل المدني</th>
+              <th>${nationalIdLabel}</th>
               <th>المرحلة</th>
               <th>الفصل</th>
               <th>أيام الغياب</th>
@@ -105,11 +107,14 @@ export function buildExcelReportHtml(
 }
 
 // CSV export (UTF-8 BOM) for the filtered student list.
-export function buildCsvReport(students: Student[]): string {
+export function buildCsvReport(
+  students: Student[],
+  nationalIdLabel: string = getCountryIdentitySpec().nationalIdLabelAr
+): string {
     const headers = [
       'الرقم المدرسي',
       'اسم الطالب',
-      'السجل المدني',
+      nationalIdLabel,
       'المرحلة',
       'الفصل',
       'إجمالي الغياب',

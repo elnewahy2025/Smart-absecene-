@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Student } from '../../types/attendance';
 import { ArrowRightLeft, X, AlertCircle, Check } from 'lucide-react';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
+import { useAttendance } from '../../context/AttendanceContext';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface TransferStudentModalProps {
   isOpen: boolean;
@@ -19,6 +21,8 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   lang,
 }) => {
   const isAr = lang === 'ar';
+  const { schoolProfile } = useAttendance();
+  const idSpec = getCountryIdentitySpec(schoolProfile?.address?.country);
   const [destinationSchool, setDestinationSchool] = useState('');
   const [reason, setReason] = useState('انتقال سكن ولي الأمر إلى حي/مدينة أخرى');
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +91,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
         <div className="my-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
           <div className="font-bold text-slate-900 text-xs">{student.fullName}</div>
           <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
-            <span>{isAr ? 'السجل المدني:' : 'National ID:'} {student.nationalId}</span>
+            <span>{isAr ? `${idSpec.nationalIdLabelAr}:` : `${idSpec.nationalIdLabelEn}:`} {student.nationalId}</span>
             <span>·</span>
             <span>{isAr ? 'الفصل:' : 'Class:'} {student.className}</span>
           </div>

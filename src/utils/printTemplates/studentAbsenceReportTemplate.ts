@@ -1,4 +1,5 @@
 import { Student, StudentBehaviourIncident, TenantSchoolProfile } from '../../types/attendance';
+import { getCountryIdentitySpec, getCountryPreset } from '../../config/countryPresets';
 
 export interface AbsenceAnalysisRecord {
   date: string;
@@ -42,7 +43,9 @@ export interface StudentAbsenceReportParams {
 export function generateStudentAbsenceReportHtml(params: StudentAbsenceReportParams): string {
   const { student, schoolProfile, activeDateRange, analysis, infractions = [] } = params;
 
-  const ministryHeader = schoolProfile?.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم';
+  const country = schoolProfile?.address?.country;
+  const ministryHeader = schoolProfile?.ministryHeaderAr || getCountryPreset(country).ministryHeaderAr;
+  const idLabelAr = getCountryIdentitySpec(country).nationalIdLabelAr;
   const schoolName = schoolProfile?.schoolName || 'المدرسة';
   const schoolCode = schoolProfile?.schoolCode || '—';
   const directorate = schoolProfile?.directorateAr || '';
@@ -167,7 +170,7 @@ export function generateStudentAbsenceReportHtml(params: StudentAbsenceReportPar
           <span style="font-size: 11px; color: #64748b;">اسم الطالب: </span>
           <strong style="font-size: 15px; color: #0f172a;">${student.fullName}</strong>
           <span style="margin: 0 8px; color: #cbd5e1;">|</span>
-          <span style="font-size: 11px; color: #64748b;">رقم السجل المدني: </span>
+          <span style="font-size: 11px; color: #64748b;">${idLabelAr}: </span>
           <strong style="font-size: 13px; font-family: monospace;">${student.nationalId || '—'}</strong>
         </div>
         <div>

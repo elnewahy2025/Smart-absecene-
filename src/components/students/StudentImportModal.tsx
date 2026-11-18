@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Student, TenantSchoolProfile } from '../../types/attendance';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 import type { AttendanceContextType } from '../../context/attendanceContextSupport';
 import type { SchoolClassSummary } from '../../types/attendance';
 
@@ -256,7 +257,7 @@ export const StudentImportModal: React.FC<StudentImportModalProps> = ({
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                يجب أن يحتوي الملف على الأعمدة التالية (الرقم المدرسي، السجل المدني، اسم الطالب، المرحلة، الفصل، ولي الأمر، الهاتف). يدعم النظام ترميز UTF-8 واللغة العربية تلقائياً.
+                يجب أن يحتوي الملف على الأعمدة التالية (الرقم المدرسي، {getCountryIdentitySpec(schoolProfile?.address?.country).nationalIdLabelAr}، اسم الطالب، المرحلة، الفصل، ولي الأمر، الهاتف). يدعم النظام ترميز UTF-8 واللغة العربية تلقائياً.
               </p>
             </div>
 
@@ -352,7 +353,7 @@ export const StudentImportModal: React.FC<StudentImportModalProps> = ({
                   setRawCsvText(e.target.value);
                   if (uploadedFile) setUploadedFile(null);
                 }}
-                placeholder="الرقم المدرسي,السجل المدني,اسم الطالب,المرحلة,الفصل,ولي الأمر,الهاتف..."
+                placeholder={`الرقم المدرسي,${getCountryIdentitySpec(schoolProfile?.address?.country).nationalIdLabelAr},اسم الطالب,المرحلة,الفصل,ولي الأمر,الهاتف...`}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-mono text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               />
             </div>
@@ -489,7 +490,7 @@ export const StudentImportModal: React.FC<StudentImportModalProps> = ({
                         <th className="py-2.5 px-3">الصف</th>
                         <th className="py-2.5 px-3">اسم الطالب</th>
                         <th className="py-2.5 px-3">الرقم المدرسي</th>
-                        <th className="py-2.5 px-3">السجل المدني</th>
+                        <th className="py-2.5 px-3">{getCountryIdentitySpec(schoolProfile?.address?.country).nationalIdLabelAr}</th>
                         <th className="py-2.5 px-3">الفصل</th>
                         <th className="py-2.5 px-3">نتيجة التحقق</th>
                       </tr>

@@ -1,9 +1,11 @@
 import React from 'react';
 import { ArrowRightLeft, Award, Calendar, QrCode, RotateCcw, Trash2 } from 'lucide-react';
 import type { Student, StudentBehaviourIncident } from '../../types/attendance';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface StudentsRegistryTableProps {
   lang: 'ar' | 'en';
+  nationalIdLabel?: string;
   students: Student[];
   behaviourIncidents: StudentBehaviourIncident[];
   canDeleteStudents: boolean;
@@ -17,6 +19,7 @@ interface StudentsRegistryTableProps {
 
 export const StudentsRegistryTable: React.FC<StudentsRegistryTableProps> = ({
   lang,
+  nationalIdLabel,
   students,
   behaviourIncidents,
   canDeleteStudents,
@@ -35,7 +38,7 @@ export const StudentsRegistryTable: React.FC<StudentsRegistryTableProps> = ({
             <th className="py-3 px-4">#</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'الرقم المدرسي' : 'Student No'}</th>
-            <th className="py-3 px-4">{lang === 'ar' ? 'السجل المدني' : 'National ID'}</th>
+            <th className="py-3 px-4">{nationalIdLabel || (lang === 'ar' ? getCountryIdentitySpec().nationalIdLabelAr : getCountryIdentitySpec().nationalIdLabelEn)}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'الفصل الدراسي' : 'Class'}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'ولي الأمر' : 'Guardian'}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'هاتف التواصل' : 'Phone'}</th>

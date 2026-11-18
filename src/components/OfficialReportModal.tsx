@@ -4,7 +4,7 @@ import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types/attendance';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 import { useModalAccessibility } from '../hooks/useModalAccessibility';
-import { getCountryPreset } from '../config/countryPresets';
+import { getCountryIdentitySpec, getCountryPreset } from '../config/countryPresets';
 import {
   FileText,
   Printer,
@@ -247,7 +247,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
                   <th className="py-2 px-2.5 border-l border-slate-300 w-10">م</th>
                   <th className="py-2 px-3 border-l border-slate-300">اسم الطالب</th>
                   <th className="py-2 px-2.5 border-l border-slate-300">الرقم المدرسي</th>
-                  <th className="py-2 px-2.5 border-l border-slate-300">السجل المدني</th>
+                  <th className="py-2 px-2.5 border-l border-slate-300">{getCountryIdentitySpec(schoolProfile.address?.country).nationalIdLabelAr}</th>
                   <th className="py-2 px-2.5 border-l border-slate-300">الفصل</th>
                   <th className="py-2 px-2 border-l border-slate-300 text-center">أيام الغياب</th>
                   <th className="py-2 px-2 border-l border-slate-300 text-center">التأخر</th>

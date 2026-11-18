@@ -23,7 +23,7 @@ export function generateSampleMedicalNoteBase64(studentName = 'يوسف خالد
   ctx.fillStyle = '#0f172a';
   ctx.font = 'bold 24px Cairo, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('المملكة العربية السعودية - وزارة الصحة', canvas.width / 2, 80);
+  ctx.fillText('وزارة الصحة - التقرير الطبي المعتمد', canvas.width / 2, 80);
 
   ctx.fillStyle = '#0284c7';
   ctx.font = 'bold 22px Cairo, sans-serif';
@@ -57,7 +57,7 @@ export function generateSampleMedicalNoteBase64(studentName = 'يوسف خالد
   ctx.fillStyle = '#334155';
   ctx.fillText(`اسم المريض / الطالب: ${studentName}`, rightX, y);
   y += 35;
-  ctx.fillText('السجل المدني: 3000000001', rightX, y);
+  ctx.fillText('الرقم المدني: 299010100001', rightX, y);
   y += 35;
   ctx.fillText('المرحلة الدراسية: الصف العاشر (الأول الثانوي)', rightX, y);
   y += 45;
@@ -194,7 +194,7 @@ export function generateSampleIrregularMedicalNoteBase64(
 
   ctx.font = '16px Cairo, sans-serif';
   ctx.fillStyle = '#64748b';
-  ctx.fillText('السجل المدني: 1045981240', rightX, y);
+  ctx.fillText('الرقم المدني: 299010100040', rightX, y);
   y += 35;
   ctx.fillText('المرحلة: الصف التاسع (المتوسط الثالث)', rightX, y);
   y += 45;

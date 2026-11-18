@@ -1,8 +1,10 @@
 import type { Student } from '../../types/attendance';
 import { Filter, Search, X } from 'lucide-react';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface StudentSelectorCardProps {
   isAr: boolean;
+  nationalIdLabel?: string;
   gradesList: string[];
   classesList: string[];
   filteredStudents: Student[];
@@ -19,6 +21,7 @@ interface StudentSelectorCardProps {
 
 export function StudentSelectorCard({
   isAr,
+  nationalIdLabel,
   gradesList,
   classesList,
   filteredStudents,
@@ -140,7 +143,7 @@ export function StudentSelectorCard({
                   <th className="py-2.5 px-3 text-start w-10">#</th>
                   <th className="py-2.5 px-3 text-start">{isAr ? 'اسم الطالب' : 'Student Name'}</th>
                   <th className="py-2.5 px-3 text-start">{isAr ? 'الصف / الفصل' : 'Grade & Class'}</th>
-                  <th className="py-2.5 px-3 text-center">{isAr ? 'الهوية الوطنية' : 'National ID'}</th>
+                  <th className="py-2.5 px-3 text-center">{isAr ? (nationalIdLabel || getCountryIdentitySpec().nationalIdLabelAr) : getCountryIdentitySpec().nationalIdLabelEn}</th>
                   <th className="py-2.5 px-3 text-center">{isAr ? 'نسبة الحضور' : 'Rate'}</th>
                   <th className="py-2.5 px-3 text-center">{isAr ? 'إجمالي الغياب' : 'Absences'}</th>
                   <th className="py-2.5 px-3 text-center w-24">{isAr ? 'الحالة' : 'Status'}</th>

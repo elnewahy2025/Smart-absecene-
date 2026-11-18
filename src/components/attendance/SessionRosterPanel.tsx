@@ -1,6 +1,8 @@
 import React from 'react';
 import { Filter, Search, X, Zap } from 'lucide-react';
 import { AttendanceRecord, AttendanceStatus, Student } from '../../types/attendance';
+import { useAttendance } from '../../context/AttendanceContext';
+import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 export interface SessionRosterRow {
   record: AttendanceRecord;
@@ -121,7 +123,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
             </th>
             <th className="py-3 px-4">#</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'اسم الطالب / الرقم المدرسي' : 'Student'}</th>
-            <th className="py-3 px-4">{lang === 'ar' ? 'السجل المدني' : 'ID'}</th>
+            <th className="py-3 px-4">{lang === 'ar' ? getCountryIdentitySpec(useAttendance().schoolProfile?.address?.country).nationalIdLabelAr : getCountryIdentitySpec(useAttendance().schoolProfile?.address?.country).nationalIdLabelEn}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'حالة الحضور في هذه الحصة' : 'Status Toggle'}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'التأخر / ملاحظة المعلم' : 'Notes / Delay'}</th>
             <th className="py-3 px-4">{lang === 'ar' ? 'سجل المواظبة' : 'Total Absences'}</th>
