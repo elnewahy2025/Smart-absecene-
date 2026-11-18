@@ -60,11 +60,6 @@ export function useFirestoreDataSync({
       : undefined;
     const parentPhone = (authenticatedPhone || parentProfile?.phone || '').trim();
     const parentEmail = firebaseEmail || (parentProfile?.email || '').trim().toLowerCase();
-    const parentContactFilter = parentPhone && parentEmail
-      ? or(where('guardianPhone', '==', parentPhone), where('guardianEmail', '==', parentEmail))
-      : parentPhone
-        ? where('guardianPhone', '==', parentPhone)
-        : where('guardianEmail', '==', parentEmail);
     const parentContactValue = parentPhone || parentEmail;
 
     // A parent may be identified by a verified phone OR email. Never attach a
@@ -75,7 +70,16 @@ export function useFirestoreDataSync({
 
     // 1. Students sync
     const qStudents = isParentUser
-      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), parentContactFilter)
+      ? parentPhone && parentEmail
+        ? query(collection(db, 'students'), where('tenantId', '==', tenantId), or(
+            where('guardianPhone', '==', parentPhone),
+            where('guardianEmail', '==', parentEmail)
+          ))
+        : query(
+            collection(db, 'students'),
+            where('tenantId', '==', tenantId),
+            where(parentPhone ? 'guardianPhone' : 'guardianEmail', '==', parentPhone || parentEmail)
+          )
       : query(collection(db, 'students'), where('tenantId', '==', tenantId));
     const unsubStudents = onSnapshot(
       qStudents,
@@ -164,7 +168,16 @@ export function useFirestoreDataSync({
 
     // 3. Justifications sync
     const qJustifications = isParentUser
-      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), parentContactFilter)
+      ? parentPhone && parentEmail
+        ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), or(
+            where('guardianPhone', '==', parentPhone),
+            where('guardianEmail', '==', parentEmail)
+          ))
+        : query(
+            collection(db, 'justifications'),
+            where('tenantId', '==', tenantId),
+            where(parentPhone ? 'guardianPhone' : 'guardianEmail', '==', parentPhone || parentEmail)
+          )
       : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
     const unsubJustifications = onSnapshot(
       qJustifications,
