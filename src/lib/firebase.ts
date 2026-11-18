@@ -4,12 +4,11 @@ import { getFirestore, doc, getDocFromServer, connectFirestoreEmulator } from 'f
 
 const env = (import.meta as any).env || {};
 
-const useEmulator = String(env.VITE_USE_FIREBASE_EMULATOR || '').toLowerCase() === 'true';
-const emulatorProjectId = env.VITE_FIREBASE_EMULATOR_PROJECT_ID || 'demo-smart-school';
+const useEmulator = String((import.meta as any).env?.VITE_USE_FIREBASE_EMULATOR || '').toLowerCase() === 'true';
 
 const firebaseConfig = {
-  projectId: useEmulator
-    ? emulatorProjectId
+  projectId: import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true'
+    ? (env.VITE_FIREBASE_EMULATOR_PROJECT_ID || 'demo-smart-school')
     : env.VITE_FIREBASE_PROJECT_ID || 'demo-project-id',
   appId: env.VITE_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
   apiKey: env.VITE_FIREBASE_API_KEY || 'demo-firebase-api-key',
