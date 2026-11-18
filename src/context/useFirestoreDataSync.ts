@@ -54,20 +54,24 @@ export function useFirestoreDataSync({
     if (!firebaseUser || !tenantId || tenantId.trim() === '') return;
 
     const isParentUser = currentUserRole === 'parent';
-    const parentProfile = isParentUser
-      ? allUsers.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
+    const firebaseEmail = (firebaseUser.email || '').trim().toLowerCase();
+    const parentProfile = isParentUser && firebaseEmail
+      ? allUsers.find((user) => user.email.trim().toLowerCase() === firebaseEmail)
       : undefined;
-    const parentPhone = authenticatedPhone || parentProfile?.phone;
+    const parentPhone = (authenticatedPhone || parentProfile?.phone || '').trim();
+    const parentEmail = firebaseEmail || (parentProfile?.email || '').trim().toLowerCase();
+    const parentContactField = parentPhone ? 'guardianPhone' : 'guardianEmail';
+    const parentContactValue = parentPhone || parentEmail;
 
-    // Authorization barrier: parents must only query records matching their own guardian phone.
-    // If the phone has not resolved yet, defer query attachment until the next render cycle.
-    if (isParentUser && !parentPhone) {
+    // A parent may be identified by a verified phone OR email. Never attach a
+    // broad tenant query when neither identity is available.
+    if (isParentUser && !parentContactValue) {
       return;
     }
 
     // 1. Students sync
     const qStudents = isParentUser
-      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
+      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where(parentContactField, '==', parentContactValue))
       : query(collection(db, 'students'), where('tenantId', '==', tenantId));
     const unsubStudents = onSnapshot(
       qStudents,
@@ -155,7 +159,7 @@ export function useFirestoreDataSync({
 
     // 3. Justifications sync
     const qJustifications = isParentUser
-      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
+      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where(parentContactField, '==', parentContactValue))
       : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
     const unsubJustifications = onSnapshot(
       qJustifications,
@@ -185,7 +189,9 @@ export function useFirestoreDataSync({
     const qNotifications = isParentUser
       ? query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId), where('recipientPhone', '==', parentPhone))
       : query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId));
-    const unsubNotifications = onSnapshot(
+    const unsubNotifications = isParentUser && !parentPhone
+      ? () => {}
+      : onSnapshot(
       qNotifications,
       (snapshot) => {
         if (!snapshot.empty) {
