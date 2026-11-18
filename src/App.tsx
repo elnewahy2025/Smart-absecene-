@@ -54,14 +54,42 @@ const ViewLoadingFallback: React.FC = () => (
   </div>
 );
 
+const VALID_TABS = new Set<ActiveTab>([
+  'dashboard',
+  'sessions',
+  'communications',
+  'justifications',
+  'digest',
+  'chatbot',
+  'emergency',
+  'outbox',
+  'reports',
+  'students',
+  'student_inquiry',
+  'settings',
+  'parent_portal',
+]);
+
+const getInitialTab = (isParent: boolean, isTeacher: boolean): ActiveTab => {
+  if (typeof window !== 'undefined') {
+    const hashTab = window.location.hash.replace(/^#/, '') as ActiveTab;
+    if (VALID_TABS.has(hashTab)) return hashTab;
+    try {
+      const saved = sessionStorage.getItem('school_active_tab') as ActiveTab | null;
+      if (saved && VALID_TABS.has(saved)) return saved;
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return isParent ? 'parent_portal' : isTeacher ? 'sessions' : 'dashboard';
+};
+
 const MainAppContent: React.FC = () => {
   const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle, subscriptionAccess } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
   const isRegistrar = currentUser.role === 'registrar';
-  const [activeTab, setActiveTab] = useState<ActiveTab>(
-    isParent ? 'parent_portal' : isTeacher ? 'sessions' : 'dashboard'
-  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => getInitialTab(isParent, isTeacher));
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('connected');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -92,6 +120,16 @@ const MainAppContent: React.FC = () => {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('school_user_authenticated');
     }
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.removeItem('school_active_tab');
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
     if (firebaseUser) {
       signOutGoogle().catch((err) => console.error('Sign out error:', err));
     }
@@ -119,6 +157,35 @@ const MainAppContent: React.FC = () => {
   useEffect(() => {
     const unsub = subscribeConnectionStatus((s) => setConnStatus(s));
     return () => unsub();
+  }, []);
+
+  // Persist activeTab across page refreshes via URL hash + sessionStorage
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('school_active_tab', activeTab);
+    } catch {
+      // ignore
+    }
+    if (window.location.hash !== `#${activeTab}`) {
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}#${activeTab}`
+      );
+    }
+  }, [activeTab, isAuthenticated]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onHashChange = () => {
+      const next = window.location.hash.replace(/^#/, '') as ActiveTab;
+      if (VALID_TABS.has(next)) {
+        setActiveTab(next);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   // Set document dir & lang attribute when language toggles

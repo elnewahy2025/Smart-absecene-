@@ -108,20 +108,25 @@ export function useUserManagement({
     };
   };
 
-  const updateUser = async (userId: string, updates: Partial<UserProfile>): Promise<UserAccountResult> => {
+  const updateUser = async (
+    userId: string,
+    updates: Partial<UserProfile> & { password?: string }
+  ): Promise<UserAccountResult> => {
     let serverError: string | null = null;
+    const { password: nextPassword, ...safeUpdates } = updates;
 
     try {
       const response = await authenticatedFetch(`/api/users/${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          name: updates.name,
-          phone: updates.phone,
-          role: updates.role,
-          jobTitle: updates.jobTitle,
-          status: updates.status,
-          assignedClasses: updates.assignedClasses,
-          assignedSubjects: updates.assignedSubjects,
+          name: safeUpdates.name,
+          phone: safeUpdates.phone,
+          role: safeUpdates.role,
+          jobTitle: safeUpdates.jobTitle,
+          status: safeUpdates.status,
+          assignedClasses: safeUpdates.assignedClasses,
+          assignedSubjects: safeUpdates.assignedSubjects,
+          ...(nextPassword ? { password: nextPassword } : {}),
         }),
       });
 
@@ -137,7 +142,7 @@ export function useUserManagement({
     }
 
     setAllUsers((prev) => {
-      const updated = prev.map((u) => (u.id === userId && u.tenantId === tenantId ? { ...u, ...updates } : u));
+      const updated = prev.map((u) => (u.id === userId && u.tenantId === tenantId ? { ...u, ...safeUpdates } : u));
       if (typeof localCache !== 'undefined') {
         localCache.setItem('school_users', JSON.stringify(updated));
       }

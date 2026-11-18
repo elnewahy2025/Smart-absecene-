@@ -197,12 +197,21 @@ export function registerUserAccountRoutes({
         roleChanged = true;
       }
 
+      const nextPassword = typeof body.password === 'string' ? body.password.trim() : '';
+      if (nextPassword.length > 0 && nextPassword.length < 8) {
+        return res.status(400).json({ success: false, error: 'Password must be at least 8 characters.' });
+      }
+
       updates.updatedAt = new Date().toISOString();
       await admin.firestore().doc(`users/${uid}`).set(updates, { merge: true });
 
       const nextRole = (updates.role as string) || existing.role;
       if (roleChanged) {
         await admin.auth().setCustomUserClaims(uid, { role: nextRole, tenantId: existing.tenantId });
+        await admin.auth().revokeRefreshTokens(uid).catch(() => {});
+      }
+      if (nextPassword.length >= 8) {
+        await admin.auth().updateUser(uid, { password: nextPassword });
         await admin.auth().revokeRefreshTokens(uid).catch(() => {});
       }
       if (updates.status === 'inactive') {

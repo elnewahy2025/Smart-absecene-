@@ -104,11 +104,20 @@ export const UserEditModal: React.FC<Props> = ({
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
 
-    if (!user && password.trim().length < 8) {
+    const trimmedPassword = password.trim();
+    if (!user && trimmedPassword.length < 8) {
       setPasswordError(
         lang === 'ar'
           ? 'يجب إدخال كلمة مرور أولية لا تقل عن 8 أحرف أو أرقام.'
           : 'First-time password is required (minimum 8 characters).'
+      );
+      return;
+    }
+    if (user && trimmedPassword.length > 0 && trimmedPassword.length < 8) {
+      setPasswordError(
+        lang === 'ar'
+          ? 'كلمة المرور الجديدة يجب أن لا تقل عن 8 أحرف أو أرقام.'
+          : 'New password must be at least 8 characters.'
       );
       return;
     }
@@ -123,7 +132,7 @@ export const UserEditModal: React.FC<Props> = ({
       status,
       assignedClasses: role === 'teacher' ? assignedClasses : undefined,
       assignedSubjects: role === 'teacher' ? assignedSubjects : undefined,
-      ...(!user ? { password: password.trim() } : {}),
+      ...(trimmedPassword.length > 0 ? { password: trimmedPassword } : {}),
     });
 
     if (!result || result.success) {
@@ -228,58 +237,72 @@ export const UserEditModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* First-time Password (required when creating a new user) */}
-          {!user && (
-            <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="font-bold text-amber-950 flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 text-amber-700" />
-                  <span>{lang === 'ar' ? 'كلمة المرور الأولية للدخول (8 أحرف على الأقل) *' : 'First-Time Login Password (min 8 chars) *'}</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={handleGeneratePassword}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>{lang === 'ar' ? 'توليد كلمة مرور' : 'Generate'}</span>
-                </button>
-              </div>
-              <div className="relative flex items-center">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="new_user_password"
-                  autoComplete="new-password"
-                  readOnly
-                  onFocus={(e) => e.currentTarget.removeAttribute('readOnly')}
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (passwordError) setPasswordError(null);
-                  }}
-                  placeholder={lang === 'ar' ? 'أدخل كلمة المرور الأولية للمستخدم...' : 'Enter first-time password...'}
-                  className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 pl-9 text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute left-2.5 text-slate-500 hover:text-slate-700 cursor-pointer"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {passwordError && (
-                <p className="text-[11px] font-semibold text-rose-700 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{passwordError}</span>
-                </p>
-              )}
+          {/* Password: required for new users, optional change/keep when editing */}
+          <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="font-bold text-amber-950 flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-amber-700" />
+                <span>
+                  {!user
+                    ? lang === 'ar'
+                      ? 'كلمة المرور الأولية للدخول (8 أحرف على الأقل) *'
+                      : 'First-Time Login Password (min 8 chars) *'
+                    : lang === 'ar'
+                      ? 'تغيير كلمة المرور (اتركه فارغاً للإبقاء على الحالية)'
+                      : 'Change Password (leave blank to keep current)'}
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>{lang === 'ar' ? 'توليد كلمة مرور' : 'Generate'}</span>
+              </button>
             </div>
-          )}
+            <div className="relative flex items-center">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="new_user_password"
+                autoComplete="new-password"
+                readOnly
+                onFocus={(e) => e.currentTarget.removeAttribute('readOnly')}
+                required={!user}
+                minLength={!user ? 8 : undefined}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (passwordError) setPasswordError(null);
+                }}
+                placeholder={
+                  !user
+                    ? lang === 'ar'
+                      ? 'أدخل كلمة المرور الأولية للمستخدم...'
+                      : 'Enter first-time password...'
+                    : lang === 'ar'
+                      ? 'أدخل كلمة مرور جديدة أو اتركه فارغاً للإبقاء على الحالية...'
+                      : 'Enter new password or leave blank to keep current...'
+                }
+                className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 pl-9 text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute left-2.5 text-slate-500 hover:text-slate-700 cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {passwordError && (
+              <p className="text-[11px] font-semibold text-rose-700 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{passwordError}</span>
+              </p>
+            )}
+          </div>
 
           {/* Role & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

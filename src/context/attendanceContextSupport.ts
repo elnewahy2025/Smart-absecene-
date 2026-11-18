@@ -159,7 +159,7 @@ export interface AttendanceContextType {
 
   // User & RBAC Management
   createUser: (user: Omit<UserProfile, 'id' | 'tenantId'> & { password?: string }) => Promise<UserAccountResult>;
-  updateUser: (userId: string, updates: Partial<UserProfile>) => Promise<UserAccountResult>;
+  updateUser: (userId: string, updates: Partial<UserProfile> & { password?: string }) => Promise<UserAccountResult>;
   deleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
 
   // Actions

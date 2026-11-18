@@ -47,8 +47,37 @@ export const AuditSettingsView: React.FC = () => {
     classesStats,
   } = useAttendance();
 
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'settings' | 'gateways' | 'users' | 'ai' | 'audit'>('profile');
-  const [activeProfileTab, setActiveProfileTab] = useState<'identity' | 'contact' | 'leadership' | 'calendar' | 'grades-classes' | 'timetable' | 'emergency'>('identity');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'settings' | 'gateways' | 'users' | 'ai' | 'audit'>(() => {
+    try {
+      const saved = sessionStorage.getItem('school_settings_subtab');
+      if (saved && ['profile', 'settings', 'gateways', 'users', 'ai', 'audit'].includes(saved)) {
+        return saved as any;
+      }
+    } catch {
+      // ignore
+    }
+    return 'profile';
+  });
+  const [activeProfileTab, setActiveProfileTab] = useState<'identity' | 'contact' | 'leadership' | 'calendar' | 'grades-classes' | 'timetable' | 'emergency'>(() => {
+    try {
+      const saved = sessionStorage.getItem('school_settings_profiletab');
+      if (saved && ['identity', 'contact', 'leadership', 'calendar', 'grades-classes', 'timetable', 'emergency'].includes(saved)) {
+        return saved as any;
+      }
+    } catch {
+      // ignore
+    }
+    return 'identity';
+  });
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem('school_settings_subtab', activeSubTab);
+      sessionStorage.setItem('school_settings_profiletab', activeProfileTab);
+    } catch {
+      // ignore
+    }
+  }, [activeSubTab, activeProfileTab]);
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [searchAudit, setSearchAudit] = useState<string>('');
 

@@ -24,7 +24,7 @@ interface Props {
     message: string;
     temporaryPassword?: string;
   }>;
-  onUpdateUser: (userId: string, data: Partial<UserProfile>) => Promise<{ success: boolean; message: string }>;
+  onUpdateUser: (userId: string, data: Partial<UserProfile> & { password?: string }) => Promise<{ success: boolean; message: string }>;
   onDeleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
   canManageUsers: boolean;
   availableClasses?: string[];
