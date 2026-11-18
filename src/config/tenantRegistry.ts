@@ -39,6 +39,8 @@ export const TENANT_REGISTRY: Record<string, TenantDomainConfig> = {
       'andalus.smartschool.com',
       'andalus.localhost',
       'smart-absecene-drul.vercel.app',
+      'smart-absecene.vercel.app',
+      'smart-absecene-khaled-osmans-projects-2ee3f454.vercel.app',
     ],
     nameAr: 'مدرسة الأندلس الثانوية النموذجية',
     nameEn: 'Al-Andalus Model High School',
