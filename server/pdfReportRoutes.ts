@@ -171,7 +171,7 @@ app.post(
   try {
     const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename, styles } = req.body;
     const safeTitle = escapeHtmlText(title, 'تقرير الحضور والانضباط المدرسي');
-    const safeStyles = typeof styles === 'string' && styles.length <= 2_000_000 && !/<\\/style/i.test(styles)
+    const safeStyles = typeof styles === 'string' && styles.length <= 2_000_000 && !styles.toLowerCase().includes('</style')
       ? styles
       : '';
 
