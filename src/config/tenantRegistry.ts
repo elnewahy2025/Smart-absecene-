@@ -120,7 +120,17 @@ export function getActiveTenantRegistry(): Record<string, TenantDomainConfig> {
   if (Array.isArray(runtimeTenantDocs)) {
     runtimeTenantDocs.forEach((dt) => {
       if (dt && dt.tenantId) {
-        registry[dt.tenantId] = { ...(registry[dt.tenantId] || {}), ...dt };
+        const base = registry[dt.tenantId];
+        registry[dt.tenantId] = {
+          ...(base || {}),
+          ...dt,
+          customDomains: Array.from(
+            new Set([
+              ...(Array.isArray(base?.customDomains) ? base.customDomains : []),
+              ...(Array.isArray(dt.customDomains) ? dt.customDomains : []),
+            ])
+          ),
+        };
       }
     });
   }
