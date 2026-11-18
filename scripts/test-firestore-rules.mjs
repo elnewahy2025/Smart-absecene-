@@ -24,6 +24,7 @@ import {
   getDoc,
   getDocs,
   query,
+  or,
   setDoc,
   updateDoc,
   where,
@@ -408,6 +409,24 @@ async function expectDenied(name, operation) {
 await expectAllowed('parent reads own child', getDoc(doc(parentDb, 'students', 'student1')));
 await expectDenied('parent cannot read another child', getDoc(doc(parentDb, 'students', 'student2')));
 await expectAllowed('email-only parent reads linked student', getDoc(doc(emailParentDb, 'students', 'student-email')));
+await expectAllowed('email-only parent query returns linked student', getDocs(query(
+  collection(emailParentDb, 'students'),
+  where('tenantId', '==', 'school-1'),
+  where('guardianEmail', '==', 'email-parent@example.com')
+)));
+await expectAllowed('email-only parent query returns linked attendance', getDocs(query(
+  collection(emailParentDb, 'attendance_records'),
+  where('tenantId', '==', 'school-1'),
+  where('guardianEmail', '==', 'email-parent@example.com')
+)));
+await expectAllowed('parent OR query supports phone or email links', getDocs(query(
+  collection(parentDb, 'attendance_records'),
+  where('tenantId', '==', 'school-1'),
+  or(
+    where('guardianPhone', '==', '+966500000001'),
+    where('guardianEmail', '==', 'p1@example.com')
+  )
+)));
 await expectAllowed('email-only parent reads linked attendance mirror', getDoc(doc(emailParentDb, 'attendance_records', 'record-email')));
 await expectDenied('email-only parent cannot read another child mirror', getDoc(doc(emailParentDb, 'attendance_records', 'record1')));
 
