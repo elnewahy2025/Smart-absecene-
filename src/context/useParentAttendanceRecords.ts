@@ -27,13 +27,19 @@ export function useParentAttendanceRecords({
       setParentAttendanceRecords([]);
       return;
     }
-    const phone = authenticatedPhone || currentUserPhone;
-    if (!phone) return;
+    const phone = (authenticatedPhone || currentUserPhone || '').trim();
+    const email = (firebaseUser.email || '').trim().toLowerCase();
+    const contactField = phone ? 'guardianPhone' : 'guardianEmail';
+    const contactValue = phone || email;
+    if (!contactValue) {
+      setParentAttendanceRecords([]);
+      return;
+    }
 
     const recordsQuery = query(
       collection(db, 'attendance_records'),
       where('tenantId', '==', tenantId),
-      where('guardianPhone', '==', phone)
+      where(contactField, '==', contactValue)
     );
     const unsubscribe = onSnapshot(
       recordsQuery,
