@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, or, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { StudentAttendanceRecord, UserRole } from '../types/attendance';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -29,17 +29,20 @@ export function useParentAttendanceRecords({
     }
     const phone = (authenticatedPhone || currentUserPhone || '').trim();
     const email = (firebaseUser.email || '').trim().toLowerCase();
-    const contactField = phone ? 'guardianPhone' : 'guardianEmail';
-    const contactValue = phone || email;
-    if (!contactValue) {
+    if (!phone && !email) {
       setParentAttendanceRecords([]);
       return;
     }
 
+    const contactFilter = phone && email
+      ? or(where('guardianPhone', '==', phone), where('guardianEmail', '==', email))
+      : phone
+        ? where('guardianPhone', '==', phone)
+        : where('guardianEmail', '==', email);
     const recordsQuery = query(
       collection(db, 'attendance_records'),
       where('tenantId', '==', tenantId),
-      where(contactField, '==', contactValue)
+      contactFilter
     );
     const unsubscribe = onSnapshot(
       recordsQuery,
