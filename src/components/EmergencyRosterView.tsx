@@ -190,7 +190,7 @@ export const EmergencyRosterView: React.FC = () => {
           {/* Search student */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-            <input
+            <input id="emergencyrosterview-input-1" name="emergencyrosterview-input-1"
               type="text"
               placeholder={lang === 'ar' ? 'بحث بالاسم...' : 'Search name...'}
               value={searchQuery}

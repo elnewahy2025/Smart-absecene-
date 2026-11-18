@@ -253,11 +253,11 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
           <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               <div className="sm:col-span-7">
-                <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                <label htmlFor="smartholidayimportmodal-input-1" className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
                   {lang === 'ar' ? 'الدولة المستهدفة بالبحث والتحقق:' : 'Target country for search and verification:'}
                 </label>
                 <div className="relative">
-                  <input
+                  <input id="smartholidayimportmodal-input-1" name="smartholidayimportmodal-input-1"
                     type="text"
                     list="modal-countries-datalist"
                     value={country}
@@ -282,10 +282,10 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
               </div>
 
               <div className="sm:col-span-5">
-                <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                <label htmlFor="smartholidayimportmodal-input-2" className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
                   {lang === 'ar' ? 'العام الدراسي المستهدف:' : 'Target academic year:'}
                 </label>
-                <input
+                <input id="smartholidayimportmodal-input-2" name="smartholidayimportmodal-input-2"
                   type="text"
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
@@ -381,7 +381,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
               {/* Automatic Adaptation Toggles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-xl">
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 dark:text-slate-200 text-[11px]">
-                  <input
+                  <input id="smartholidayimportmodal-input-3" name="smartholidayimportmodal-input-3"
                     type="checkbox"
                     checked={applyWeekend}
                     onChange={(e) => setApplyWeekend(e.target.checked)}
@@ -400,7 +400,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 dark:text-slate-200 text-[11px]">
-                  <input
+                  <input id="smartholidayimportmodal-input-4" name="smartholidayimportmodal-input-4"
                     type="checkbox"
                     checked={applyHeader}
                     onChange={(e) => setApplyHeader(e.target.checked)}
@@ -440,7 +440,7 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
                             : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
                         }`}
                       >
-                        <input
+                        <input id="smartholidayimportmodal-input-5" name="smartholidayimportmodal-input-5"
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}} // handled by parent div

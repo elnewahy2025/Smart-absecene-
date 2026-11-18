@@ -206,7 +206,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
 
           {!disabled && (
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <select id="timetableperiodstab-select-1" name="timetableperiodstab-select-1"
                 value={selectedPresetId}
                 onChange={(e) => handleApplyPreset(e.target.value)}
                 className="bg-white border border-purple-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
@@ -234,7 +234,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'بداية الطابور' : 'Assembly Start'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-2" name="timetableperiodstab-input-2"
               type="time"
               disabled={disabled}
               value={config.assemblyStartTime}
@@ -247,7 +247,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'مدة الطابور (دقيقة)' : 'Assembly Duration (m)'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-3" name="timetableperiodstab-input-3"
               type="number"
               min={0}
               max={120}
@@ -264,7 +264,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-bold text-purple-800">
               {lang === 'ar' ? 'مدة الحصة الدراسية (دقيقة)' : 'Lesson Duration (m)'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-4" name="timetableperiodstab-input-4"
               type="number"
               min={10}
               max={120}
@@ -281,7 +281,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'الفاصل بين الحصص (دقيقة)' : 'Break Between Lessons (m)'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-5" name="timetableperiodstab-input-5"
               type="number"
               min={0}
               max={30}
@@ -298,7 +298,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'عدد الحصص' : 'Lessons Count'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-6" name="timetableperiodstab-input-6"
               type="number"
               min={1}
               max={12}
@@ -313,7 +313,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'الفرصة الأولى (دقيقة)' : '1st Break (m)'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-7" name="timetableperiodstab-input-7"
               type="number"
               min={0}
               max={90}
@@ -330,7 +330,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'الفرصة الأولى بعد الحصة' : '1st Break After Lesson'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-8" name="timetableperiodstab-input-8"
               type="number"
               min={1}
               max={11}
@@ -347,7 +347,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'الفرصة الثانية / الصلاة (دقيقة)' : '2nd Break / Prayer (m)'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-9" name="timetableperiodstab-input-9"
               type="number"
               min={0}
               max={90}
@@ -364,7 +364,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
             <span className="block text-[11px] font-semibold text-slate-700">
               {lang === 'ar' ? 'الفرصة الثانية بعد الحصة' : '2nd Break After Lesson'}
             </span>
-            <input
+            <input id="timetableperiodstab-input-10" name="timetableperiodstab-input-10"
               type="number"
               min={1}
               max={11}
@@ -434,7 +434,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                         {period.periodNumber}
                       </td>
                       <td className="p-2">
-                        <input
+                        <input id="timetableperiodstab-input-11" name="timetableperiodstab-input-11"
                           type="text"
                           disabled={disabled}
                           value={period.nameAr}
@@ -444,7 +444,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                         />
                       </td>
                       <td className="p-2 w-36">
-                        <select
+                        <select id="timetableperiodstab-select-12" name="timetableperiodstab-select-12"
                           disabled={disabled}
                           value={period.type}
                           onChange={(e) => handlePeriodChange(period.id, 'type', e.target.value as any)}
@@ -458,7 +458,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                         </select>
                       </td>
                       <td className="p-2 w-28">
-                        <input
+                        <input id="timetableperiodstab-input-13" name="timetableperiodstab-input-13"
                           type="time"
                           disabled={disabled}
                           value={period.startTime}
@@ -468,7 +468,7 @@ export const TimetablePeriodsTab: React.FC<Props> = ({
                         />
                       </td>
                       <td className="p-2 w-28">
-                        <input
+                        <input id="timetableperiodstab-input-14" name="timetableperiodstab-input-14"
                           type="time"
                           disabled={disabled}
                           value={period.endTime}

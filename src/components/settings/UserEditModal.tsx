@@ -177,8 +177,8 @@ export const UserEditModal: React.FC<Props> = ({
           {/* Basic Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
-              <input
+              <label htmlFor="usereditmodal-input-1" className="font-semibold text-slate-700">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
+              <input id="usereditmodal-input-1" name="usereditmodal-input-1"
                 type="text"
                 required
                 autoComplete="off"
@@ -190,8 +190,8 @@ export const UserEditModal: React.FC<Props> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{lang === 'ar' ? 'المسمى الوظيفي:' : 'Job Title:'}</label>
-              <input
+              <label htmlFor="usereditmodal-input-2" className="font-semibold text-slate-700">{lang === 'ar' ? 'المسمى الوظيفي:' : 'Job Title:'}</label>
+              <input id="usereditmodal-input-2" name="usereditmodal-input-2"
                 type="text"
                 autoComplete="off"
                 value={jobTitle}
@@ -307,8 +307,8 @@ export const UserEditModal: React.FC<Props> = ({
           {/* Role & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{lang === 'ar' ? 'الدور والصلاحية (RBAC):' : 'Role (RBAC):'}</label>
-              <select
+              <label htmlFor="usereditmodal-select-3" className="font-semibold text-slate-700">{lang === 'ar' ? 'الدور والصلاحية (RBAC):' : 'Role (RBAC):'}</label>
+              <select id="usereditmodal-select-3" name="usereditmodal-select-3"
                 value={role}
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
@@ -321,8 +321,8 @@ export const UserEditModal: React.FC<Props> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{lang === 'ar' ? 'حالة الحساب:' : 'Account Status:'}</label>
-              <select
+              <label htmlFor="usereditmodal-select-4" className="font-semibold text-slate-700">{lang === 'ar' ? 'حالة الحساب:' : 'Account Status:'}</label>
+              <select id="usereditmodal-select-4" name="usereditmodal-select-4"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
@@ -397,7 +397,7 @@ export const UserEditModal: React.FC<Props> = ({
 
                 {/* Custom Subject Tag Input */}
                 <div className="flex items-center gap-2 pt-1">
-                  <input
+                  <input id="usereditmodal-input-5" name="usereditmodal-input-5"
                     type="text"
                     value={customSubject}
                     onChange={(e) => setCustomSubject(e.target.value)}

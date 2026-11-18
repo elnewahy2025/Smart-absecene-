@@ -106,12 +106,12 @@ export function HorizonController({
       {/* Sub-selectors depending on Horizon type */}
       {horizonType === 'month' && (
         <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
+          <label htmlFor="horizoncontroller-select-1" className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Calendar className="w-4 h-4 text-primary" />
             <span>{isAr ? 'اختر الشهر:' : 'Select Month:'}</span>
           </label>
           <div className="relative min-w-[260px] max-w-sm">
-            <select
+            <select id="horizoncontroller-select-1" name="horizoncontroller-select-1"
               value={selectedMonth}
               onChange={(e) => onMonthChange(e.target.value)}
               className="w-full text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
@@ -152,8 +152,8 @@ export function HorizonController({
         <div className="pt-2 space-y-3 bg-slate-50/80 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'من تاريخ:' : 'From:'}</label>
-              <input
+              <label htmlFor="horizoncontroller-input-2" className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'من تاريخ:' : 'From:'}</label>
+              <input id="horizoncontroller-input-2" name="horizoncontroller-input-2"
                 type="date"
                 min={academicYearBounds.start}
                 max={academicYearBounds.end}
@@ -165,8 +165,8 @@ export function HorizonController({
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'إلى تاريخ:' : 'To:'}</label>
-              <input
+              <label htmlFor="horizoncontroller-input-3" className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'إلى تاريخ:' : 'To:'}</label>
+              <input id="horizoncontroller-input-3" name="horizoncontroller-input-3"
                 type="date"
                 min={academicYearBounds.start}
                 max={academicYearBounds.end}

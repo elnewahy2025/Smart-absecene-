@@ -143,7 +143,7 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
 
         {/* Filter */}
         <div className="flex items-center gap-2 text-xs">
-          <select
+          <select id="studentengagementsection-select-1" name="studentengagementsection-select-1"
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
             className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 font-medium cursor-pointer"

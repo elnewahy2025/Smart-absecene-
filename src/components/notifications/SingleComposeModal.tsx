@@ -126,7 +126,7 @@ export const SingleComposeModal: React.FC<SingleComposeModalProps> = ({
 
               {singleTargetType === 'student' ? (
                 <div className="pt-1">
-                  <select
+                  <select id="singlecomposemodal-select-1" name="singlecomposemodal-select-1"
                     value={singleStudentId}
                     onChange={(e) => setSingleStudentId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
@@ -140,7 +140,7 @@ export const SingleComposeModal: React.FC<SingleComposeModalProps> = ({
                 </div>
               ) : (
                 <div className="pt-1">
-                  <select
+                  <select id="singlecomposemodal-select-2" name="singlecomposemodal-select-2"
                     value={singleClass}
                     onChange={(e) => setSingleClass(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
@@ -188,10 +188,10 @@ export const SingleComposeModal: React.FC<SingleComposeModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
+                <label htmlFor="singlecomposemodal-select-3" className="text-xs font-bold text-slate-700 block mb-1">
                   {lang === 'ar' ? 'التصنيف:' : 'Category:'}
                 </label>
-                <select
+                <select id="singlecomposemodal-select-3" name="singlecomposemodal-select-3"
                   value={composeCategory}
                   onChange={(e) => setComposeCategory(e.target.value as any)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-medium cursor-pointer"
@@ -206,10 +206,10 @@ export const SingleComposeModal: React.FC<SingleComposeModalProps> = ({
 
             {/* Message Textarea */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label htmlFor="singlecomposemodal-textarea-4" className="text-xs font-bold text-slate-700 block">
                 {lang === 'ar' ? 'نص الرسالة:' : 'Message:'}
               </label>
-              <textarea
+              <textarea id="singlecomposemodal-textarea-4" name="singlecomposemodal-textarea-4"
                 rows={3}
                 value={composeMessage}
                 onChange={(e) => setComposeMessage(e.target.value)}

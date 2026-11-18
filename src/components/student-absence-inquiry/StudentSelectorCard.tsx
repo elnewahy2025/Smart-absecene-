@@ -48,11 +48,11 @@ export function StudentSelectorCard({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Select Grade */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+          <label htmlFor="studentselectorcard-select-1" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
             {isAr ? '1. اختر الصف الدراسي:' : '1. Grade:'}
           </label>
           <div className="relative">
-            <select
+            <select id="studentselectorcard-select-1" name="studentselectorcard-select-1"
               value={selectedGrade}
               onChange={(e) => onGradeChange(e.target.value)}
               className="w-full text-xs font-medium bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -70,11 +70,11 @@ export function StudentSelectorCard({
 
         {/* Select Class */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+          <label htmlFor="studentselectorcard-select-2" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
             {isAr ? '2. اختر الفصل / الشعبة:' : '2. Class / Section:'}
           </label>
           <div className="relative">
-            <select
+            <select id="studentselectorcard-select-2" name="studentselectorcard-select-2"
               value={selectedClass}
               onChange={(e) => onClassChange(e.target.value)}
               className="w-full text-xs font-medium bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -92,12 +92,12 @@ export function StudentSelectorCard({
 
         {/* Instant Search Box */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+          <label htmlFor="studentselectorcard-input-3" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
             {isAr ? '3. أو ابحث مباشرة بالاسم أو الهوية:' : '3. Or Search by Name / ID:'}
           </label>
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute start-3 top-2.5" />
-            <input
+            <input id="studentselectorcard-input-3" name="studentselectorcard-input-3"
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}

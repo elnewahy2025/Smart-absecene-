@@ -51,8 +51,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'اسم المدرسة الرسمي (عربي):' : 'Official School Name (Arabic):'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-1" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'اسم المدرسة الرسمي (عربي):' : 'Official School Name (Arabic):'}</label>
+          <input id="schoolidentitytab-input-1" name="schoolidentitytab-input-1"
             type="text"
             disabled={disabled}
             value={profile.schoolName}
@@ -63,8 +63,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'كود / الرقم الإحصائي للمدرسة (الرقم الوزاري):' : 'School Code / Statistical Number (Ministry Number):'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-2" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'كود / الرقم الإحصائي للمدرسة (الرقم الوزاري):' : 'School Code / Statistical Number (Ministry Number):'}</label>
+          <input id="schoolidentitytab-input-2" name="schoolidentitytab-input-2"
             type="text"
             disabled={disabled}
             value={profile.schoolCode}
@@ -75,11 +75,11 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div className="md:col-span-2">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
+          <label htmlFor="schoolidentitytab-textarea-3" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
             <span>{lang === 'ar' ? 'ترويسة الوزارة الرسمية (يظهر بأعلى التقارير ونماذج PDF):' : 'Official Ministry Header (appears atop reports and PDF forms):'}</span>
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">{lang === 'ar' ? `تتكيّف تلقائياً لـ (${preset.countryNameAr})` : `Automatically adapts to (${preset.countryNameAr})`}</span>
           </label>
-          <textarea
+          <textarea id="schoolidentitytab-textarea-3" name="schoolidentitytab-textarea-3"
             rows={2}
             disabled={disabled}
             value={profile.ministryHeaderAr}
@@ -90,8 +90,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.directorateLabelAr : 'Affiliated Education Directorate:'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-4" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.directorateLabelAr : 'Affiliated Education Directorate:'}</label>
+          <input id="schoolidentitytab-input-4" name="schoolidentitytab-input-4"
             type="text"
             disabled={disabled}
             value={profile.directorateAr}
@@ -102,8 +102,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.officeLabelAr : 'Affiliated Education Office:'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-5" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.officeLabelAr : 'Affiliated Education Office:'}</label>
+          <input id="schoolidentitytab-input-5" name="schoolidentitytab-input-5"
             type="text"
             disabled={disabled}
             value={profile.officeAr}
@@ -114,8 +114,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المرحلة الدراسية (يُضبط التوقيت آلياً حسبها):' : 'Educational Stage (auto-syncs timetable):'}</label>
-          <select
+          <label htmlFor="schoolidentitytab-select-6" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المرحلة الدراسية (يُضبط التوقيت آلياً حسبها):' : 'Educational Stage (auto-syncs timetable):'}</label>
+          <select id="schoolidentitytab-select-6" name="schoolidentitytab-select-6"
             disabled={disabled}
             value={profile.stageAr}
             onChange={(e) => handleStageChange(e.target.value)}
@@ -133,8 +133,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'نوع التعليم / الجنس:' : 'Education Type / Gender:'}</label>
-          <select
+          <label htmlFor="schoolidentitytab-select-7" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'نوع التعليم / الجنس:' : 'Education Type / Gender:'}</label>
+          <select id="schoolidentitytab-select-7" name="schoolidentitytab-select-7"
             disabled={disabled}
             value={profile.genderType}
             onChange={(e) => onChange({ genderType: e.target.value as any })}
@@ -147,8 +147,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'رابط شعار المدرسة (Logo URL):' : 'School Logo URL:'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-8" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'رابط شعار المدرسة (Logo URL):' : 'School Logo URL:'}</label>
+          <input id="schoolidentitytab-input-8" name="schoolidentitytab-input-8"
             type="url"
             disabled={disabled}
             value={profile.logoUrl || ''}
@@ -159,8 +159,8 @@ export const SchoolIdentityTab: React.FC<Props> = ({ profile, onChange, disabled
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'رابط الختم الرسمي الإلكتروني (اختياري للتقارير):' : 'Official Electronic Stamp URL (optional for reports):'}</label>
-          <input
+          <label htmlFor="schoolidentitytab-input-9" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'رابط الختم الرسمي الإلكتروني (اختياري للتقارير):' : 'Official Electronic Stamp URL (optional for reports):'}</label>
+          <input id="schoolidentitytab-input-9" name="schoolidentitytab-input-9"
             type="url"
             disabled={disabled}
             value={profile.stampUrl || ''}

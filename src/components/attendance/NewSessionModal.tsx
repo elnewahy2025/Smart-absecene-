@@ -147,10 +147,10 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
           {newSessionType === 'period' && (
             <>
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
+                <label htmlFor="newsessionmodal-select-1" className="block text-slate-700 font-semibold mb-1">
                   {lang === 'ar' ? 'الحصة الدراسية (وفق الجدول المعتمد بالإعدادات):' : 'Period:'}
                 </label>
-                <select
+                <select id="newsessionmodal-select-1" name="newsessionmodal-select-1"
                   value={newPeriodNum}
                   onChange={(e) => setNewPeriodNum(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
@@ -172,11 +172,11 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
+                <label htmlFor="newsessionmodal-select-2" className="block text-slate-700 font-semibold mb-1">
                   {lang === 'ar' ? 'المادة الدراسية (المعتمدة بالإعدادات):' : 'Subject:'}
                 </label>
                 {configuredSubjects.length > 0 ? (
-                  <select
+                  <select id="newsessionmodal-select-2" name="newsessionmodal-select-2"
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
@@ -188,7 +188,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
                     ))}
                   </select>
                 ) : (
-                  <input
+                  <input id="newsessionmodal-input-3" name="newsessionmodal-input-3"
                     type="text"
                     required
                     value={newSubject}
@@ -202,10 +202,10 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
           )}
 
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label htmlFor="newsessionmodal-select-4" className="block text-slate-700 font-semibold mb-1">
               {lang === 'ar' ? 'الفصل الدراسي:' : 'Class:'}
             </label>
-            <select
+            <select id="newsessionmodal-select-4" name="newsessionmodal-select-4"
               value={newClass}
               onChange={(e) => setNewClass(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800"

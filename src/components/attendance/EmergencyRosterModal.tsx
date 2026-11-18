@@ -225,10 +225,10 @@ export const EmergencyRosterModal: React.FC<EmergencyRosterModalProps> = ({
           <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                <label htmlFor="emergencyrostermodal-select-1" className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                   {lang === 'ar' ? 'نقطة التجمع الميدانية:' : 'Assembly Point:'}
                 </label>
-                <select
+                <select id="emergencyrostermodal-select-1" name="emergencyrostermodal-select-1"
                   value={selectedAssemblyPoint}
                   onChange={(e) => setSelectedAssemblyPoint(e.target.value)}
                   className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-rose-500 cursor-pointer"
@@ -242,10 +242,10 @@ export const EmergencyRosterModal: React.FC<EmergencyRosterModalProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                <label htmlFor="emergencyrostermodal-select-2" className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                   {lang === 'ar' ? 'تصفية الفصل:' : 'Class:'}
                 </label>
-                <select
+                <select id="emergencyrostermodal-select-2" name="emergencyrostermodal-select-2"
                   value={selectedClassFilter}
                   onChange={(e) => setSelectedClassFilter(e.target.value)}
                   className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-rose-500 cursor-pointer"
@@ -262,7 +262,7 @@ export const EmergencyRosterModal: React.FC<EmergencyRosterModalProps> = ({
 
             <div className="relative w-full md:w-72">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute start-3 top-2.5" />
-              <input
+              <input id="emergencyrostermodal-input-3" name="emergencyrostermodal-input-3"
                 type="text"
                 placeholder={lang === 'ar' ? 'بحث سريع باسم الطالب أو الهوية...' : 'Search student...'}
                 value={searchQuery}
@@ -297,7 +297,7 @@ export const EmergencyRosterModal: React.FC<EmergencyRosterModalProps> = ({
                       }`}
                     >
                       <td className="py-2 px-3 text-center">
-                        <input
+                        <input id="emergencyrostermodal-input-4" name="emergencyrostermodal-input-4"
                           type="checkbox"
                           checked={item.isVerifiedAtPoint}
                           onChange={() => {}}

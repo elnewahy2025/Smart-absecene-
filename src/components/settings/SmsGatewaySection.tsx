@@ -42,7 +42,7 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
         <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
           {lang === 'ar' ? 'تفعيل إرسال الرسائل النصية (SMS):' : 'Enable sending SMS messages:'}
         </span>
-        <input
+        <input id="smsgatewaysection-input-1" name="smsgatewaysection-input-1"
           type="checkbox"
           disabled={!isSuperAdmin}
           checked={form.enableSmsNotifications}
@@ -55,10 +55,10 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* SMS Provider */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="smsgatewaysection-select-2" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'مزود خدمة الـ SMS المعتمد:' : 'Approved SMS service provider:'}
         </label>
-        <select
+        <select id="smsgatewaysection-select-2" name="smsgatewaysection-select-2"
           disabled={!isSuperAdmin}
           value={form.smsProvider}
           onChange={(e) => handleFieldChange('smsProvider', e.target.value as SmsGatewayProvider)}
@@ -73,10 +73,10 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
 
       {/* SMS Sender ID */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="smsgatewaysection-input-3" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'اسم المرسل المعتمد (Sender ID):' : 'Approved sender name (Sender ID):'}
         </label>
-        <input
+        <input id="smsgatewaysection-input-3" name="smsgatewaysection-input-3"
           type="text"
           disabled={!isSuperAdmin}
           value={form.smsSenderId || ''}
@@ -91,11 +91,11 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
 
       {/* SMS API Key / Token */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="smsgatewaysection-input-4" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'مفتاح الواجهة البرمجية (API Key):' : 'API key (API Key):'}
         </label>
         <div className="relative flex items-center">
-          <input
+          <input id="smsgatewaysection-input-4" name="smsgatewaysection-input-4"
             type={showApiKey ? 'text' : 'password'}
             disabled={!isSuperAdmin}
             value={form.smsApiKey || ''}
@@ -115,11 +115,11 @@ export const SmsGatewaySection: React.FC<SmsGatewaySectionProps> = ({
 
       {/* SMS API Secret */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="smsgatewaysection-input-5" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'الرمز السري (API Secret / Password):' : 'API secret (API Secret / Password):'}
         </label>
         <div className="relative flex items-center">
-          <input
+          <input id="smsgatewaysection-input-5" name="smsgatewaysection-input-5"
             type={showApiSecret ? 'text' : 'password'}
             disabled={!isSuperAdmin}
             value={form.smsApiSecret || ''}

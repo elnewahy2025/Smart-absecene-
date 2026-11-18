@@ -209,7 +209,7 @@ export const UserManagementTab: React.FC<Props> = ({
 
         <div className="relative w-full sm:w-64">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-          <input
+          <input id="usermanagementtab-input-1" name="usermanagementtab-input-1"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

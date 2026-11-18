@@ -212,7 +212,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           {isSuperAdmin && devTenants.length > 1 && (
             <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg text-amber-300 text-xs">
               <span className="font-bold hidden md:inline">🧪 تجربة:</span>
-              <select
+              <select id="headernav-select-1" name="headernav-select-1"
                 value={currentTenant.id}
                 onChange={(e) => switchDevTestTenant(e.target.value)}
                 className="bg-transparent text-amber-300 dark:text-amber-200 text-xs font-bold border-none focus:outline-hidden cursor-pointer"

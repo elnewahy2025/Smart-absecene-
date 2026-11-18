@@ -50,7 +50,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
-            <input
+            <input id="digestschedulersettingstab-input-1" name="digestschedulersettingstab-input-1"
               type="checkbox"
               checked={formConfig.enabled}
               onChange={(e) => onFormConfigChange((prev) => ({ ...prev, enabled: e.target.checked }))}
@@ -63,10 +63,10 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
         {/* Schedule Time Picker & Days */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label htmlFor="digestschedulersettingstab-select-2" className="block text-xs font-bold text-slate-700 mb-1">
               {lang === 'ar' ? 'وقت الإرسال الصباحي المعتمد' : 'Scheduled Delivery Time'}
             </label>
-            <select
+            <select id="digestschedulersettingstab-select-2" name="digestschedulersettingstab-select-2"
               value={formConfig.scheduledTime}
               onChange={(e) => onFormConfigChange((prev) => ({ ...prev, scheduledTime: e.target.value }))}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
@@ -103,7 +103,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
 
         {/* Recipients List Manager */}
         <div className="space-y-3 pt-2 border-t border-slate-100">
-          <label className="block text-xs font-bold text-slate-800">
+          <label htmlFor="digestschedulersettingstab-input-3" className="block text-xs font-bold text-slate-800">
             {lang === 'ar'
               ? 'قائمة المستلمين المعتمدين (قيادات المدرسة والمشرفين)'
               : 'Authorized Administrator Recipients'}
@@ -111,7 +111,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
 
           {/* Add Recipient */}
           <div className="flex gap-2">
-            <input
+            <input id="digestschedulersettingstab-input-3" name="digestschedulersettingstab-input-3"
               type="email"
               value={newRecipientEmail}
               onChange={(e) => onNewRecipientEmailChange(e.target.value)}
@@ -174,7 +174,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
               <span className="text-[11px] font-semibold text-slate-600">
                 {lang === 'ar' ? 'حد الغياب الحرج (أيام)' : 'Critical Absence Limit (Days)'}
               </span>
-              <input
+              <input id="digestschedulersettingstab-input-4" name="digestschedulersettingstab-input-4"
                 type="number"
                 min="3"
                 max="10"
@@ -196,7 +196,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
               <span className="text-[11px] font-semibold text-slate-600">
                 {lang === 'ar' ? 'حد الغياب المتتالي (أيام)' : 'Consecutive Days Limit'}
               </span>
-              <input
+              <input id="digestschedulersettingstab-input-5" name="digestschedulersettingstab-input-5"
                 type="number"
                 min="1"
                 max="5"
@@ -218,7 +218,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
               <span className="text-[11px] font-semibold text-slate-600">
                 {lang === 'ar' ? 'نسبة قفزة غياب الشعبة (%)' : 'Class Spike Threshold (%)'}
               </span>
-              <input
+              <input id="digestschedulersettingstab-input-6" name="digestschedulersettingstab-input-6"
                 type="number"
                 min="10"
                 max="50"
@@ -253,7 +253,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
                   : 'Generates strategic briefing with top 3 priorities before first period.'}
               </p>
             </div>
-            <input
+            <input id="digestschedulersettingstab-input-7" name="digestschedulersettingstab-input-7"
               type="checkbox"
               checked={formConfig.includeGeminiBriefing}
               onChange={(e) =>
@@ -279,7 +279,7 @@ export const DigestSchedulerSettingsTab: React.FC<DigestSchedulerSettingsTabProp
                   : 'Sends instant alert with quick link to morning digest.'}
               </p>
             </div>
-            <input
+            <input id="digestschedulersettingstab-input-8" name="digestschedulersettingstab-input-8"
               type="checkbox"
               checked={formConfig.notifyViaWhatsAppToo}
               onChange={(e) =>

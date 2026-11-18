@@ -107,7 +107,7 @@ export const DigestSettingsModal: React.FC<DigestSettingsModalProps> = ({ isOpen
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
-              <input
+              <input id="digestsettingsmodal-input-1" name="digestsettingsmodal-input-1"
                 type="checkbox"
                 checked={formConfig.enabled}
                 onChange={(e) => setFormConfig((prev) => ({ ...prev, enabled: e.target.checked }))}
@@ -120,11 +120,11 @@ export const DigestSettingsModal: React.FC<DigestSettingsModalProps> = ({ isOpen
           {/* Time & Days */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label htmlFor="digestsettingsmodal-select-2" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-primary" />
                 <span>{isAr ? 'وقت الإرسال الصباحي المعتمد:' : 'Scheduled Dispatch Time:'}</span>
               </label>
-              <select
+              <select id="digestsettingsmodal-select-2" name="digestsettingsmodal-select-2"
                 value={formConfig.scheduledTime}
                 onChange={(e) => setFormConfig((prev) => ({ ...prev, scheduledTime: e.target.value }))}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
@@ -138,11 +138,11 @@ export const DigestSettingsModal: React.FC<DigestSettingsModalProps> = ({ isOpen
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label htmlFor="digestsettingsmodal-select-3" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
                 <span>{isAr ? 'عتبة كشف شذوذ غياب الشعبة:' : 'Class Spike Threshold:'}</span>
               </label>
-              <select
+              <select id="digestsettingsmodal-select-3" name="digestsettingsmodal-select-3"
                 value={formConfig.anomalySpikePercentage}
                 onChange={(e) => setFormConfig((prev) => ({ ...prev, anomalySpikePercentage: Number(e.target.value) }))}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
@@ -157,13 +157,13 @@ export const DigestSettingsModal: React.FC<DigestSettingsModalProps> = ({ isOpen
 
           {/* Email Recipients */}
           <div className="space-y-3">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            <label htmlFor="digestsettingsmodal-input-4" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5 text-primary" />
               <span>{isAr ? 'قائمة البريد الإلكتروني للمستلمين (مدير المدرسة والوكلاء):' : 'Recipients Email List:'}</span>
             </label>
 
             <div className="flex gap-2">
-              <input
+              <input id="digestsettingsmodal-input-4" name="digestsettingsmodal-input-4"
                 type="email"
                 value={newRecipientEmail}
                 onChange={(e) => setNewRecipientEmail(e.target.value)}

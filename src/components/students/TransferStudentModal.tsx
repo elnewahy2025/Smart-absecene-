@@ -115,10 +115,10 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5 text-xs">
           <div className="space-y-1">
-            <label className="font-semibold text-slate-700">
+            <label htmlFor="transferstudentmodal-input-1" className="font-semibold text-slate-700">
               {isAr ? 'اسم المدرسة المنقول إليها *' : 'Destination School Name *'}
             </label>
-            <input
+            <input id="transferstudentmodal-input-1" name="transferstudentmodal-input-1"
               type="text"
               required
               value={destinationSchool}
@@ -129,10 +129,10 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="font-semibold text-slate-700">
+            <label htmlFor="transferstudentmodal-select-2" className="font-semibold text-slate-700">
               {isAr ? 'سبب النقل' : 'Transfer Reason'}
             </label>
-            <select
+            <select id="transferstudentmodal-select-2" name="transferstudentmodal-select-2"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white"

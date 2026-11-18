@@ -341,7 +341,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
         <div className="relative w-full md:w-72">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-          <input
+          <input id="studentmanagementview-input-1" name="studentmanagementview-input-1"
             type="text"
             placeholder={lang === 'ar' ? 'بحث بالاسم، الرقم المدني/المدرسي، الفصل، أو الهاتف...' : 'Search student...'}
             value={searchQuery}

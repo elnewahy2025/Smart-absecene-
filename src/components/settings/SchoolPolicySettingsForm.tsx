@@ -37,10 +37,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
       {/* Mode */}
       <div className="space-y-1">
-        <label className="font-semibold text-slate-800 block">
+        <label htmlFor="schoolpolicysettingsform-select-1" className="font-semibold text-slate-800 block">
           {lang === 'ar' ? 'نمط تسجيل الحضور المعتمد بالمدرسة:' : 'Attendance Mode:'}
         </label>
-        <select
+        <select id="schoolpolicysettingsform-select-1" name="schoolpolicysettingsform-select-1"
           value={formSettings.attendanceMode}
           onChange={(e: any) =>
             setFormSettings({ ...formSettings, attendanceMode: e.target.value })
@@ -55,10 +55,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
       {/* Late Grace Period */}
       <div className="space-y-1">
-        <label className="font-semibold text-slate-800 block">
+        <label htmlFor="schoolpolicysettingsform-input-2" className="font-semibold text-slate-800 block">
           {lang === 'ar' ? 'حد احتساب التأخر الصباحي (بالدقائق):' : 'Late Grace Minutes:'}
         </label>
-        <input
+        <input id="schoolpolicysettingsform-input-2" name="schoolpolicysettingsform-input-2"
           type="number"
           min="0"
           max="60"
@@ -78,10 +78,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
       {/* Chronic Limit */}
       <div className="space-y-1">
-        <label className="font-semibold text-slate-800 block">
+        <label htmlFor="schoolpolicysettingsform-input-3" className="font-semibold text-slate-800 block">
           {lang === 'ar' ? 'حد إنذار الغياب المتكرر التلقائي (بالأيام):' : 'Chronic Absence Limit (Days):'}
         </label>
-        <input
+        <input id="schoolpolicysettingsform-input-3" name="schoolpolicysettingsform-input-3"
           type="number"
           min="1"
           max="20"
@@ -98,10 +98,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
       {/* Preferred Notification Channel */}
       <div className="space-y-1">
-        <label className="font-semibold text-slate-800 block">
+        <label htmlFor="schoolpolicysettingsform-select-4" className="font-semibold text-slate-800 block">
           {lang === 'ar' ? 'قناة إرسال إشعارات أولياء الأمور الافتراضية:' : 'Default Notification Channel:'}
         </label>
-        <select
+        <select id="schoolpolicysettingsform-select-4" name="schoolpolicysettingsform-select-4"
           value={formSettings.preferredChannel || 'both'}
           onChange={(e: any) =>
             setFormSettings({ ...formSettings, preferredChannel: e.target.value })
@@ -122,10 +122,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
         {/* Absence Template */}
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-700 block">
+          <label htmlFor="schoolpolicysettingsform-textarea-5" className="text-xs font-semibold text-slate-700 block">
             {lang === 'ar' ? 'صيغة رسالة تسجيل الغياب:' : 'Absence Message Template:'}
           </label>
-          <textarea
+          <textarea id="schoolpolicysettingsform-textarea-5" name="schoolpolicysettingsform-textarea-5"
             rows={2}
             value={
               formSettings.absenceMessageTemplate ||
@@ -145,10 +145,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
         {/* Late Template */}
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-700 block">
+          <label htmlFor="schoolpolicysettingsform-textarea-6" className="text-xs font-semibold text-slate-700 block">
             {lang === 'ar' ? 'صيغة رسالة التأخر الصباحي:' : 'Tardiness Message Template:'}
           </label>
-          <textarea
+          <textarea id="schoolpolicysettingsform-textarea-6" name="schoolpolicysettingsform-textarea-6"
             rows={2}
             value={
               formSettings.lateMessageTemplate ||
@@ -168,10 +168,10 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
 
         {/* Warning Template */}
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-700 block">
+          <label htmlFor="schoolpolicysettingsform-textarea-7" className="text-xs font-semibold text-slate-700 block">
             {lang === 'ar' ? 'صيغة إنذار الغياب المتكرر:' : 'Chronic Absence Warning Template:'}
           </label>
-          <textarea
+          <textarea id="schoolpolicysettingsform-textarea-7" name="schoolpolicysettingsform-textarea-7"
             rows={2}
             value={
               formSettings.warningMessageTemplate ||
@@ -190,7 +190,7 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
       {/* Checkboxes */}
       <div className="space-y-3 pt-2">
         <label className="flex items-center gap-2 cursor-pointer">
-          <input
+          <input id="schoolpolicysettingsform-input-8" name="schoolpolicysettingsform-input-8"
             type="checkbox"
             checked={formSettings.sendSmsOnAbsent}
             onChange={(e) =>
@@ -204,7 +204,7 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
-          <input
+          <input id="schoolpolicysettingsform-input-9" name="schoolpolicysettingsform-input-9"
             type="checkbox"
             checked={formSettings.sendSmsOnLate}
             onChange={(e) =>
@@ -218,7 +218,7 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
-          <input
+          <input id="schoolpolicysettingsform-input-10" name="schoolpolicysettingsform-input-10"
             type="checkbox"
             checked={formSettings.notifyOnExcuseApproved ?? true}
             onChange={(e) =>
@@ -232,7 +232,7 @@ export const SchoolPolicySettingsForm: React.FC<SchoolPolicySettingsFormProps> =
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
-          <input
+          <input id="schoolpolicysettingsform-input-11" name="schoolpolicysettingsform-input-11"
             type="checkbox"
             checked={formSettings.requireExcuseAttachment}
             onChange={(e) =>

@@ -96,10 +96,10 @@ export const AbsenceHorizonSelector: React.FC<AbsenceHorizonSelectorProps> = ({
         <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
           {horizonType === 'month' && (
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+              <label htmlFor="absencehorizonselector-select-1" className="text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {isAr ? 'اختر الشهر المعتمد بالتقويم:' : 'Select Month:'}
               </label>
-              <select
+              <select id="absencehorizonselector-select-1" name="absencehorizonselector-select-1"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="flex-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
@@ -115,10 +115,10 @@ export const AbsenceHorizonSelector: React.FC<AbsenceHorizonSelectorProps> = ({
 
           {horizonType === 'term' && (
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+              <label htmlFor="absencehorizonselector-select-2" className="text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {isAr ? 'اختر الفصل الدراسي:' : 'Select Term:'}
               </label>
-              <select
+              <select id="absencehorizonselector-select-2" name="absencehorizonselector-select-2"
                 value={selectedTermId}
                 onChange={(e) => setSelectedTermId(e.target.value)}
                 className="flex-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
@@ -145,10 +145,10 @@ export const AbsenceHorizonSelector: React.FC<AbsenceHorizonSelectorProps> = ({
             <div className="space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  <label htmlFor="absencehorizonselector-input-3" className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
                     {isAr ? 'من تاريخ:' : 'Start Date:'}
                   </label>
-                  <input
+                  <input id="absencehorizonselector-input-3" name="absencehorizonselector-input-3"
                     type="date"
                     value={customStartDate}
                     min={academicYearBounds.start}
@@ -158,10 +158,10 @@ export const AbsenceHorizonSelector: React.FC<AbsenceHorizonSelectorProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  <label htmlFor="absencehorizonselector-input-4" className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
                     {isAr ? 'إلى تاريخ:' : 'End Date:'}
                   </label>
-                  <input
+                  <input id="absencehorizonselector-input-4" name="absencehorizonselector-input-4"
                     type="date"
                     value={customEndDate}
                     min={academicYearBounds.start}

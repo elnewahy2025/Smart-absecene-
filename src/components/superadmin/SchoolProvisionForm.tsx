@@ -147,8 +147,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">اسم المدرسة باللغة العربية *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-1" className="block text-xs font-medium text-slate-300 mb-1">اسم المدرسة باللغة العربية *</label>
+              <input id="schoolprovisionform-input-1" name="schoolprovisionform-input-1"
                 type="text"
                 required
                 value={nameAr}
@@ -158,8 +158,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">اسم المدرسة بالإنجليزية</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-2" className="block text-xs font-medium text-slate-300 mb-1">اسم المدرسة بالإنجليزية</label>
+              <input id="schoolprovisionform-input-2" name="schoolprovisionform-input-2"
                 type="text"
                 value={nameEn}
                 onChange={(e) => setNameEn(e.target.value)}
@@ -168,8 +168,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">رمز المدرسة الوزاري / الكود *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-3" className="block text-xs font-medium text-slate-300 mb-1">رمز المدرسة الوزاري / الكود *</label>
+              <input id="schoolprovisionform-input-3" name="schoolprovisionform-input-3"
                 type="text"
                 required
                 value={code}
@@ -179,8 +179,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">اسم الدولة *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-4" className="block text-xs font-medium text-slate-300 mb-1">اسم الدولة *</label>
+              <input id="schoolprovisionform-input-4" name="schoolprovisionform-input-4"
                 type="text"
                 list="provision-countries-datalist"
                 required
@@ -198,11 +198,11 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               </datalist>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+              <label htmlFor="schoolprovisionform-input-5" className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
                 <span>الكود الدولي للاتصال *</span>
                 <span className="text-[10px] text-amber-400 font-mono">قابل للتعديل</span>
               </label>
-              <input
+              <input id="schoolprovisionform-input-5" name="schoolprovisionform-input-5"
                 type="text"
                 required
                 value={countryCallingCode}
@@ -213,8 +213,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">المدينة *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-6" className="block text-xs font-medium text-slate-300 mb-1">المدينة *</label>
+              <input id="schoolprovisionform-input-6" name="schoolprovisionform-input-6"
                 type="text"
                 required
                 value={cityAr}
@@ -224,8 +224,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">نوع المدرسة *</label>
-              <select
+              <label htmlFor="schoolprovisionform-select-7" className="block text-xs font-medium text-slate-300 mb-1">نوع المدرسة *</label>
+              <select id="schoolprovisionform-select-7" name="schoolprovisionform-select-7"
                 value={schoolType}
                 onChange={(e) => setSchoolType(e.target.value as any)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
@@ -236,8 +236,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">العام الدراسي</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-8" className="block text-xs font-medium text-slate-300 mb-1">العام الدراسي</label>
+              <input id="schoolprovisionform-input-8" name="schoolprovisionform-input-8"
                 type="text"
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
@@ -255,9 +255,9 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">النطاق الفرعي (Subdomain slug) *</label>
+              <label htmlFor="schoolprovisionform-input-9" className="block text-xs font-medium text-slate-300 mb-1">النطاق الفرعي (Subdomain slug) *</label>
               <div className="flex items-center">
-                <input
+                <input id="schoolprovisionform-input-9" name="schoolprovisionform-input-9"
                   type="text"
                   required
                   value={subdomain}
@@ -272,8 +272,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">معرّف المدرسة البرمجي (Tenant ID)</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-10" className="block text-xs font-medium text-slate-300 mb-1">معرّف المدرسة البرمجي (Tenant ID)</label>
+              <input id="schoolprovisionform-input-10" name="schoolprovisionform-input-10"
                 type="text"
                 value={schoolId}
                 onChange={(e) => setSchoolId(e.target.value)}
@@ -318,8 +318,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">اسم مدير المدرسة *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-11" className="block text-xs font-medium text-slate-300 mb-1">اسم مدير المدرسة *</label>
+              <input id="schoolprovisionform-input-11" name="schoolprovisionform-input-11"
                 type="text"
                 required
                 value={principalName}
@@ -329,8 +329,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">البريد الإلكتروني لتسجيل الدخول *</label>
-              <input
+              <label htmlFor="schoolprovisionform-input-12" className="block text-xs font-medium text-slate-300 mb-1">البريد الإلكتروني لتسجيل الدخول *</label>
+              <input id="schoolprovisionform-input-12" name="schoolprovisionform-input-12"
                 type="email"
                 required
                 value={principalEmail}
@@ -341,11 +341,11 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+              <label htmlFor="schoolprovisionform-input-13" className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
                 <span>رقم جوال المدير:</span>
                 <span className="font-mono text-[10px] text-amber-400 font-normal" dir="ltr">{countryCallingCode}</span>
               </label>
-              <input
+              <input id="schoolprovisionform-input-13" name="schoolprovisionform-input-13"
                 type="tel"
                 value={principalPhone}
                 onChange={(e) => setPrincipalPhone(e.target.value)}

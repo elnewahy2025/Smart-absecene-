@@ -66,7 +66,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
       {/* Search input */}
       <div className="relative w-full sm:w-72">
         <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-        <input
+        <input id="sessionrosterpanel-input-1" name="sessionrosterpanel-input-1"
           type="text"
           placeholder={lang === 'ar' ? 'بحث باسم الطالب أو الرقم...' : 'Search student...'}
           value={searchStudent}
@@ -109,7 +109,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
         <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
           <tr>
             <th className="py-3 px-3 w-10 text-center">
-              <input
+              <input id="sessionrosterpanel-input-2" name="sessionrosterpanel-input-2"
                 type="checkbox"
                 aria-label="تحديد الكل"
                 checked={
@@ -149,7 +149,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                   }`}
                 >
                   <td className="py-3 px-3 text-center">
-                    <input
+                    <input id="sessionrosterpanel-input-3" name="sessionrosterpanel-input-3"
                       type="checkbox"
                       aria-label={`تحديد ${student.fullName}`}
                       checked={isSelected}
@@ -199,7 +199,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                       {record.status === 'late' && (
                         <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] text-amber-800">
                           <span>{lang === 'ar' ? 'تأخر:' : 'Late:'}</span>
-                          <input
+                          <input id="sessionrosterpanel-input-4" name="sessionrosterpanel-input-4"
                             type="number"
                             min="1"
                             max="45"
@@ -214,7 +214,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                         </div>
                       )}
 
-                      <input
+                      <input id="sessionrosterpanel-input-5" name="sessionrosterpanel-input-5"
                         type="text"
                         disabled={!canEdit}
                         placeholder={lang === 'ar' ? 'ملاحظة خاصة...' : 'Note...'}

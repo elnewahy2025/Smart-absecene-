@@ -248,7 +248,7 @@ export const BatchNotificationModal: React.FC<BatchNotificationModalProps> = ({
 
                   {/* Class Filter */}
                   <div>
-                    <select
+                    <select id="batchnotificationmodal-select-1" name="batchnotificationmodal-select-1"
                       value={batchClassFilter}
                       onChange={(e) => setBatchClassFilter(e.target.value)}
                       className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-medium text-slate-700 cursor-pointer"
@@ -265,7 +265,7 @@ export const BatchNotificationModal: React.FC<BatchNotificationModalProps> = ({
                   {/* Student Search */}
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-                    <input
+                    <input id="batchnotificationmodal-input-2" name="batchnotificationmodal-input-2"
                       type="text"
                       placeholder={lang === 'ar' ? 'بحث بالاسم أو الفصل...' : 'Filter students...'}
                       value={batchSearchQuery}
@@ -293,7 +293,7 @@ export const BatchNotificationModal: React.FC<BatchNotificationModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <input
+                            <input id="batchnotificationmodal-input-3" name="batchnotificationmodal-input-3"
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => {}} // Handled by container onClick
@@ -445,7 +445,7 @@ export const BatchNotificationModal: React.FC<BatchNotificationModalProps> = ({
                 {/* Message Customization Textarea & Dynamic Variable Pills */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-slate-600">
-                    <label className="font-bold">
+                    <label htmlFor="batchnotificationmodal-textarea-4" className="font-bold">
                       {lang === 'ar' ? 'نص التذكير المعتمد للإرسال:' : 'Message Content to Dispatch:'}
                     </label>
                     <span className="font-mono text-[11px] text-slate-500">
@@ -453,7 +453,7 @@ export const BatchNotificationModal: React.FC<BatchNotificationModalProps> = ({
                     </span>
                   </div>
 
-                  <textarea
+                  <textarea id="batchnotificationmodal-textarea-4" name="batchnotificationmodal-textarea-4"
                     rows={3}
                     value={currentBatchMessage}
                     onChange={(e) => setBatchCustomMessage(e.target.value)}

@@ -410,10 +410,10 @@ export const JustificationReviewModal: React.FC<JustificationReviewModalProps> =
                 </div>
               ) : (
                 <div className="space-y-1.5 pt-1">
-                  <label className="block font-bold text-slate-800 text-xs">
+                  <label htmlFor="justificationreviewmodal-input-1" className="block font-bold text-slate-800 text-xs">
                     {lang === 'ar' ? 'ملاحظة وقرار لجنة الحضور المدرسية:' : 'Committee Decision Notes:'}
                   </label>
-                  <input
+                  <input id="justificationreviewmodal-input-1" name="justificationreviewmodal-input-1"
                     type="text"
                     value={reviewerNotes}
                     onChange={(e) => setReviewerNotes(e.target.value)}

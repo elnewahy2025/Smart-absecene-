@@ -307,8 +307,8 @@ export const StudentBehaviourModal: React.FC<Props> = ({
               {/* Title & Points */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="font-semibold text-slate-700">{lang === 'ar' ? 'عنوان الواقعة' : 'Title'}</label>
-                  <input
+                  <label htmlFor="studentbehaviourmodal-input-1" className="font-semibold text-slate-700">{lang === 'ar' ? 'عنوان الواقعة' : 'Title'}</label>
+                  <input id="studentbehaviourmodal-input-1" name="studentbehaviourmodal-input-1"
                     type="text"
                     required
                     value={title}
@@ -318,8 +318,8 @@ export const StudentBehaviourModal: React.FC<Props> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">{lang === 'ar' ? 'النقاط' : 'Points'}</label>
-                  <input
+                  <label htmlFor="studentbehaviourmodal-input-2" className="font-semibold text-slate-700">{lang === 'ar' ? 'النقاط' : 'Points'}</label>
+                  <input id="studentbehaviourmodal-input-2" name="studentbehaviourmodal-input-2"
                     type="number"
                     min={1}
                     max={20}
@@ -332,8 +332,8 @@ export const StudentBehaviourModal: React.FC<Props> = ({
 
               {/* Description */}
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">{lang === 'ar' ? 'تفاصيل الواقعة' : 'Description'}</label>
-                <textarea
+                <label htmlFor="studentbehaviourmodal-textarea-3" className="font-semibold text-slate-700">{lang === 'ar' ? 'تفاصيل الواقعة' : 'Description'}</label>
+                <textarea id="studentbehaviourmodal-textarea-3" name="studentbehaviourmodal-textarea-3"
                   rows={2}
                   required
                   value={description}
@@ -345,8 +345,8 @@ export const StudentBehaviourModal: React.FC<Props> = ({
 
               {/* Action Taken */}
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">{lang === 'ar' ? 'الإجراء التربوي المتخذ (اختياري)' : 'Action Taken (Optional)'}</label>
-                <input
+                <label htmlFor="studentbehaviourmodal-input-4" className="font-semibold text-slate-700">{lang === 'ar' ? 'الإجراء التربوي المتخذ (اختياري)' : 'Action Taken (Optional)'}</label>
+                <input id="studentbehaviourmodal-input-4" name="studentbehaviourmodal-input-4"
                   type="text"
                   value={actionTaken}
                   onChange={(e) => setActionTaken(e.target.value)}
@@ -357,7 +357,7 @@ export const StudentBehaviourModal: React.FC<Props> = ({
 
               {/* Guardian Notified Checkbox */}
               <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <input
+                <input id="studentbehaviourmodal-input-5" name="studentbehaviourmodal-input-5"
                   type="checkbox"
                   checked={guardianNotified}
                   onChange={(e) => setGuardianNotified(e.target.checked)}

@@ -128,10 +128,10 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
         <form onSubmit={onSubmit} className="space-y-4 text-xs">
           {/* Student Selector */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label htmlFor="justificationsubmitform-select-1" className="block text-slate-700 font-semibold mb-1">
               {lang === 'ar' ? 'الطالب المعني بالعذر:' : 'Target Student:'}
             </label>
-            <select
+            <select id="justificationsubmitform-select-1" name="justificationsubmitform-select-1"
               value={selectedStudentId}
               onChange={(e) => setSelectedStudentId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
@@ -147,10 +147,10 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
           {/* Date & Reason Type */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="justificationsubmitform-input-2" className="block text-slate-700 font-semibold mb-1">
                 {lang === 'ar' ? 'تاريخ الغياب المطلوب تبريره:' : 'Absence Date:'}
               </label>
-              <input
+              <input id="justificationsubmitform-input-2" name="justificationsubmitform-input-2"
                 type="date"
                 required
                 min={academicYearBounds.start}
@@ -172,10 +172,10 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="justificationsubmitform-select-3" className="block text-slate-700 font-semibold mb-1">
                 {lang === 'ar' ? 'تصنيف العذر:' : 'Reason Category:'}
               </label>
-              <select
+              <select id="justificationsubmitform-select-3" name="justificationsubmitform-select-3"
                 value={reasonType}
                 onChange={(e) => setReasonType(e.target.value as any)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 font-medium cursor-pointer"
@@ -190,7 +190,7 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
 
           {/* Upload Document & Interactive Demo Helpers */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label htmlFor="medical-file-input" className="block text-slate-700 font-semibold mb-1">
               {lang === 'ar' ? 'إرفاق التقرير الطبي أو المستند:' : 'Attach Medical Document:'}
             </label>
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50 hover:bg-slate-100/70 transition-colors space-y-3">
@@ -274,10 +274,10 @@ export const JustificationSubmitForm: React.FC<JustificationSubmitFormProps> = (
 
           {/* Guardian Explanation */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label htmlFor="justificationsubmitform-textarea-4" className="block text-slate-700 font-semibold mb-1">
               {lang === 'ar' ? 'بيان وتفاصيل العذر:' : 'Explanation:'}
             </label>
-            <textarea
+            <textarea id="justificationsubmitform-textarea-4" name="justificationsubmitform-textarea-4"
               rows={3}
               required
               value={guardianExplanation}

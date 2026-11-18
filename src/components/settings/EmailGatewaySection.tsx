@@ -49,7 +49,7 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
         <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
           {lang === 'ar' ? 'تفعيل البريد الإلكتروني:' : 'Enable email:'}
         </span>
-        <input
+        <input id="emailgatewaysection-input-1" name="emailgatewaysection-input-1"
           type="checkbox"
           disabled={!isSuperAdmin}
           checked={Boolean(form.emailEnabled)}
@@ -62,10 +62,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Email Provider */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="emailgatewaysection-select-2" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'مزود البريد الإلكتروني:' : 'Email provider:'}
         </label>
-        <select
+        <select id="emailgatewaysection-select-2" name="emailgatewaysection-select-2"
           disabled={!isSuperAdmin}
           value={form.emailProvider || 'smtp'}
           onChange={(e) => handleFieldChange('emailProvider', e.target.value as EmailGatewayProvider)}
@@ -79,10 +79,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
 
       {/* From Email */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="emailgatewaysection-input-3" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'عنوان المرسل (From Email):' : 'Sender address (From Email):'}
         </label>
-        <input
+        <input id="emailgatewaysection-input-3" name="emailgatewaysection-input-3"
           type="email"
           disabled={!isSuperAdmin}
           value={form.fromEmail || ''}
@@ -94,10 +94,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
 
       {/* From Name */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="emailgatewaysection-input-4" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'اسم المرسل (From Name):' : 'Sender name (From Name):'}
         </label>
-        <input
+        <input id="emailgatewaysection-input-4" name="emailgatewaysection-input-4"
           type="text"
           disabled={!isSuperAdmin}
           value={form.fromName || ''}
@@ -111,10 +111,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
     {(form.emailProvider || 'smtp') === 'smtp' ? (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+          <label htmlFor="emailgatewaysection-input-5" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
             {lang === 'ar' ? 'خادم SMTP (Host):' : 'SMTP server (Host):'}
           </label>
-          <input
+          <input id="emailgatewaysection-input-5" name="emailgatewaysection-input-5"
             type="text"
             disabled={!isSuperAdmin}
             value={form.smtpHost || ''}
@@ -124,10 +124,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
           />
         </div>
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+          <label htmlFor="emailgatewaysection-input-6" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
             {lang === 'ar' ? 'المنفذ (Port):' : 'Port (Port):'}
           </label>
-          <input
+          <input id="emailgatewaysection-input-6" name="emailgatewaysection-input-6"
             type="number"
             disabled={!isSuperAdmin}
             value={form.smtpPort ?? 587}
@@ -137,7 +137,7 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
         </div>
         <div className="flex items-end gap-2">
           <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-            <input
+            <input id="emailgatewaysection-input-7" name="emailgatewaysection-input-7"
               type="checkbox"
               disabled={!isSuperAdmin}
               checked={Boolean(form.smtpSecure)}
@@ -148,10 +148,10 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
           </label>
         </div>
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+          <label htmlFor="emailgatewaysection-input-8" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
             {lang === 'ar' ? 'اسم المستخدم (SMTP User):' : 'Username (SMTP User):'}
           </label>
-          <input
+          <input id="emailgatewaysection-input-8" name="emailgatewaysection-input-8"
             type="text"
             disabled={!isSuperAdmin}
             value={form.smtpUser || ''}
@@ -161,11 +161,11 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
           />
         </div>
         <div className="lg:col-span-2">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+          <label htmlFor="emailgatewaysection-input-9" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
             {lang === 'ar' ? 'كلمة مرور SMTP:' : 'SMTP password:'}
           </label>
           <div className="relative flex items-center">
-            <input
+            <input id="emailgatewaysection-input-9" name="emailgatewaysection-input-9"
               type={showSmtpPass ? 'text' : 'password'}
               disabled={!isSuperAdmin}
               value={form.smtpPass || ''}
@@ -185,11 +185,11 @@ export const EmailGatewaySection: React.FC<EmailGatewaySectionProps> = ({
       </div>
     ) : (
       <div className="max-w-md">
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+        <label htmlFor="emailgatewaysection-input-10" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
           {lang === 'ar' ? 'مفتاح الواجهة البرمجية (Email API Key):' : 'API key (Email API Key):'}
         </label>
         <div className="relative flex items-center">
-          <input
+          <input id="emailgatewaysection-input-10" name="emailgatewaysection-input-10"
             type={showEmailApiKey ? 'text' : 'password'}
             disabled={!isSuperAdmin}
             value={form.emailApiKey || ''}

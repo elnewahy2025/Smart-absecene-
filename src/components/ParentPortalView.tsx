@@ -109,7 +109,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({ onOpenExcuse
                   : 'Active Child:'}
               </span>
               {myChildren.length > 1 ? (
-                <select
+                <select id="parentportalview-select-1" name="parentportalview-select-1"
                   value={activeStudent.id}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   className="bg-emerald-950/80 text-white font-semibold text-xs rounded-lg px-3 py-1.5 border border-emerald-500/50 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 cursor-pointer"

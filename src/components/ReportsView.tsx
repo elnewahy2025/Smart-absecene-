@@ -145,7 +145,7 @@ export const ReportsView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
               <span className="text-slate-500 dark:text-slate-400 font-bold">{lang === 'ar' ? 'الفصل:' : 'Class:'}</span>
-              <select
+              <select id="reportsview-select-1" name="reportsview-select-1"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="bg-transparent font-bold focus:outline-none cursor-pointer"
@@ -166,7 +166,7 @@ export const ReportsView: React.FC = () => {
 
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
               <span className="text-slate-500 dark:text-slate-400 font-bold">{lang === 'ar' ? 'نوع الكشف:' : 'Report Type:'}</span>
-              <select
+              <select id="reportsview-select-2" name="reportsview-select-2"
                 value={reportType}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                   setReportType(e.target.value as 'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical')

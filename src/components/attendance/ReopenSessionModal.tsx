@@ -51,10 +51,10 @@ export const ReopenSessionModal: React.FC<ReopenSessionModalProps> = ({
         </p>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-800 mb-1">
+          <label htmlFor="reopensessionmodal-textarea-1" className="block text-xs font-semibold text-slate-800 mb-1">
             {lang === 'ar' ? 'سبب إعادة الفتح (إلزامي):' : 'Reopen Reason (Required):'}
           </label>
-          <textarea
+          <textarea id="reopensessionmodal-textarea-1" name="reopensessionmodal-textarea-1"
             rows={3}
             required
             value={reopenReason}

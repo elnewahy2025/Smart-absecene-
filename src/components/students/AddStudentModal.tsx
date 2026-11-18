@@ -141,8 +141,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
           <div className="space-y-1">
-            <label className="font-semibold text-slate-700">{isAr ? 'اسم الطالب رباعي *' : 'Full Name *'}</label>
-            <input
+            <label htmlFor="addstudentmodal-input-1" className="font-semibold text-slate-700">{isAr ? 'اسم الطالب رباعي *' : 'Full Name *'}</label>
+            <input id="addstudentmodal-input-1" name="addstudentmodal-input-1"
               type="text"
               required
               value={fullName}
@@ -154,12 +154,12 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">
+              <label htmlFor="addstudentmodal-input-2" className="font-semibold text-slate-700">
                 {isAr
                   ? `${idSpec.nationalIdLabelAr}${idSpec.nationalIdLength > 0 ? ` (${idSpec.nationalIdLength} أرقام)` : ''} *`
                   : `${idSpec.nationalIdLabelEn} *`}
               </label>
-              <input
+              <input id="addstudentmodal-input-2" name="addstudentmodal-input-2"
                 type="text"
                 required
                 maxLength={idSpec.nationalIdLength > 0 ? idSpec.nationalIdLength : 20}
@@ -170,8 +170,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               />
             </div>
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'الرقم المدرسي / الأكاديمي *' : 'Student No. *'}</label>
-              <input
+              <label htmlFor="addstudentmodal-input-3" className="font-semibold text-slate-700">{isAr ? 'الرقم المدرسي / الأكاديمي *' : 'Student No. *'}</label>
+              <input id="addstudentmodal-input-3" name="addstudentmodal-input-3"
                 type="text"
                 required
                 value={studentNumber}
@@ -184,8 +184,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'المرحلة الدراسية' : 'Grade'}</label>
-              <select
+              <label htmlFor="addstudentmodal-select-4" className="font-semibold text-slate-700">{isAr ? 'المرحلة الدراسية' : 'Grade'}</label>
+              <select id="addstudentmodal-select-4" name="addstudentmodal-select-4"
                 value={grade}
                 onChange={(e) => {
                   const newG = e.target.value;
@@ -205,10 +205,10 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'الفصل الدراسي' : 'Class Section'}</label>
+              <label htmlFor="addstudentmodal-select-5" className="font-semibold text-slate-700">{isAr ? 'الفصل الدراسي' : 'Class Section'}</label>
               {!useCustomClass ? (
                 <div className="flex gap-1.5">
-                  <select
+                  <select id="addstudentmodal-select-5" name="addstudentmodal-select-5"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-slate-800 text-xs focus:bg-white"
@@ -229,7 +229,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                 </div>
               ) : (
                 <div className="flex gap-1.5">
-                  <input
+                  <input id="addstudentmodal-input-6" name="addstudentmodal-input-6"
                     type="text"
                     value={customClass}
                     onChange={(e) => setCustomClass(e.target.value)}
@@ -250,8 +250,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'اسم ولي الأمر' : 'Guardian Name'}</label>
-              <input
+              <label htmlFor="addstudentmodal-input-7" className="font-semibold text-slate-700">{isAr ? 'اسم ولي الأمر' : 'Guardian Name'}</label>
+              <input id="addstudentmodal-input-7" name="addstudentmodal-input-7"
                 type="text"
                 value={guardianName}
                 onChange={(e) => setGuardianName(e.target.value)}
@@ -260,11 +260,11 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               />
             </div>
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 flex items-center justify-between">
+              <label htmlFor="addstudentmodal-input-8" className="font-semibold text-slate-700 flex items-center justify-between">
                 <span>{isAr ? 'جوال ولي الأمر *' : 'Guardian Phone *'}</span>
                 <span className="font-mono text-[10px] text-emerald-600 font-normal" dir="ltr">{dialCode}</span>
               </label>
-              <input
+              <input id="addstudentmodal-input-8" name="addstudentmodal-input-8"
                 type="text"
                 required
                 value={guardianPhone}
@@ -277,8 +277,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'صلة القرابة' : 'Relationship'}</label>
-              <select
+              <label htmlFor="addstudentmodal-select-9" className="font-semibold text-slate-700">{isAr ? 'صلة القرابة' : 'Relationship'}</label>
+              <select id="addstudentmodal-select-9" name="addstudentmodal-select-9"
                 value={guardianRelationship}
                 onChange={(e) => setGuardianRelationship(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white"
@@ -290,8 +290,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700">{isAr ? 'فصيلة الدم' : 'Blood Type'}</label>
-              <select
+              <label htmlFor="addstudentmodal-select-10" className="font-semibold text-slate-700">{isAr ? 'فصيلة الدم' : 'Blood Type'}</label>
+              <select id="addstudentmodal-select-10" name="addstudentmodal-select-10"
                 value={bloodType}
                 onChange={(e) => setBloodType(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:bg-white"

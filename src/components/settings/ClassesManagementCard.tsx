@@ -140,8 +140,8 @@ export const ClassesManagementCard: React.FC<Props> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الفصل / الشعبة *' : 'Class / section name *'}</label>
-              <input
+              <label htmlFor="classesmanagementcard-input-1" className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الفصل / الشعبة *' : 'Class / section name *'}</label>
+              <input id="classesmanagementcard-input-1" name="classesmanagementcard-input-1"
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -151,9 +151,9 @@ export const ClassesManagementCard: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الصف / المرحلة الدراسية *' : 'Grade / grade level *'}</label>
+              <label htmlFor="classesmanagementcard-select-2" className="text-slate-600 block mb-1">{lang === 'ar' ? 'الصف / المرحلة الدراسية *' : 'Grade / grade level *'}</label>
               {educationalGrades.length > 0 ? (
-                <select
+                <select id="classesmanagementcard-select-2" name="classesmanagementcard-select-2"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 font-medium"
@@ -165,7 +165,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                   ))}
                 </select>
               ) : (
-                <input
+                <input id="classesmanagementcard-input-3" name="classesmanagementcard-input-3"
                   type="text"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
@@ -175,8 +175,8 @@ export const ClassesManagementCard: React.FC<Props> = ({
               )}
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'القاعة / الغرفة الصفية' : 'Room / classroom'}</label>
-              <input
+              <label htmlFor="classesmanagementcard-input-4" className="text-slate-600 block mb-1">{lang === 'ar' ? 'القاعة / الغرفة الصفية' : 'Room / classroom'}</label>
+              <input id="classesmanagementcard-input-4" name="classesmanagementcard-input-4"
                 type="text"
                 value={newRoom}
                 onChange={(e) => setNewRoom(e.target.value)}
@@ -185,8 +185,8 @@ export const ClassesManagementCard: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'السعة الاستيعابية' : 'Capacity'}</label>
-              <input
+              <label htmlFor="classesmanagementcard-input-5" className="text-slate-600 block mb-1">{lang === 'ar' ? 'السعة الاستيعابية' : 'Capacity'}</label>
+              <input id="classesmanagementcard-input-5" name="classesmanagementcard-input-5"
                 type="number"
                 value={newCapacity}
                 onChange={(e) => setNewCapacity(Number(e.target.value))}
@@ -243,7 +243,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                     {isEditing ? (
                       <>
                         <td className="p-2">
-                          <input
+                          <input id="classesmanagementcard-input-6" name="classesmanagementcard-input-6"
                             type="text"
                             value={nameInput}
                             onChange={(e) => setNameInput(e.target.value)}
@@ -252,7 +252,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                         </td>
                         <td className="p-2">
                           {educationalGrades.length > 0 ? (
-                            <select
+                            <select id="classesmanagementcard-select-7" name="classesmanagementcard-select-7"
                               value={gradeInput}
                               onChange={(e) => setGradeInput(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-800 font-medium"
@@ -267,7 +267,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                               ))}
                             </select>
                           ) : (
-                            <input
+                            <input id="classesmanagementcard-input-8" name="classesmanagementcard-input-8"
                               type="text"
                               value={gradeInput}
                               onChange={(e) => setGradeInput(e.target.value)}
@@ -276,7 +276,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                           )}
                         </td>
                         <td className="p-2">
-                          <input
+                          <input id="classesmanagementcard-input-9" name="classesmanagementcard-input-9"
                             type="text"
                             value={roomInput}
                             onChange={(e) => setRoomInput(e.target.value)}
@@ -284,7 +284,7 @@ export const ClassesManagementCard: React.FC<Props> = ({
                           />
                         </td>
                         <td className="p-2 w-20 text-center">
-                          <input
+                          <input id="classesmanagementcard-input-10" name="classesmanagementcard-input-10"
                             type="number"
                             value={capacityInput}
                             onChange={(e) => setCapacityInput(Number(e.target.value))}

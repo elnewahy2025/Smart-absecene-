@@ -143,7 +143,7 @@ export const QrFinalizeModal: React.FC<QrFinalizeModalProps> = ({
 
                       {/* Minutes selector if late */}
                       {isLate && (
-                        <select
+                        <select id="qrfinalizemodal-select-1" name="qrfinalizemodal-select-1"
                           value={currentSetting.minutesLate}
                           onChange={(e) => onChangeUnscannedMinutes(std.id, Number(e.target.value))}
                           className="bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-md px-1.5 py-1 text-[10px] font-bold text-amber-900 dark:text-amber-200 cursor-pointer"

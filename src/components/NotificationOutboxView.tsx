@@ -206,7 +206,7 @@ export const NotificationOutboxView: React.FC = () => {
 
           <div className="relative w-full sm:w-60">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-            <input
+            <input id="notificationoutboxview-input-1" name="notificationoutboxview-input-1"
               type="text"
               placeholder={lang === 'ar' ? 'بحث بالاسم أو الهاتف...' : 'Search recipient or text...'}
               value={searchQuery}
@@ -254,7 +254,7 @@ export const NotificationOutboxView: React.FC = () => {
             <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
               <tr>
                 <th className="py-3 px-3 text-center w-10">
-                  <input
+                  <input id="notificationoutboxview-input-2" name="notificationoutboxview-input-2"
                     type="checkbox"
                     checked={
                       filteredNotifications.length > 0 &&
@@ -298,7 +298,7 @@ export const NotificationOutboxView: React.FC = () => {
                       }`}
                     >
                       <td className="py-3 px-3 text-center">
-                        <input
+                        <input id="notificationoutboxview-input-3" name="notificationoutboxview-input-3"
                           type="checkbox"
                           checked={isRowSelected}
                           onChange={() => toggleSelectOutboxItem(notif.id)}

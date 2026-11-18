@@ -100,7 +100,7 @@ export const AbsenceHeatmapCard: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
+          <select id="absenceheatmapcard-select-1" name="absenceheatmapcard-select-1"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
             className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 font-medium cursor-pointer"

@@ -108,7 +108,7 @@ export const QrViewfinderPanel: React.FC<QrViewfinderPanelProps> = ({
 
       {/* Manual Code / Hardware Barcode Input */}
       <form onSubmit={onManualSubmit} className="flex items-center gap-1.5">
-        <input
+        <input id="qrviewfinderpanel-input-1" name="qrviewfinderpanel-input-1"
           type="text"
           placeholder={lang === 'ar' ? 'أدخل رقم الطالب أو امسح بالباركود...' : 'Scan / Enter Student ID...'}
           value={manualCodeInput}

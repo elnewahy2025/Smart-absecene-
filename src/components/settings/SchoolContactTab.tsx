@@ -96,11 +96,11 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Country Name */}
           <div className="lg:col-span-2">
-            <label className="font-semibold text-slate-700 dark:text-slate-200 block mb-1">
+            <label htmlFor="schoolcontacttab-input-1" className="font-semibold text-slate-700 dark:text-slate-200 block mb-1">
               {lang === 'ar' ? 'اسم الدولة (قابلة للاختيار أو الكتابة الحرة لأي دولة):' : 'Country Name (select or type freely for any country):'}
             </label>
             <div className="relative">
-              <input
+              <input id="schoolcontacttab-input-1" name="schoolcontacttab-input-1"
                 type="text"
                 list="countries-datalist"
                 disabled={disabled}
@@ -121,12 +121,12 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
           {/* International Dial Code */}
           <div>
-            <label className="font-semibold text-slate-700 dark:text-slate-200 block mb-1 flex items-center justify-between">
+            <label htmlFor="schoolcontacttab-input-2" className="font-semibold text-slate-700 dark:text-slate-200 block mb-1 flex items-center justify-between">
               <span>{lang === 'ar' ? 'الكود الدولي للاتصال:' : 'International Dial Code:'}</span>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">{lang === 'ar' ? 'قابل للتعديل' : 'Editable'}</span>
             </label>
             <div className="flex items-center gap-1.5">
-              <input
+              <input id="schoolcontacttab-input-2" name="schoolcontacttab-input-2"
                 type="text"
                 disabled={disabled}
                 value={currentDialCode}
@@ -143,8 +143,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
       {/* Address Details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.regionLabelAr : 'Administrative Region:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-3" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? preset.regionLabelAr : 'Administrative Region:'}</label>
+          <input id="schoolcontacttab-input-3" name="schoolcontacttab-input-3"
             type="text"
             disabled={disabled}
             value={address.region || ''}
@@ -155,8 +155,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المدينة:' : 'City:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-4" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'المدينة:' : 'City:'}</label>
+          <input id="schoolcontacttab-input-4" name="schoolcontacttab-input-4"
             type="text"
             disabled={disabled}
             value={address.city || ''}
@@ -167,8 +167,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الحي / المنطقة السكنية:' : 'District / Residential Area:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-5" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الحي / المنطقة السكنية:' : 'District / Residential Area:'}</label>
+          <input id="schoolcontacttab-input-5" name="schoolcontacttab-input-5"
             type="text"
             disabled={disabled}
             value={address.district || ''}
@@ -179,8 +179,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div className="md:col-span-2">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الشارع والوصف التفصيلي:' : 'Street & Detailed Description:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-6" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الشارع والوصف التفصيلي:' : 'Street & Detailed Description:'}</label>
+          <input id="schoolcontacttab-input-6" name="schoolcontacttab-input-6"
             type="text"
             disabled={disabled}
             value={address.streetAddress || ''}
@@ -191,8 +191,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
         </div>
 
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الرمز البريدي (Postal Code):' : 'Postal Code:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-7" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الرمز البريدي (Postal Code):' : 'Postal Code:'}</label>
+          <input id="schoolcontacttab-input-7" name="schoolcontacttab-input-7"
             type="text"
             disabled={disabled}
             value={address.postalCode || ''}
@@ -204,7 +204,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* General School Phone */}
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
+          <label htmlFor="schoolcontacttab-input-8" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
             <span>{lang === 'ar' ? 'هاتف المدرسة العام:' : 'General School Phone:'}</span>
             <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
               {lang === 'ar' ? `كود الدولة: ${currentDialCode}` : `Country code: ${currentDialCode}`}
@@ -214,7 +214,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
             <span className="absolute right-3 font-mono text-xs text-slate-400 dark:text-slate-500 select-none" dir="ltr">
               {currentDialCode}
             </span>
-            <input
+            <input id="schoolcontacttab-input-8" name="schoolcontacttab-input-8"
               type="text"
               disabled={disabled}
               value={profile.generalPhone || ''}
@@ -227,7 +227,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* Emergency Hotline */}
         <div>
-          <label className="font-semibold text-rose-700 dark:text-rose-400 block mb-1 flex items-center gap-1 justify-between">
+          <label htmlFor="schoolcontacttab-input-9" className="font-semibold text-rose-700 dark:text-rose-400 block mb-1 flex items-center gap-1 justify-between">
             <span className="flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>{lang === 'ar' ? 'خط طوارئ الإخلاء والسلامة:' : 'Evacuation & Safety Emergency Line:'}</span>
@@ -240,7 +240,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
             <span className="absolute right-3 font-mono text-xs text-rose-400 select-none" dir="ltr">
               {currentDialCode}
             </span>
-            <input
+            <input id="schoolcontacttab-input-9" name="schoolcontacttab-input-9"
               type="text"
               disabled={disabled}
               value={profile.emergencyHotline || ''}
@@ -253,8 +253,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* Official Email */}
         <div>
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني الرسمي:' : 'Official Email:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-10" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني الرسمي:' : 'Official Email:'}</label>
+          <input id="schoolcontacttab-input-10" name="schoolcontacttab-input-10"
             type="email"
             disabled={disabled}
             value={profile.officialEmail || ''}
@@ -266,8 +266,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
         {/* Website URL */}
         <div className="md:col-span-3">
-          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الموقع الإلكتروني الرسمي للمدرسة:' : 'Official School Website:'}</label>
-          <input
+          <label htmlFor="schoolcontacttab-input-11" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">{lang === 'ar' ? 'الموقع الإلكتروني الرسمي للمدرسة:' : 'Official School Website:'}</label>
+          <input id="schoolcontacttab-input-11" name="schoolcontacttab-input-11"
             type="url"
             disabled={disabled}
             value={profile.websiteUrl || ''}

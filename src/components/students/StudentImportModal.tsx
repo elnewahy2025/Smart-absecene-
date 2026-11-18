@@ -280,7 +280,7 @@ export const StudentImportModal: React.FC<StudentImportModalProps> = ({
                     : 'border-slate-300 bg-slate-50 hover:bg-slate-100/70 hover:border-slate-400'
                 }`}
               >
-                <input
+                <input id="studentimportmodal-input-1" name="studentimportmodal-input-1"
                   ref={fileInputRef}
                   type="file"
                   accept=".csv,text/csv"
@@ -346,7 +346,7 @@ export const StudentImportModal: React.FC<StudentImportModalProps> = ({
                   {lang === 'ar' ? 'تجربة عينة طلاب نموذجية' : 'Load Demo Sample'}
                 </button>
               </div>
-              <textarea
+              <textarea id="studentimportmodal-textarea-2" name="studentimportmodal-textarea-2"
                 rows={5}
                 value={rawCsvText}
                 onChange={(e) => {

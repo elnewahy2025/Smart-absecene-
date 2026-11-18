@@ -41,7 +41,7 @@ export const AuditLogPanel: React.FC<AuditLogPanelProps> = ({
             <div className="flex items-center gap-2">
               <div className="relative w-48 sm:w-60">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-                <input
+                <input id="auditlogpanel-input-1" name="auditlogpanel-input-1"
                   type="text"
                   placeholder={lang === 'ar' ? 'بحث بالسجل...' : 'Search logs...'}
                   value={searchAudit}
@@ -50,7 +50,7 @@ export const AuditLogPanel: React.FC<AuditLogPanelProps> = ({
                 />
               </div>
 
-              <select
+              <select id="auditlogpanel-select-2" name="auditlogpanel-select-2"
                 value={auditFilter}
                 onChange={(e) => onFilterChange(e.target.value)}
                 className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer"

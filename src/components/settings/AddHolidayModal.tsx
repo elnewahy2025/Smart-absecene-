@@ -86,10 +86,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
 
         <div className="space-y-3.5">
           <div>
-            <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+            <label htmlFor="addholidaymodal-input-1" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
               {lang === 'ar' ? 'اسم العطلة أو المناسبة الرسمية (بالعربية) *:' : 'Holiday or official occasion name (in Arabic) *:'}
             </label>
-            <input
+            <input id="addholidaymodal-input-1" name="addholidaymodal-input-1"
               type="text"
               required
               placeholder={lang === 'ar' ? 'مثال: إجازة منتصف العام الدراسي، يوم التأسيس، تعليق الدراسة...' : 'e.g. Mid-year school vacation, Founding Day, class suspension...'}
@@ -100,10 +100,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
           </div>
 
           <div>
-            <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+            <label htmlFor="addholidaymodal-input-2" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
               {lang === 'ar' ? 'الاسم بالإنجليزية (اختياري):' : 'English name (optional):'}
             </label>
-            <input
+            <input id="addholidaymodal-input-2" name="addholidaymodal-input-2"
               type="text"
               placeholder="e.g. Mid-term Vacation, Founding Day..."
               value={newHoliday.nameEn || ''}
@@ -114,10 +114,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+              <label htmlFor="addholidaymodal-input-3" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
                 {lang === 'ar' ? 'تاريخ البدء *:' : 'Start date *:'}
               </label>
-              <input
+              <input id="addholidaymodal-input-3" name="addholidaymodal-input-3"
                 type="date"
                 required
                 value={newHoliday.startDate}
@@ -134,10 +134,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
             </div>
 
             <div>
-              <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+              <label htmlFor="addholidaymodal-input-4" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
                 {lang === 'ar' ? 'تاريخ النهاية *:' : 'End date *:'}
               </label>
-              <input
+              <input id="addholidaymodal-input-4" name="addholidaymodal-input-4"
                 type="date"
                 required
                 value={newHoliday.endDate}
@@ -148,10 +148,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
           </div>
 
           <div>
-            <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+            <label htmlFor="addholidaymodal-select-5" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
               {lang === 'ar' ? 'تصنيف الإجازة:' : 'Holiday classification:'}
             </label>
-            <select
+            <select id="addholidaymodal-select-5" name="addholidaymodal-select-5"
               value={newHoliday.type}
               onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value as HolidayType })}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 cursor-pointer"
@@ -165,10 +165,10 @@ export const AddHolidayModal: React.FC<AddHolidayModalProps> = ({
           </div>
 
           <div>
-            <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
+            <label htmlFor="addholidaymodal-textarea-6" className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
               {lang === 'ar' ? 'ملاحظات أو قرار الاعتماد الوزاري:' : 'Notes or the ministerial approval decision:'}
             </label>
-            <textarea
+            <textarea id="addholidaymodal-textarea-6" name="addholidaymodal-textarea-6"
               rows={2}
               placeholder={lang === 'ar' ? 'مثال: بناءً على التعميم الوزاري رقم ... للتقويم الدراسي المعتمد' : 'e.g. Based on ministerial circular No. ... for the approved academic calendar'}
               value={newHoliday.notes || ''}

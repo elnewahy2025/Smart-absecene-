@@ -236,7 +236,7 @@ export const ParentRecordsTable: React.FC<ParentRecordsTableProps> = ({
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            <input
+            <input id="parentrecordstable-input-1" name="parentrecordstable-input-1"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -258,7 +258,7 @@ export const ParentRecordsTable: React.FC<ParentRecordsTableProps> = ({
               <span className="text-slate-500 font-medium shrink-0 flex items-center gap-1">
                 <Filter className="w-3.5 h-3.5" /> تصفية الحالة:
               </span>
-              <select
+              <select id="parentrecordstable-select-2" name="parentrecordstable-select-2"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
                 className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 cursor-pointer"

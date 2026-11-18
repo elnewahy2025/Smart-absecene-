@@ -117,8 +117,8 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
         <div className="p-3 border-b border-slate-100 bg-white flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
             <div>
-              <label className="text-slate-500 block mb-0.5 text-[10px]">نوع المستند:</label>
-              <select
+              <label htmlFor="batchprintcentermodal-select-1" className="text-slate-500 block mb-0.5 text-[10px]">نوع المستند:</label>
+              <select id="batchprintcentermodal-select-1" name="batchprintcentermodal-select-1"
                 value={selectedDocType}
                 onChange={(e) => setSelectedDocType(e.target.value as any)}
                 className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-semibold text-slate-800"
@@ -130,8 +130,8 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
             </div>
 
             <div>
-              <label className="text-slate-500 block mb-0.5 text-[10px]">نطاق الفصل:</label>
-              <select
+              <label htmlFor="batchprintcentermodal-select-2" className="text-slate-500 block mb-0.5 text-[10px]">نطاق الفصل:</label>
+              <select id="batchprintcentermodal-select-2" name="batchprintcentermodal-select-2"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-slate-800"

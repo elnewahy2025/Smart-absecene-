@@ -67,7 +67,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
         <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
           {lang === 'ar' ? 'تفعيل إشعارات الواتساب:' : 'Enable WhatsApp notifications:'}
         </span>
-        <input
+        <input id="whatsappgatewaysection-input-1" name="whatsappgatewaysection-input-1"
           type="checkbox"
           disabled={!isSuperAdmin}
           checked={form.enableWhatsAppNotifications}
@@ -80,7 +80,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* WhatsApp Dedicated Phone Number */}
       <div>
-        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
+        <label htmlFor="whatsappgatewaysection-input-2" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 flex items-center justify-between">
           <span>{lang === 'ar' ? 'رقم هاتف الواتساب المعتمد للمراسلة:' : 'Approved WhatsApp messaging phone number:'}</span>
           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" dir="ltr">
             {lang === 'ar' ? 'كود الدولة:' : 'Country code:'} {defaultCallingCode}
@@ -90,7 +90,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
           <span className="absolute right-3 font-mono text-xs text-slate-400 dark:text-slate-500 select-none" dir="ltr">
             {defaultCallingCode}
           </span>
-          <input
+          <input id="whatsappgatewaysection-input-2" name="whatsappgatewaysection-input-2"
             type="text"
             disabled={!isSuperAdmin}
             value={form.whatsappPhoneNumber || ''}
@@ -187,10 +187,10 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
         </h5>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+            <label htmlFor="whatsappgatewaysection-input-3" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
               Business Account ID:
             </label>
-            <input
+            <input id="whatsappgatewaysection-input-3" name="whatsappgatewaysection-input-3"
               type="text"
               disabled={!isSuperAdmin}
               value={form.whatsappBusinessAccountId || ''}
@@ -201,10 +201,10 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+            <label htmlFor="whatsappgatewaysection-input-4" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
               Phone Number ID:
             </label>
-            <input
+            <input id="whatsappgatewaysection-input-4" name="whatsappgatewaysection-input-4"
               type="text"
               disabled={!isSuperAdmin}
               value={form.whatsappPhoneNumberId || ''}
@@ -215,11 +215,11 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+            <label htmlFor="whatsappgatewaysection-input-5" className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
               Permanent System Access Token:
             </label>
             <div className="relative flex items-center">
-              <input
+              <input id="whatsappgatewaysection-input-5" name="whatsappgatewaysection-input-5"
                 type={showToken ? 'text' : 'password'}
                 disabled={!isSuperAdmin}
                 value={form.whatsappApiToken || ''}
@@ -243,7 +243,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
     {/* Quick WhatsApp Web Live Tester */}
     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div className="flex items-center gap-2 w-full sm:w-auto">
-        <input
+        <input id="whatsappgatewaysection-input-6" name="whatsappgatewaysection-input-6"
           type="text"
           value={testPhoneNumber}
           onChange={(e) => setTestPhoneNumber(e.target.value)}

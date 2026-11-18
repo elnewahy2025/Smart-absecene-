@@ -47,8 +47,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             <span>{lang === 'ar' ? 'مدير / مديرة المدرسة' : 'School Principal'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
-            <input
+            <label htmlFor="schoolleadershiptab-input-1" className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
+            <input id="schoolleadershiptab-input-1" name="schoolleadershiptab-input-1"
               type="text"
               disabled={disabled}
               value={leadership.principalName || ''}
@@ -59,11 +59,11 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1 flex items-center justify-between">
+              <label htmlFor="schoolleadershiptab-input-2" className="text-slate-600 block mb-1 flex items-center justify-between">
                 <span>{lang === 'ar' ? 'رقم الجوال:' : 'Mobile Number:'}</span>
                 <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
               </label>
-              <input
+              <input id="schoolleadershiptab-input-2" name="schoolleadershiptab-input-2"
                 type="text"
                 disabled={disabled}
                 value={leadership.principalPhone || ''}
@@ -73,8 +73,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
-              <input
+              <label htmlFor="schoolleadershiptab-input-3" className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
+              <input id="schoolleadershiptab-input-3" name="schoolleadershiptab-input-3"
                 type="email"
                 disabled={disabled}
                 value={leadership.principalEmail || ''}
@@ -93,8 +93,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             <span>{lang === 'ar' ? 'وكيل شؤون الطلاب (المسؤول المباشر عن الغياب والانضباط)' : 'Vice Principal for Student Affairs (Directly responsible for attendance & discipline)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
-            <input
+            <label htmlFor="schoolleadershiptab-input-4" className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
+            <input id="schoolleadershiptab-input-4" name="schoolleadershiptab-input-4"
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalStudentAffairsName || ''}
@@ -104,11 +104,11 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             />
           </div>
           <div>
-            <label className="text-slate-600 block mb-1 flex items-center justify-between">
+            <label htmlFor="schoolleadershiptab-input-5" className="text-slate-600 block mb-1 flex items-center justify-between">
               <span>{lang === 'ar' ? 'رقم الجوال / التحويلة:' : 'Mobile Number / Extension:'}</span>
               <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
             </label>
-            <input
+            <input id="schoolleadershiptab-input-5" name="schoolleadershiptab-input-5"
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalStudentAffairsPhone || ''}
@@ -126,8 +126,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             <span>{lang === 'ar' ? 'وكيل الشؤون التعليمية والمدرسية (الجداول والحصص)' : 'Vice Principal for Academic & School Affairs (Timetables & Classes)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
-            <input
+            <label htmlFor="schoolleadershiptab-input-6" className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
+            <input id="schoolleadershiptab-input-6" name="schoolleadershiptab-input-6"
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalAcademicAffairsName || ''}
@@ -137,11 +137,11 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             />
           </div>
           <div>
-            <label className="text-slate-600 block mb-1 flex items-center justify-between">
+            <label htmlFor="schoolleadershiptab-input-7" className="text-slate-600 block mb-1 flex items-center justify-between">
               <span>{lang === 'ar' ? 'رقم الجوال / التحويلة:' : 'Mobile Number / Extension:'}</span>
               <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
             </label>
-            <input
+            <input id="schoolleadershiptab-input-7" name="schoolleadershiptab-input-7"
               type="text"
               disabled={disabled}
               value={leadership.vicePrincipalAcademicAffairsPhone || ''}
@@ -159,8 +159,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
             <span>{lang === 'ar' ? 'الموجه الطلابي / الأخصائي الاجتماعي (متابعة الأعذار ورعاية الطلاب)' : 'Student Counselor / Social Worker (Excuse follow-up & student care)'}</span>
           </div>
           <div>
-            <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
-            <input
+            <label htmlFor="schoolleadershiptab-input-8" className="text-slate-600 block mb-1">{lang === 'ar' ? 'الاسم الكامل:' : 'Full Name:'}</label>
+            <input id="schoolleadershiptab-input-8" name="schoolleadershiptab-input-8"
               type="text"
               disabled={disabled}
               value={leadership.socialWorkerName || ''}
@@ -171,11 +171,11 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1 flex items-center justify-between">
+              <label htmlFor="schoolleadershiptab-input-9" className="text-slate-600 block mb-1 flex items-center justify-between">
                 <span>{lang === 'ar' ? 'رقم الجوال:' : 'Mobile Number:'}</span>
                 <span className="font-mono text-[10px] text-indigo-600 font-normal" dir="ltr">{dialCode}</span>
               </label>
-              <input
+              <input id="schoolleadershiptab-input-9" name="schoolleadershiptab-input-9"
                 type="text"
                 disabled={disabled}
                 value={leadership.socialWorkerPhone || ''}
@@ -185,8 +185,8 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
-              <input
+              <label htmlFor="schoolleadershiptab-input-10" className="text-slate-600 block mb-1">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</label>
+              <input id="schoolleadershiptab-input-10" name="schoolleadershiptab-input-10"
                 type="email"
                 disabled={disabled}
                 value={leadership.socialWorkerEmail || ''}

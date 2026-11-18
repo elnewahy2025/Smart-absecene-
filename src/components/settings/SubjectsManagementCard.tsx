@@ -129,8 +129,8 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم المادة *' : 'Subject name *'}</label>
-              <input
+              <label htmlFor="subjectsmanagementcard-input-1" className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم المادة *' : 'Subject name *'}</label>
+              <input id="subjectsmanagementcard-input-1" name="subjectsmanagementcard-input-1"
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -140,8 +140,8 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'رمز المادة (Course Code)' : 'Course code'}</label>
-              <input
+              <label htmlFor="subjectsmanagementcard-input-2" className="text-slate-600 block mb-1">{lang === 'ar' ? 'رمز المادة (Course Code)' : 'Course code'}</label>
+              <input id="subjectsmanagementcard-input-2" name="subjectsmanagementcard-input-2"
                 type="text"
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
@@ -150,8 +150,8 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'القسم الأكاديمي' : 'Academic department'}</label>
-              <input
+              <label htmlFor="subjectsmanagementcard-input-3" className="text-slate-600 block mb-1">{lang === 'ar' ? 'القسم الأكاديمي' : 'Academic department'}</label>
+              <input id="subjectsmanagementcard-input-3" name="subjectsmanagementcard-input-3"
                 type="text"
                 value={newDept}
                 onChange={(e) => setNewDept(e.target.value)}
@@ -187,21 +187,21 @@ export const SubjectsManagementCard: React.FC<Props> = ({ subjects, onChange, on
           if (isEditing) {
             return (
               <div key={subj.id} className="p-2.5 bg-blue-50/60 border border-blue-300 rounded-xl space-y-2">
-                <input
+                <input id="subjectsmanagementcard-input-4" name="subjectsmanagementcard-input-4"
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-900"
                   placeholder={lang === 'ar' ? 'اسم المادة' : 'Subject name'}
                 />
-                <input
+                <input id="subjectsmanagementcard-input-5" name="subjectsmanagementcard-input-5"
                   type="text"
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-mono text-slate-900"
                   placeholder={lang === 'ar' ? 'الرمز' : 'Code'}
                 />
-                <input
+                <input id="subjectsmanagementcard-input-6" name="subjectsmanagementcard-input-6"
                   type="text"
                   value={deptInput}
                   onChange={(e) => setDeptInput(e.target.value)}

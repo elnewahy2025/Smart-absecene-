@@ -189,7 +189,7 @@ export const GradeLevelsCard: React.FC<Props> = ({
             <span>{lang === 'ar' ? 'تعريف مرحلة / صف دراسي جديد' : 'Define a new grade level'}</span>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <input
+            <input id="gradelevelscard-input-1" name="gradelevelscard-input-1"
               type="text"
               value={newGradeName}
               onChange={(e) => setNewGradeName(e.target.value)}
@@ -252,7 +252,7 @@ export const GradeLevelsCard: React.FC<Props> = ({
                     {isEditing ? (
                       <>
                         <td className="p-2" colSpan={disabled ? 2 : 3}>
-                          <input
+                          <input id="gradelevelscard-input-2" name="gradelevelscard-input-2"
                             type="text"
                             value={editNameInput}
                             onChange={(e) => setEditNameInput(e.target.value)}

@@ -133,7 +133,7 @@ export const JustificationsRosterTable: React.FC<JustificationsRosterTableProps>
 
             <div className="relative w-48">
               <Search className="w-3 h-3 text-slate-400 absolute right-2.5 top-2.5" />
-              <input
+              <input id="justificationsrostertable-input-1" name="justificationsrostertable-input-1"
                 type="text"
                 placeholder={lang === 'ar' ? 'بحث بالطالب أو المستشفى...' : 'Search...'}
                 value={searchQuery}

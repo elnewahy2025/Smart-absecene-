@@ -423,7 +423,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             <span className="font-semibold text-slate-700 shrink-0">
               {lang === 'ar' ? 'الكشف المستهدف:' : 'Target Session:'}
             </span>
-            <select
+            <select id="qrscannermodal-select-1" name="qrscannermodal-select-1"
               value={activeSessionId}
               onChange={(e) => setActiveSessionId(e.target.value)}
               className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 cursor-pointer text-xs w-full sm:w-auto"
@@ -463,7 +463,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         />
 
         {/* Hidden Camera File Inputs for Native Phone Camera Capture & Upload */}
-        <input
+        <input id="qrscannermodal-input-2" name="qrscannermodal-input-2"
           ref={cameraInputRef}
           type="file"
           accept="image/*"
@@ -471,7 +471,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           onChange={handlePhotoCapture}
           className="hidden"
         />
-        <input
+        <input id="qrscannermodal-input-3" name="qrscannermodal-input-3"
           ref={fileUploadInputRef}
           type="file"
           accept="image/*"

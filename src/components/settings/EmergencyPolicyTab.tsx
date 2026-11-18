@@ -72,8 +72,8 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
           {assemblyPoints.map((point) => (
             <div key={point.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'اسم نقطة التجمع:' : 'Assembly point name:'}</label>
-                <input
+                <label htmlFor="emergencypolicytab-input-1" className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'اسم نقطة التجمع:' : 'Assembly point name:'}</label>
+                <input id="emergencypolicytab-input-1" name="emergencypolicytab-input-1"
                   type="text"
                   disabled={disabled}
                   value={point.name}
@@ -82,8 +82,8 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
                 />
               </div>
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'المنطقة الجغرافية (Zone):' : 'Geographic zone (Zone):'}</label>
-                <input
+                <label htmlFor="emergencypolicytab-input-2" className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'المنطقة الجغرافية (Zone):' : 'Geographic zone (Zone):'}</label>
+                <input id="emergencypolicytab-input-2" name="emergencypolicytab-input-2"
                   type="text"
                   disabled={disabled}
                   value={point.zone}
@@ -92,8 +92,8 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
                 />
               </div>
               <div>
-                <label className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'الطاقة الاستيعابية (طالب):' : 'Capacity (students):'}</label>
-                <input
+                <label htmlFor="emergencypolicytab-input-3" className="text-slate-500 block mb-1 text-[11px]">{lang === 'ar' ? 'الطاقة الاستيعابية (طالب):' : 'Capacity (students):'}</label>
+                <input id="emergencypolicytab-input-3" name="emergencypolicytab-input-3"
                   type="number"
                   disabled={disabled}
                   value={point.capacity}
@@ -124,7 +124,7 @@ export const EmergencyPolicyTab: React.FC<Props> = ({ profile, onChange, disable
           <FileCheck className="w-4 h-4 text-emerald-600" />
           <span>{lang === 'ar' ? 'هامش وملاحظة الاعتماد في أسفل التقارير الرسمية (PDF Footer Note):' : 'Footer note for official reports (PDF Footer Note):'}</span>
         </div>
-        <textarea
+        <textarea id="emergencypolicytab-textarea-4" name="emergencypolicytab-textarea-4"
           rows={2}
           disabled={disabled}
           value={profile.officialReportFooterNote}

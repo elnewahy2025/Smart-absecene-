@@ -132,7 +132,7 @@ export const BatchQRModal: React.FC<BatchQRModalProps> = ({ onClose, initialClas
                 <span>جارٍ التوليد...</span>
               </span>
             )}
-            <select
+            <select id="batchqrmodal-select-1" name="batchqrmodal-select-1"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 cursor-pointer"

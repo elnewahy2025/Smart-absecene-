@@ -173,8 +173,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الترم (عربي) *' : 'Term name (Arabic) *'}</label>
-              <input
+              <label htmlFor="academictermscard-input-1" className="text-slate-600 block mb-1">{lang === 'ar' ? 'اسم الترم (عربي) *' : 'Term name (Arabic) *'}</label>
+              <input id="academictermscard-input-1" name="academictermscard-input-1"
                 type="text"
                 value={newNameAr}
                 onChange={(e) => setNewNameAr(e.target.value)}
@@ -184,8 +184,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ البداية' : 'Start date'}</label>
-              <input
+              <label htmlFor="academictermscard-input-2" className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ البداية' : 'Start date'}</label>
+              <input id="academictermscard-input-2" name="academictermscard-input-2"
                 type="date"
                 value={newStartDate}
                 onChange={(e) => setNewStartDate(e.target.value)}
@@ -193,8 +193,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               />
             </div>
             <div>
-              <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ النهاية' : 'End date'}</label>
-              <input
+              <label htmlFor="academictermscard-input-3" className="text-slate-600 block mb-1">{lang === 'ar' ? 'تاريخ النهاية' : 'End date'}</label>
+              <input id="academictermscard-input-3" name="academictermscard-input-3"
                 type="date"
                 value={newEndDate}
                 onChange={(e) => setNewEndDate(e.target.value)}
@@ -239,8 +239,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
               {isEditing ? (
                 <div className="space-y-2 text-xs" onClick={(e) => e.stopPropagation()}>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'اسم الفصل الدراسي:' : 'Term name:'}</label>
-                    <input
+                    <label htmlFor="academictermscard-input-4" className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'اسم الفصل الدراسي:' : 'Term name:'}</label>
+                    <input id="academictermscard-input-4" name="academictermscard-input-4"
                       type="text"
                       value={nameArInput}
                       onChange={(e) => setNameArInput(e.target.value)}
@@ -251,8 +251,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ البداية:' : 'Start date:'}</label>
-                    <input
+                    <label htmlFor="academictermscard-input-5" className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ البداية:' : 'Start date:'}</label>
+                    <input id="academictermscard-input-5" name="academictermscard-input-5"
                       type="date"
                       value={startDateInput}
                       onChange={(e) => setStartDateInput(e.target.value)}
@@ -263,8 +263,8 @@ export const AcademicTermsCard: React.FC<Props> = ({ terms, onChange, onAutoSave
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ النهاية:' : 'End date:'}</label>
-                    <input
+                    <label htmlFor="academictermscard-input-6" className="text-[10px] text-slate-500 block mb-0.5 font-semibold">{lang === 'ar' ? 'تاريخ النهاية:' : 'End date:'}</label>
+                    <input id="academictermscard-input-6" name="academictermscard-input-6"
                       type="date"
                       value={endDateInput}
                       onChange={(e) => setEndDateInput(e.target.value)}

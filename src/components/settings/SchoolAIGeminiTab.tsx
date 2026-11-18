@@ -316,13 +316,13 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
       {canManageSettings ? (
         <form onSubmit={handleSaveKey} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-800">
+            <label htmlFor="schoolaigeminitab-input-1" className="block text-xs font-bold text-slate-800">
               {config?.hasCustomKey
                 ? (lang === 'ar' ? 'تحديث أو استبدال مفتاح Gemini API للمدرسة:' : 'Replace School Gemini API Key:')
                 : (lang === 'ar' ? 'إدخال مفتاح Gemini API الجديد للمدرسة:' : 'Enter School Gemini API Key:')}
             </label>
             <div className="relative">
-              <input
+              <input id="schoolaigeminitab-input-1" name="schoolaigeminitab-input-1"
                 type={showKey ? 'text' : 'password'}
                 dir="ltr"
                 placeholder={lang === 'ar' ? 'AIzaSy... أو AQ.Ab8R...' : 'AIzaSy... or AQ.Ab8R...'}
@@ -347,10 +347,10 @@ export const SchoolAIGeminiTab: React.FC<Props> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-800">
+              <label htmlFor="schoolaigeminitab-select-2" className="block text-xs font-semibold text-slate-800">
                 {lang === 'ar' ? 'النموذج المفضل للمدرسة:' : 'Preferred AI Model:'}
               </label>
-              <select
+              <select id="schoolaigeminitab-select-2" name="schoolaigeminitab-select-2"
                 value={preferredModel}
                 onChange={(e) => setPreferredModel(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 font-mono"

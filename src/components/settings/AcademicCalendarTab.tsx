@@ -66,8 +66,8 @@ export const AcademicCalendarTab: React.FC<Props> = ({ profile, onChange, onAuto
       {/* Academic Year Info */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
         <div>
-          <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'رمز العام الدراسي:' : 'Academic year code:'}</label>
-          <input
+          <label htmlFor="academiccalendartab-input-1" className="text-slate-600 block mb-1">{lang === 'ar' ? 'رمز العام الدراسي:' : 'Academic year code:'}</label>
+          <input id="academiccalendartab-input-1" name="academiccalendartab-input-1"
             type="text"
             disabled={disabled}
             value={academicYear.code}
@@ -78,8 +78,8 @@ export const AcademicCalendarTab: React.FC<Props> = ({ profile, onChange, onAuto
           />
         </div>
         <div>
-          <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'العام الدراسي الهجري:' : 'Hijri academic year:'}</label>
-          <input
+          <label htmlFor="academiccalendartab-input-2" className="text-slate-600 block mb-1">{lang === 'ar' ? 'العام الدراسي الهجري:' : 'Hijri academic year:'}</label>
+          <input id="academiccalendartab-input-2" name="academiccalendartab-input-2"
             type="text"
             disabled={disabled}
             value={academicYear.hijriYear}
@@ -90,8 +90,8 @@ export const AcademicCalendarTab: React.FC<Props> = ({ profile, onChange, onAuto
           />
         </div>
         <div>
-          <label className="text-slate-600 block mb-1">{lang === 'ar' ? 'المقابل الميلادي:' : 'Gregorian equivalent:'}</label>
-          <input
+          <label htmlFor="academiccalendartab-input-3" className="text-slate-600 block mb-1">{lang === 'ar' ? 'المقابل الميلادي:' : 'Gregorian equivalent:'}</label>
+          <input id="academiccalendartab-input-3" name="academiccalendartab-input-3"
             type="text"
             disabled={disabled}
             value={academicYear.gregorianYear}

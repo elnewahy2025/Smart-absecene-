@@ -410,7 +410,7 @@ export const GeminiChatbotView: React.FC = () => {
           }}
           className="flex items-center gap-2"
         >
-          <input
+          <input id="geminichatbotview-input-1" name="geminichatbotview-input-1"
             type="text"
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}

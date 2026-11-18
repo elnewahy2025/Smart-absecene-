@@ -247,7 +247,7 @@ export const WeeklyAttendanceTrendCard: React.FC = () => {
             <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <Filter className="w-3.5 h-3.5" />
             </span>
-            <select
+            <select id="weeklyattendancetrendcard-select-1" name="weeklyattendancetrendcard-select-1"
               value={selectedClassFilter}
               onChange={(e) => setSelectedClassFilter(e.target.value)}
               aria-label={lang === 'ar' ? 'تصفية حسب الفصل' : 'Filter by class'}
