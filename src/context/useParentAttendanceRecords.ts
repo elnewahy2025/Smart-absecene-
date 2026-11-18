@@ -34,16 +34,20 @@ export function useParentAttendanceRecords({
       return;
     }
 
-    const contactFilter = phone && email
-      ? or(where('guardianPhone', '==', phone), where('guardianEmail', '==', email))
-      : phone
-        ? where('guardianPhone', '==', phone)
-        : where('guardianEmail', '==', email);
-    const recordsQuery = query(
-      collection(db, 'attendance_records'),
-      where('tenantId', '==', tenantId),
-      contactFilter
-    );
+    const recordsQuery = phone && email
+      ? query(
+          collection(db, 'attendance_records'),
+          where('tenantId', '==', tenantId),
+          or(
+            where('guardianPhone', '==', phone),
+            where('guardianEmail', '==', email)
+          )
+        )
+      : query(
+          collection(db, 'attendance_records'),
+          where('tenantId', '==', tenantId),
+          where(phone ? 'guardianPhone' : 'guardianEmail', '==', phone || email)
+        );
     const unsubscribe = onSnapshot(
       recordsQuery,
       (snapshot) => {
