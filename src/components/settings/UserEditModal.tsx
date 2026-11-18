@@ -196,7 +196,10 @@ export const UserEditModal: React.FC<Props> = ({
               <label className="font-semibold text-slate-700">{lang === 'ar' ? 'البريد الإلكتروني المعتمد:' : 'Email Address:'}</label>
               <input
                 type="email"
+                name="new_user_email"
                 required
+                readOnly={!user}
+                onFocus={(e) => e.currentTarget.removeAttribute('readOnly')}
                 autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -213,8 +216,10 @@ export const UserEditModal: React.FC<Props> = ({
               </label>
               <input
                 type="tel"
-                name="user-phone"
-                autoComplete="new-password"
+                name="new_user_phone"
+                readOnly={!user}
+                onFocus={(e) => e.currentTarget.removeAttribute('readOnly')}
+                autoComplete="off"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder={lang === 'ar' ? `أدخل رقم الهاتف (${dialCode}${localPhoneExample})` : `Enter phone number (${dialCode}${localPhoneExample})`}
@@ -243,6 +248,10 @@ export const UserEditModal: React.FC<Props> = ({
               <div className="relative flex items-center">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="new_user_password"
+                  autoComplete="new-password"
+                  readOnly
+                  onFocus={(e) => e.currentTarget.removeAttribute('readOnly')}
                   required
                   minLength={8}
                   value={password}
