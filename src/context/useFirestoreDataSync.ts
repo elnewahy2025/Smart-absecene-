@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, or, query, where } from 'firebase/firestore';
 import type {
   AttendanceSession,
   AuditLog,
@@ -60,7 +60,11 @@ export function useFirestoreDataSync({
       : undefined;
     const parentPhone = (authenticatedPhone || parentProfile?.phone || '').trim();
     const parentEmail = firebaseEmail || (parentProfile?.email || '').trim().toLowerCase();
-    const parentContactField = parentPhone ? 'guardianPhone' : 'guardianEmail';
+    const parentContactFilter = parentPhone && parentEmail
+      ? or(where('guardianPhone', '==', parentPhone), where('guardianEmail', '==', parentEmail))
+      : parentPhone
+        ? where('guardianPhone', '==', parentPhone)
+        : where('guardianEmail', '==', parentEmail);
     const parentContactValue = parentPhone || parentEmail;
 
     // A parent may be identified by a verified phone OR email. Never attach a
@@ -71,7 +75,7 @@ export function useFirestoreDataSync({
 
     // 1. Students sync
     const qStudents = isParentUser
-      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where(parentContactField, '==', parentContactValue))
+      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), parentContactFilter)
       : query(collection(db, 'students'), where('tenantId', '==', tenantId));
     const unsubStudents = onSnapshot(
       qStudents,
@@ -160,7 +164,7 @@ export function useFirestoreDataSync({
 
     // 3. Justifications sync
     const qJustifications = isParentUser
-      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where(parentContactField, '==', parentContactValue))
+      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), parentContactFilter)
       : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
     const unsubJustifications = onSnapshot(
       qJustifications,
