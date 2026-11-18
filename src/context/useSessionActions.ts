@@ -9,6 +9,9 @@ import type {
   UserProfile,
 } from '../types/attendance';
 import type { User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { toFirestoreData } from './attendanceContextSupport';
 
 interface UseSessionActionsParams {
   tenantId: string;
@@ -370,6 +373,12 @@ export function useSessionActions({
     };
 
     setAllSessions((prev) => [newSession, ...prev]);
+
+    if (firebaseUser) {
+      void setDoc(doc(db, 'attendance_sessions', newSession.id), toFirestoreData(newSession), { merge: true }).catch(
+        (error) => console.error('[SESSIONS] Could not persist newly created session:', error)
+      );
+    }
 
     addAuditLog({
       entityType: 'session',

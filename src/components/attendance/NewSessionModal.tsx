@@ -47,8 +47,32 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
   );
   const [newClass, setNewClass] = useState<string>(classesStats[0]?.className || '');
 
+  // Keep defaults synced when classesStats or schoolProfile hydrate after mount
+  React.useEffect(() => {
+    if (!newClass && classesStats.length > 0) {
+      setNewClass(classesStats[0].className);
+    }
+  }, [classesStats, newClass]);
+
+  React.useEffect(() => {
+    if (configuredLessonPeriods.length > 0 && !configuredLessonPeriods.some((p) => p.periodNumber === newPeriodNum)) {
+      setNewPeriodNum(configuredLessonPeriods[0].periodNumber);
+    }
+  }, [configuredLessonPeriods, newPeriodNum]);
+
+  React.useEffect(() => {
+    if (configuredSubjects.length > 0 && !configuredSubjects.includes(newSubject)) {
+      setNewSubject(configuredSubjects[0]);
+    }
+  }, [configuredSubjects, newSubject]);
+
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
+    const resolvedClass = newClass || classesStats[0]?.className || '';
+    if (!resolvedClass) {
+      alert(lang === 'ar' ? 'يرجى اختيار الفصل الدراسي أولاً.' : 'Please select a class first.');
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
     const offCheck = isOffDay(today);
     if (offCheck.isOff) {
@@ -60,15 +84,15 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
       if (!proceed) return;
     }
 
-    const matchedClass = classesStats.find((c) => c.className === newClass);
-    const targetClassId = matchedClass?.classId || `class-${newClass.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const matchedClass = classesStats.find((c) => c.className === resolvedClass);
+    const targetClassId = matchedClass?.classId || `class-${resolvedClass.replace(/[^a-zA-Z0-9]/g, '')}`;
     const targetGrade = matchedClass?.grade || 'المرحلة الدراسية';
 
     const created = createNewSession(
       newSessionType,
       newPeriodNum,
       newSubject,
-      newClass,
+      resolvedClass,
       targetClassId,
       targetGrade
     );

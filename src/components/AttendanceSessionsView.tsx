@@ -534,7 +534,10 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
         isOffDay={isOffDay}
         createNewSession={createNewSession}
         onClose={() => setIsNewSessionModalOpen(false)}
-        onCreated={setSelectedSessionId}
+        onCreated={(sessionId) => {
+          setSelectedSessionId(sessionId);
+          setFilterDate(new Date().toISOString().split('T')[0]);
+        }}
       />
 
       {/* Modal: Reopen Session with Audit Reason */}

@@ -55,10 +55,17 @@ export function useSessionPersistence({
           continue;
         }
 
-        sessionHashesRef.current[session.id] = hash;
-        void setDoc(doc(db, 'attendance_sessions', session.id), toFirestoreData(session), { merge: true }).catch((error) =>
-          console.error('[SESSIONS] Could not persist session:', error)
-        );
+        const isNewSession = !(session.id in sessionHashesRef.current);
+        if (isNewSession) {
+          // Persist immediately; only mark hash synced after Firestore confirms the write.
+        }
+        void setDoc(doc(db, 'attendance_sessions', session.id), toFirestoreData(session), { merge: true })
+          .then(() => {
+            sessionHashesRef.current[session.id] = hash;
+          })
+          .catch((error) => {
+            console.error('[SESSIONS] Could not persist session:', error);
+          });
         for (const record of session.records) {
           const student = allStudents.find((item) => item.id === record.studentId);
           if (!student?.guardianPhone && !student?.guardianEmail) continue;
@@ -89,7 +96,7 @@ export function useSessionPersistence({
           ).catch((error) => console.error('[SESSIONS] Could not persist attendance record:', error));
         }
       }
-    }, 1200);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [allSessions, allStudents, firebaseUser, tenantId, currentUserRole]);
