@@ -45,7 +45,7 @@ export function normalizeStudentCreateInput(input: unknown): StudentNormalizatio
     enrollmentStatus: 'active',
   };
 
-  const guardianEmail = text(raw.guardianEmail, 120);
+  const guardianEmail = text(raw.guardianEmail, 120).toLowerCase();
   if (guardianEmail) value.guardianEmail = guardianEmail;
 
   const birthDate = text(raw.birthDate, 30);
