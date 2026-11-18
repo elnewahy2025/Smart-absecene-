@@ -142,10 +142,9 @@ const escapeHtmlText = (value: unknown, fallback: string): string => {
 // Only the print stylesheet, the Arabic webfonts and data: documents are reachable
 // from the renderer. file:// and internal network targets are aborted.
 const isAllowedPdfRequest = (url: string): boolean =>
-  url.startsWith('data:') ||
+  url.startsWith('data:image/') ||
   url.startsWith('https://fonts.googleapis.com/') ||
-  url.startsWith('https://fonts.gstatic.com/') ||
-  url.startsWith('https://cdn.tailwindcss.com/');
+  url.startsWith('https://fonts.gstatic.com/');
 /**
  * Native Vector PDF Generator Route with Full Arabic RTL Typography Support.
  * Uses headless Chromium / Puppeteer to guarantee true selectable text,
@@ -170,8 +169,11 @@ app.post(
   let context: any = null;
   let page: any = null;
   try {
-    const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename } = req.body;
+    const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename, styles } = req.body;
     const safeTitle = escapeHtmlText(title, 'تقرير الحضور والانضباط المدرسي');
+    const safeStyles = typeof styles === 'string' && styles.length <= 2_000_000 && !styles.toLowerCase().includes('</style')
+      ? styles
+      : '';
 
     if (!htmlContent) {
       return res.status(400).json({ error: 'htmlContent is required' });
@@ -196,6 +198,10 @@ app.post(
     page.setDefaultTimeout(20000);
     page.setDefaultNavigationTimeout(20000);
 
+    // PDF content is untrusted HTML supplied by an authenticated client.
+    // Disable JavaScript before loading it; the renderer needs layout and CSS,
+    // never page script execution.
+    await page.setJavaScriptEnabled(false);
     await page.setRequestInterception(true);
     page.on('request', (request: any) => {
       if (isAllowedPdfRequest(request.url())) {
@@ -211,11 +217,12 @@ app.post(
       <html dir="rtl" lang="ar">
         <head>
           <meta charset="UTF-8">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
           <title>${safeTitle}</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-          <script src="https://cdn.tailwindcss.com"></script>
+          <style>${safeStyles}</style>
           <style>
             @page {
               size: A4 portrait;

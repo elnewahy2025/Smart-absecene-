@@ -54,23 +54,29 @@ export function useFirestoreDataSync({
     if (!firebaseUser || !tenantId || tenantId.trim() === '') return;
 
     const isParentUser = currentUserRole === 'parent';
-    const parentProfile = isParentUser
-      ? allUsers.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
+    const firebaseEmail = (firebaseUser.email || '').trim().toLowerCase();
+    const parentProfile = isParentUser && firebaseEmail
+      ? allUsers.find((user) => user.email.trim().toLowerCase() === firebaseEmail)
       : undefined;
-    const parentPhone = authenticatedPhone || parentProfile?.phone;
+    const parentPhone = (authenticatedPhone || parentProfile?.phone || '').trim();
+    const parentEmail = firebaseEmail || (parentProfile?.email || '').trim().toLowerCase();
+    const parentContactValue = parentPhone || parentEmail;
 
-    // Authorization barrier: parents must only query records matching their own guardian phone.
-    // If the phone has not resolved yet, defer query attachment until the next render cycle.
-    if (isParentUser && !parentPhone) {
+    // A parent may be identified by a verified phone OR email. Never attach a
+    // broad tenant query when neither identity is available.
+    if (isParentUser && !parentContactValue) {
       return;
     }
 
     // 1. Students sync
     const qStudents = isParentUser
-      ? query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
-      : query(collection(db, 'students'), where('tenantId', '==', tenantId));
-    const unsubStudents = onSnapshot(
-      qStudents,
+      ? [
+          ...(parentPhone ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))] : []),
+          ...(parentEmail ? [query(collection(db, 'students'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))] : []),
+        ]
+      : [query(collection(db, 'students'), where('tenantId', '==', tenantId))];
+    const unsubStudents = qStudents.map((studentQuery) => onSnapshot(
+      studentQuery,
       (snapshot) => {
         if (!snapshot.empty) {
           const remoteStudents: Student[] = [];
@@ -87,6 +93,7 @@ export function useFirestoreDataSync({
               classId: data.classId || 'class-1a',
               guardianName: data.guardianName || 'ولي أمر معتمد',
               guardianPhone: data.guardianPhone || '',
+              guardianEmail: data.guardianEmail || '',
               guardianRelationship: data.guardianRelationship || '',
               bloodType: data.bloodType || '',
               totalAbsences: data.totalAbsences || 0,
@@ -107,7 +114,7 @@ export function useFirestoreDataSync({
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'students');
       }
-    );
+    ));
 
     // 2. Attendance Sessions sync
     const qSessions = query(collection(db, 'attendance_sessions'), where('tenantId', '==', tenantId));
@@ -155,10 +162,13 @@ export function useFirestoreDataSync({
 
     // 3. Justifications sync
     const qJustifications = isParentUser
-      ? query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))
-      : query(collection(db, 'justifications'), where('tenantId', '==', tenantId));
-    const unsubJustifications = onSnapshot(
-      qJustifications,
+      ? [
+          ...(parentPhone ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianPhone', '==', parentPhone))] : []),
+          ...(parentEmail ? [query(collection(db, 'justifications'), where('tenantId', '==', tenantId), where('guardianEmail', '==', parentEmail))] : []),
+        ]
+      : [query(collection(db, 'justifications'), where('tenantId', '==', tenantId))];
+    const unsubJustifications = qJustifications.map((justificationQuery) => onSnapshot(
+      justificationQuery,
       (snapshot) => {
         if (!snapshot.empty) {
           const remoteJustifications: Justification[] = [];
@@ -179,13 +189,15 @@ export function useFirestoreDataSync({
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'justifications');
       }
-    );
+    ));
 
     // 4. Notification outbox sync
     const qNotifications = isParentUser
       ? query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId), where('recipientPhone', '==', parentPhone))
       : query(collection(db, 'notification_outbox'), where('tenantId', '==', tenantId));
-    const unsubNotifications = onSnapshot(
+    const unsubNotifications = isParentUser && !parentPhone
+      ? () => {}
+      : onSnapshot(
       qNotifications,
       (snapshot) => {
         if (!snapshot.empty) {
@@ -240,9 +252,9 @@ export function useFirestoreDataSync({
     );
 
     return () => {
-      unsubStudents();
+      unsubStudents.forEach((unsubscribe) => unsubscribe());
       unsubSessions();
-      unsubJustifications();
+      unsubJustifications.forEach((unsubscribe) => unsubscribe());
       unsubNotifications();
       unsubAudit();
     };

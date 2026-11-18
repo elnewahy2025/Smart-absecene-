@@ -278,9 +278,12 @@ service cloud.firestore {
         isAdmin() || (
           hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
-            (getUserData().role == 'parent' &&
-              resource.data.get('guardianPhone', '') != '' &&
-              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
+            (getUserData().role == 'parent' && (
+              (resource.data.get('guardianPhone', '') != '' &&
+                resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
+              (resource.data.get('guardianEmail', '') != '' &&
+                resource.data.get('guardianEmail', '') == getUserData().get('email', ''))
+            ))
           )
         )
       );
@@ -295,9 +298,12 @@ service cloud.firestore {
           hasActiveUserDoc() && resource.data.tenantId == getUserData().tenantId && tenantAccessAllowed(resource.data.tenantId) && (
             getUserData().role in ['admin', 'registrar', 'teacher'] ||
             ('studentId' in resource.data && resource.data.studentId == request.auth.uid) ||
-            (getUserData().role == 'parent' &&
-              resource.data.get('guardianPhone', '') != '' &&
-              resource.data.get('guardianPhone', '') == getUserData().get('phone', ''))
+            (getUserData().role == 'parent' && (
+              (resource.data.get('guardianPhone', '') != '' &&
+                resource.data.get('guardianPhone', '') == getUserData().get('phone', '')) ||
+              (resource.data.get('guardianEmail', '') != '' &&
+                resource.data.get('guardianEmail', '') == getUserData().get('email', ''))
+            ))
           )
         )
       );

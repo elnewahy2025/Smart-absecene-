@@ -61,7 +61,7 @@ export function useSessionPersistence({
         );
         for (const record of session.records) {
           const student = allStudents.find((item) => item.id === record.studentId);
-          if (!student?.guardianPhone) continue;
+          if (!student || (!student.guardianPhone && !student.guardianEmail)) continue;
 
           const recordId = `${session.id}_${record.studentId}`;
           void setDoc(
@@ -71,7 +71,8 @@ export function useSessionPersistence({
               tenantId: session.tenantId,
               sessionId: session.id,
               studentId: record.studentId,
-              guardianPhone: student.guardianPhone,
+              guardianPhone: student.guardianPhone || '',
+              guardianEmail: student.guardianEmail?.trim().toLowerCase() || '',
               date: session.date,
               sessionType: session.sessionType,
               periodNumber: session.periodNumber,

@@ -60,6 +60,16 @@ describe('normalizeStudentCreateInput', () => {
     expect(result.value.guardianName).toHaveLength(120);
   });
 
+  it('normalizes guardian email addresses for case-insensitive identity matching', () => {
+    const result = normalizeStudentCreateInput({
+      ...validInput,
+      guardianEmail: '  Parent@Example.com  ',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.guardianEmail).toBe('parent@example.com');
+  });
+
   it('omits optional empty fields and keeps provided optional fields', () => {
     const result = normalizeStudentCreateInput({
       ...validInput,
