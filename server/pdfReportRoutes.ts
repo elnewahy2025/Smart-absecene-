@@ -169,8 +169,11 @@ app.post(
   let context: any = null;
   let page: any = null;
   try {
-    const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename } = req.body;
+    const { htmlContent, title = 'تقرير الحضور والانضباط المدرسي', filename, styles } = req.body;
     const safeTitle = escapeHtmlText(title, 'تقرير الحضور والانضباط المدرسي');
+    const safeStyles = typeof styles === 'string' && styles.length <= 2_000_000 && !/<\\/style/i.test(styles)
+      ? styles
+      : '';
 
     if (!htmlContent) {
       return res.status(400).json({ error: 'htmlContent is required' });
@@ -219,6 +222,7 @@ app.post(
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+          <style>${safeStyles}</style>
           <style>
             @page {
               size: A4 portrait;
