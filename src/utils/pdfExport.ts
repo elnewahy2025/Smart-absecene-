@@ -1,3 +1,5 @@
+import pdfStyles from '../index.css?inline';
+
 /**
  * Client utility to generate and download native vector PDFs via the server's Puppeteer engine.
  * Ensures proper Arabic font embedding (Cairo, Amiri) and RTL shaping with selectable text.
@@ -19,6 +21,7 @@ export async function fetchNativePdfBlob(options: {
       htmlContent: options.htmlContent,
       title: options.title,
       filename: options.filename,
+      styles: pdfStyles,
     }),
   });
 
@@ -80,6 +83,7 @@ export function printHtmlFallback(options: { htmlContent: string; title: string 
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
         <title>${safeTitle}</title>
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+        <style>${pdfStyles}</style>
         <style>
           @page { size: A4 portrait; margin: 10mm; }
           body {
