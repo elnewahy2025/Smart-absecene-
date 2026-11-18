@@ -98,7 +98,7 @@ describe('WhatsAppGatewaySection', () => {
 
   it('opens a test WhatsApp conversation for the entered parent number', () => {
     renderSection();
-    fireEvent.change(screen.getByPlaceholderText('أدخل رقم ولي أمر للتجربة (مثال: 050xxxxxxx)'), {
+    fireEvent.change(screen.getByPlaceholderText('أدخل رقم ولي أمر للتجربة (مثال: 0501234567)'), {
       target: { value: '0555111222' },
     });
     fireEvent.click(screen.getByText('تجربة فتح واتساب ويب'));

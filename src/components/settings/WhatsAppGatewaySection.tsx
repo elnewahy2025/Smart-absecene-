@@ -5,6 +5,7 @@ import {
   formatWhatsAppInternationalPhone,
   openWhatsAppDirect,
 } from '../../utils/whatsappUtils';
+import { getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface WhatsAppGatewaySectionProps {
   form: SchoolMessagingGatewayConfig;
@@ -44,6 +45,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
     openWhatsAppDirect(targetPhone, testMessage, cleanCountryCode);
   };
 
+  const localPhonePlaceholder = getLocalPhonePlaceholder(defaultCallingCode);
   return (
   <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -93,7 +95,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
             disabled={!isSuperAdmin}
             value={form.whatsappPhoneNumber || ''}
             onChange={(e) => handleFieldChange('whatsappPhoneNumber', e.target.value)}
-            placeholder="0501234567"
+            placeholder={localPhonePlaceholder}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pr-14 font-mono text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </div>
@@ -245,7 +247,7 @@ export const WhatsAppGatewaySection: React.FC<WhatsAppGatewaySectionProps> = ({
           type="text"
           value={testPhoneNumber}
           onChange={(e) => setTestPhoneNumber(e.target.value)}
-          placeholder={lang === 'ar' ? 'أدخل رقم ولي أمر للتجربة (مثال: 050xxxxxxx)' : 'Enter a parent number to test (e.g. 050xxxxxxx)'}
+          placeholder={lang === 'ar' ? `أدخل رقم ولي أمر للتجربة (مثال: ${localPhonePlaceholder})` : `Enter a parent number to test (e.g. ${localPhonePlaceholder})`}
           className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono text-xs w-full sm:w-64"
         />
         <button

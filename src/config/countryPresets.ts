@@ -684,7 +684,7 @@ export const COUNTRY_PRESETS: Record<string, CountryPreset> = {
  */
 export function getCountryPreset(countryNameOrCode?: string): CountryPreset {
   if (!countryNameOrCode) {
-    return COUNTRY_PRESETS['المملكة العربية السعودية'];
+    return COUNTRY_PRESETS['الكويت'];
   }
 
   const normalized = countryNameOrCode.trim().toLowerCase();
@@ -715,7 +715,7 @@ export function getCountryPreset(countryNameOrCode?: string): CountryPreset {
   return {
     countryNameAr: countryNameOrCode.trim(),
     countryNameEn: countryNameOrCode.trim(),
-    callingCode: countryNameOrCode.startsWith('+') ? countryNameOrCode.trim() : '+966',
+    callingCode: countryNameOrCode.startsWith('+') ? countryNameOrCode.trim() : '+965',
     flag: '🌐',
     ministryHeaderAr: `${countryNameOrCode.trim()}\nوزارة التعليم والتربية\nالجهة التعليمية الرسمية...`,
     directorateLabelAr: 'المديرية / المنطقة التعليمية:',
@@ -750,4 +750,19 @@ export function getCountryPreset(countryNameOrCode?: string): CountryPreset {
       },
     ],
   };
+}
+
+/**
+ * Returns a local-format phone placeholder (without international dial code)
+ * matching the given country name or calling code.
+ */
+export function getLocalPhonePlaceholder(countryNameOrCode?: string): string {
+  const preset = getCountryPreset(countryNameOrCode);
+  if (preset.callingCode === '+966') return '0501234567';
+  if (preset.callingCode === '+20') return '01012345678';
+  const stripped = preset.phoneExample
+    .replace(preset.callingCode, '')
+    .replace(/\s+/g, '')
+    .trim();
+  return stripped || '91234567';
 }

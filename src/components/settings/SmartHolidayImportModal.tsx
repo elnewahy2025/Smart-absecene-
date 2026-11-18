@@ -191,10 +191,10 @@ export const SmartHolidayImportModal: React.FC<SmartHolidayImportModalProps> = (
   };
 
   const popularCountries = [
+    { name: 'دولة الكويت', flag: '🇰🇼', short: 'الكويت' },
     { name: 'المملكة العربية السعودية', flag: '🇸🇦', short: 'السعودية' },
     { name: 'جمهورية مصر العربية', flag: '🇪🇬', short: 'مصر' },
     { name: 'الإمارات العربية المتحدة', flag: '🇦🇪', short: 'الإمارات' },
-    { name: 'دولة الكويت', flag: '🇰🇼', short: 'الكويت' },
     { name: 'دولة قطر', flag: '🇶🇦', short: 'قطر' },
     { name: 'سلطنة عمان', flag: '🇴🇲', short: 'عمان' },
     { name: 'مملكة البحرين', flag: '🇧🇭', short: 'البحرين' },

@@ -2,6 +2,7 @@ import React from 'react';
 import { TenantSchoolProfile } from '../../types/attendance';
 import { Users, UserCheck, ShieldAlert, HeartHandshake } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
+import { getCountryPreset, getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -13,6 +14,9 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
   const { lang } = useAttendance();
   const leadership = profile.leadership || ({} as Partial<TenantSchoolProfile['leadership']>);
   const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+965';
+  const countryPreset = getCountryPreset(profile.address?.country || dialCode);
+  const phonePlaceholder = `${dialCode} ${getLocalPhonePlaceholder(profile.address?.country || dialCode)}`;
+  void countryPreset;
 
   const handleLeadershipChange = (key: string, value: string) => {
     onChange({
@@ -65,7 +69,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
                 value={leadership.principalPhone || ''}
                 onChange={(e) => handleLeadershipChange('principalPhone', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder={`${dialCode} 50 111 2233`}
+                placeholder={phonePlaceholder}
               />
             </div>
             <div>
@@ -76,7 +80,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
                 value={leadership.principalEmail || ''}
                 onChange={(e) => handleLeadershipChange('principalEmail', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder="principal@school.edu.sa"
+                placeholder="principal@school.edu"
               />
             </div>
           </div>
@@ -110,7 +114,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.vicePrincipalStudentAffairsPhone || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalStudentAffairsPhone', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-              placeholder={`${dialCode} 50 222 3344`}
+              placeholder={phonePlaceholder}
             />
           </div>
         </div>
@@ -143,7 +147,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
               value={leadership.vicePrincipalAcademicAffairsPhone || ''}
               onChange={(e) => handleLeadershipChange('vicePrincipalAcademicAffairsPhone', e.target.value)}
               className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-              placeholder={`${dialCode} 50 333 4455`}
+              placeholder={phonePlaceholder}
             />
           </div>
         </div>
@@ -177,7 +181,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
                 value={leadership.socialWorkerPhone || ''}
                 onChange={(e) => handleLeadershipChange('socialWorkerPhone', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder={`${dialCode} 50 444 5566`}
+                placeholder={phonePlaceholder}
               />
             </div>
             <div>
@@ -188,7 +192,7 @@ export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabl
                 value={leadership.socialWorkerEmail || ''}
                 onChange={(e) => handleLeadershipChange('socialWorkerEmail', e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900"
-                placeholder="counselor@school.edu.sa"
+                placeholder="counselor@school.edu"
               />
             </div>
           </div>

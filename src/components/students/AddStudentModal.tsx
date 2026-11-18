@@ -3,6 +3,7 @@ import { Student, SchoolClassSummary } from '../../types/attendance';
 import { UserPlus, X, Check } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
+import { getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   const { schoolProfile } = useAttendance();
   const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
+  const localPhoneExample = getLocalPhonePlaceholder(schoolProfile?.address?.country || dialCode);
 
   const availableGrades = React.useMemo(() => {
     if (educationalGrades && educationalGrades.length > 0) {
@@ -258,7 +260,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                 required
                 value={guardianPhone}
                 onChange={(e) => setGuardianPhone(e.target.value)}
-                placeholder={`${dialCode}5XXXXXXXX`}
+                placeholder={`${dialCode}${localPhoneExample}`}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:bg-white"
               />
             </div>

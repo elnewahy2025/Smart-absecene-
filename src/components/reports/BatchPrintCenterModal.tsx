@@ -5,6 +5,7 @@ import { useAttendance } from '../../context/AttendanceContext';
 import { Printer, Download, X, Layers, CheckCircle2, FileText, Loader2 } from 'lucide-react';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../../utils/pdfExport';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
+import { getCountryPreset } from '../../config/countryPresets';
 
 interface Props {
   isOpen: boolean;
@@ -154,7 +155,7 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
           <div className="border-b-2 border-slate-800 pb-3 flex items-start justify-between text-xs">
             <div className="text-right space-y-0.5">
               <div className="font-bold whitespace-pre-line text-slate-900">
-                {schoolProfile.ministryHeaderAr || 'المملكة العربية السعودية\nوزارة التعليم'}
+                {schoolProfile.ministryHeaderAr || getCountryPreset(schoolProfile.address?.country).ministryHeaderAr}
               </div>
               <div className="font-semibold text-slate-800">{schoolProfile.schoolName || currentTenant.name}</div>
             </div>

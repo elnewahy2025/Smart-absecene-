@@ -12,8 +12,8 @@ const CODE = 'MAJD-303';
 const SUBDOMAIN = 'majd';
 const SCHOOL_ID = 'school-majd';
 const PRINCIPAL_EMAIL = 'principal@majd-school.edu.sa';
-const COUNTRY = 'المملكة العربية السعودية / مصر / الإمارات...';
-const CITY = 'الرياض / مكة / الدمام / القاهرة';
+const COUNTRY = 'دولة الكويت / السعودية / مصر / الإمارات...';
+const CITY = 'مدينة الكويت / حولي / السالمية / الفروانية';
 
 function renderForm(overrides: Partial<React.ComponentProps<typeof SchoolProvisionForm>> = {}) {
   const defaults = {
@@ -67,8 +67,8 @@ describe('SchoolProvisionForm', () => {
 
     fireEvent.change(country, { target: { value: 'جمهورية مصر العربية' } });
 
-    expect((screen.getByPlaceholderText('+966') as HTMLInputElement).value).toBe('+20');
-    expect((screen.getByDisplayValue('+20500000000') as HTMLInputElement).value).toBe('+20500000000');
+    expect((screen.getByPlaceholderText('+965') as HTMLInputElement).value).toBe('+20');
+    expect((screen.getByDisplayValue('+2001012345678') as HTMLInputElement).value).toBe('+2001012345678');
   });
 
   it('submits a normalized payload with defaults for optional fields', async () => {
@@ -76,7 +76,7 @@ describe('SchoolProvisionForm', () => {
 
     fireEvent.change(screen.getByPlaceholderText(NAME_AR), { target: { value: '  مدرسة المجد  ' } });
     fireEvent.change(screen.getByPlaceholderText(CODE), { target: { value: ' majd-303 ' } });
-    fireEvent.change(screen.getByPlaceholderText(CITY), { target: { value: 'جدة' } });
+    fireEvent.change(screen.getByPlaceholderText(CITY), { target: { value: 'حولي' } });
 
     submit(form);
 
@@ -85,10 +85,10 @@ describe('SchoolProvisionForm', () => {
       nameAr: 'مدرسة المجد',
       nameEn: 'مدرسة المجد',
       code: 'MAJD-303',
-      cityAr: 'جدة',
-      cityEn: 'Riyadh',
-      countryAr: 'المملكة العربية السعودية',
-      countryCallingCode: '+966',
+      cityAr: 'حولي',
+      cityEn: 'Kuwait City',
+      countryAr: 'دولة الكويت',
+      countryCallingCode: '+965',
       logoText: 'م',
       schoolType: 'boys',
       primaryColor: '#7c3aed',

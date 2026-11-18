@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Building2, Sparkles, Palette, Globe, User } from 'lucide-react';
 import { SchoolProvisionInput } from '../../types/attendance';
 import { COUNTRIES_LIST, findCountryByName } from '../../config/countryCodes';
+import { getCountryPreset, getLocalPhonePlaceholder } from '../../config/countryPresets';
 
 interface SchoolProvisionFormProps {
   onProvision: (input: SchoolProvisionInput) => Promise<{ success: boolean; message: string }>;
@@ -33,10 +34,10 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [code, setCode] = useState('');
-  const [countryAr, setCountryAr] = useState('المملكة العربية السعودية');
-  const [countryCallingCode, setCountryCallingCode] = useState('+966');
-  const [cityAr, setCityAr] = useState('الرياض');
-  const [cityEn, setCityEn] = useState('Riyadh');
+  const [countryAr, setCountryAr] = useState('دولة الكويت');
+  const [countryCallingCode, setCountryCallingCode] = useState('+965');
+  const [cityAr, setCityAr] = useState('مدينة الكويت');
+  const [cityEn, setCityEn] = useState('Kuwait City');
   const [subdomain, setSubdomain] = useState('');
   const [schoolType, setSchoolType] = useState<'boys' | 'girls' | 'mixed'>('boys');
   const [academicYear, setAcademicYear] = useState('1447-1448 هـ / 2026 م');
@@ -66,14 +67,18 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
     }
   };
 
+  const countryPreset = getCountryPreset(countryAr);
+  const localPhonePlaceholder = getLocalPhonePlaceholder(countryAr);
+
   const handleCountryChange = (val: string) => {
     setCountryAr(val);
     const matched = findCountryByName(val);
-    if (matched) {
-      setCountryCallingCode(matched.dialCode);
-      if (!principalPhone || principalPhone.includes('500000000')) {
-        setPrincipalPhone(`${matched.dialCode}500000000`);
-      }
+    const nextPreset = getCountryPreset(val);
+    const nextDialCode = matched ? matched.dialCode : nextPreset.callingCode;
+    const nextLocalPhone = getLocalPhonePlaceholder(val);
+    setCountryCallingCode(nextDialCode);
+    if (!principalPhone || principalPhone.startsWith('+')) {
+      setPrincipalPhone(`${nextDialCode}${nextLocalPhone}`);
     }
   };
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,9 +93,9 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
         nameEn: nameEn.trim() || nameAr.trim(),
         code: code.trim().toUpperCase() || `SCH-${Date.now().toString().slice(-4)}`,
         countryAr: countryAr.trim(),
-        countryCallingCode: countryCallingCode.trim() || '+966',
+        countryCallingCode: countryCallingCode.trim() || '+965',
         cityAr: cityAr.trim(),
-        cityEn: cityEn.trim() || 'Saudi Arabia',
+        cityEn: cityEn.trim() || countryPreset.countryNameEn || 'Kuwait',
         subdomain: subdomain.trim(),
         schoolType,
         academicYear,
@@ -110,8 +115,8 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
         setCode('');
         setSubdomain('');
         setSchoolId('');
-        setCountryAr('المملكة العربية السعودية');
-        setCountryCallingCode('+966');
+        setCountryAr('دولة الكويت');
+        setCountryCallingCode('+965');
         setPrincipalName('');
         setPrincipalEmail('');
       } else {
@@ -180,7 +185,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 required
                 value={countryAr}
                 onChange={(e) => handleCountryChange(e.target.value)}
-                placeholder="المملكة العربية السعودية / مصر / الإمارات..."
+                placeholder="دولة الكويت / السعودية / مصر / الإمارات..."
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
               />
               <datalist id="provision-countries-datalist">
@@ -201,7 +206,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 required
                 value={countryCallingCode}
                 onChange={(e) => setCountryCallingCode(e.target.value)}
-                placeholder="+966"
+                placeholder="+965"
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden text-left"
                 dir="ltr"
               />
@@ -213,7 +218,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 required
                 value={cityAr}
                 onChange={(e) => setCityAr(e.target.value)}
-                placeholder="الرياض / مكة / الدمام / القاهرة"
+                placeholder={countryPreset.cityPlaceholderAr}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
               />
             </div>
@@ -343,7 +348,7 @@ export const SchoolProvisionForm: React.FC<SchoolProvisionFormProps> = ({
                 type="tel"
                 value={principalPhone}
                 onChange={(e) => setPrincipalPhone(e.target.value)}
-                placeholder={`${countryCallingCode}501112233`}
+                placeholder={`${countryCallingCode}${localPhonePlaceholder}`}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 dir="ltr"
               />

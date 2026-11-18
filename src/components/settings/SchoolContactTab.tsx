@@ -32,7 +32,8 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
 
   const handleCountryChange = (countryName: string) => {
     const matched = findCountryByName(countryName);
-    const newDialCode = matched ? matched.dialCode : currentDialCode;
+    const countryPreset = getCountryPreset(countryName);
+    const newDialCode = matched ? matched.dialCode : countryPreset.callingCode || currentDialCode;
 
     onChange({
       countryCallingCode: newDialCode,
@@ -106,7 +107,7 @@ export const SchoolContactTab: React.FC<Props> = ({ profile, onChange, disabled 
                 value={address.country || ''}
                 onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                placeholder={lang === 'ar' ? 'اختر أو اكتب اسم الدولة (مثال: المملكة العربية السعودية، مصر، الإمارات...)' : 'Select or type the country name (e.g., Saudi Arabia, Egypt, UAE...)'}
+                placeholder={lang === 'ar' ? 'اختر أو اكتب اسم الدولة (مثال: دولة الكويت، مصر، الإمارات...)' : 'Select or type the country name (e.g., Kuwait, Egypt, UAE...)'}
               />
               <datalist id="countries-datalist">
                 {COUNTRIES_LIST.map((c) => (

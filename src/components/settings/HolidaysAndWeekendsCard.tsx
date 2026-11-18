@@ -331,7 +331,7 @@ export const HolidaysAndWeekendsCard: React.FC<Props> = ({
                 onClick={() => applyPreset('saudi')}
                 className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
               >
-                {lang === 'ar' ? 'الجمعة والسبت (السعودية)' : 'Friday and Saturday (Saudi Arabia)'}
+                {lang === 'ar' ? 'الجمعة والسبت (الافتراضي الخليجي والعربي)' : 'Friday and Saturday (Gulf / Arab Default)'}
               </button>
               <button
                 type="button"
