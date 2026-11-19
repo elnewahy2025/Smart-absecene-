@@ -15,52 +15,48 @@ interface ParentAttendanceDeps {
 
 /** Parent portal reads per-student mirrors, never the raw session documents. */
 export function useParentAttendanceRecords({
-  firebaseUser,
-  currentUserRole,
-  currentUserPhone,
-  tenantId,
-  authenticatedPhone,
-  setParentAttendanceRecords,
+  firebaseUser, currentUserRole, currentUserPhone, tenantId, authenticatedPhone, setParentAttendanceRecords,
 }: ParentAttendanceDeps) {
   useEffect(() => {
-    if (!firebaseUser || currentUserRole !== 'parent') {
-      setParentAttendanceRecords([]);
-      return;
-    }
+    // Clear immediately so records from a previous identity/tenant cannot remain visible.
+    setParentAttendanceRecords([]);
+    if (!firebaseUser || currentUserRole !== 'parent') return;
+
     const phone = authenticatedPhone || currentUserPhone;
     const email = (firebaseUser.email || '').trim().toLowerCase();
     if (!phone && !email) return;
 
-    const mergedById = new Map<string, StudentAttendanceRecord>();
+    // Retain each query's latest snapshot and rebuild the union on every update.
+    const latestByQuery = new Map<string, Map<string, StudentAttendanceRecord>>();
     const unsubscribes: Array<() => void> = [];
+    const publishMergedRecords = () => {
+      const merged = new Map<string, StudentAttendanceRecord>();
+      latestByQuery.forEach((records) => records.forEach((record, id) => merged.set(id, record)));
+      setParentAttendanceRecords(Array.from(merged.values()));
+    };
 
     const attachQuery = (field: 'guardianPhone' | 'guardianEmail', value: string) => {
-      const recordsQuery = query(
-        collection(db, 'attendance_records'),
-        where('tenantId', '==', tenantId),
-        where(field, '==', value)
-      );
-      const unsub = onSnapshot(
-        recordsQuery,
-        (snapshot) => {
-          snapshot.forEach((docSnap) => {
-            const row = { ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id };
-            if (row.tenantId === tenantId) {
-              mergedById.set(docSnap.id, row);
-            }
-          });
-          setParentAttendanceRecords(Array.from(mergedById.values()));
-        },
-        (error) => console.error('[PARENT] Could not load attendance records:', error?.code)
-      );
+      const queryKey = `${field}:${value}`;
+      const recordsQuery = query(collection(db, 'attendance_records'),
+        where('tenantId', '==', tenantId), where(field, '==', value));
+      const unsub = onSnapshot(recordsQuery, (snapshot) => {
+        const records = new Map<string, StudentAttendanceRecord>();
+        snapshot.forEach((docSnap) => {
+          const row = { ...(docSnap.data() as StudentAttendanceRecord), id: docSnap.id };
+          if (row.tenantId === tenantId) records.set(docSnap.id, row);
+        });
+        latestByQuery.set(queryKey, records);
+        publishMergedRecords();
+      }, (error) => {
+        console.error('[PARENT] Could not load attendance records:', error?.code);
+        latestByQuery.set(queryKey, new Map());
+        publishMergedRecords();
+      });
       unsubscribes.push(unsub);
     };
 
     if (phone) attachQuery('guardianPhone', phone);
     if (email) attachQuery('guardianEmail', email);
-
-    return () => {
-      unsubscribes.forEach((unsub) => unsub());
-    };
-  }, [firebaseUser, currentUserRole, currentUserPhone, tenantId, authenticatedPhone]);
+    return () => { unsubscribes.forEach((unsub) => unsub()); };
+  }, [firebaseUser, currentUserRole, currentUserPhone, tenantId, authenticatedPhone, setParentAttendanceRecords]);
 }
