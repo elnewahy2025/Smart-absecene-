@@ -149,7 +149,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                   }`}
                 >
                   <td className="py-3 px-3 text-center">
-                    <input id="sessionrosterpanel-input-3" name="sessionrosterpanel-input-3"
+                    <input id={`sessionrosterpanel-select-${record.studentId}`} name={`sessionrosterpanel-select-${record.studentId}`}
                       type="checkbox"
                       aria-label={`تحديد ${student.fullName}`}
                       checked={isSelected}
@@ -199,7 +199,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                       {record.status === 'late' && (
                         <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] text-amber-800">
                           <span>{lang === 'ar' ? 'تأخر:' : 'Late:'}</span>
-                          <input id="sessionrosterpanel-input-4" name="sessionrosterpanel-input-4"
+                          <input id={`sessionrosterpanel-late-${record.studentId}`} name={`sessionrosterpanel-late-${record.studentId}`}
                             type="number"
                             min="1"
                             max="45"
@@ -214,7 +214,7 @@ export const SessionRosterPanel: React.FC<SessionRosterPanelProps> = ({
                         </div>
                       )}
 
-                      <input id="sessionrosterpanel-input-5" name="sessionrosterpanel-input-5"
+                      <input id={`sessionrosterpanel-note-${record.studentId}`} name={`sessionrosterpanel-note-${record.studentId}`}
                         type="text"
                         disabled={!canEdit}
                         placeholder={lang === 'ar' ? 'ملاحظة خاصة...' : 'Note...'}
