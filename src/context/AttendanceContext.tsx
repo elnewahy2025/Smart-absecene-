@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Tenant,
   UserProfile,
@@ -24,7 +24,7 @@ import {
 
 import { auth, db } from '../lib/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
-import type { AttendanceContextType } from './attendanceContextSupport';
+import { AttendanceContext } from './attendanceContextInstance';
 import { authenticatedFetch, setApiTenantOverride } from '../lib/api';
 import type { TenantSubscription } from '../config/subscription';
 import { useDailyDigest } from './useDailyDigest';
@@ -60,8 +60,6 @@ import {
   loadSchoolProfilesMap,
 } from './attendanceStateFactories';
 import { useBehaviourIncidents } from './useBehaviourIncidents';
-
-const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTenantId?: string }> = ({
   children,

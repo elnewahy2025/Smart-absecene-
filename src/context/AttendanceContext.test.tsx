@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React from 'react';
+import React, { useContext } from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +43,7 @@ vi.mock('../lib/api', () => ({
 }));
 
 import { AttendanceProvider, useAttendance } from './AttendanceContext';
+import { AttendanceContext } from './attendanceContextInstance';
 import type { AttendanceContextType } from './attendanceContextSupport';
 import { localCache } from '../utils/localCache';
 import { authenticatedFetch } from '../lib/api';
@@ -179,6 +180,30 @@ describe('AttendanceContext provider harness', () => {
       return null;
     };
     expect(() => render(<Bare />)).toThrow(/AttendanceProvider/);
+  });
+
+  it('shares one stable context instance between the provider and useAttendance', () => {
+    let fromInstance: unknown = null;
+    let fromHook: unknown = null;
+
+    const DirectProbe: React.FC = () => {
+      fromInstance = useContext(AttendanceContext);
+      return null;
+    };
+    const HookProbe: React.FC = () => {
+      fromHook = useAttendance();
+      return null;
+    };
+
+    render(
+      <AttendanceProvider initialTenantId="school-1">
+        <DirectProbe />
+        <HookProbe />
+      </AttendanceProvider>
+    );
+
+    expect(fromInstance).not.toBeNull();
+    expect(fromHook).toBe(fromInstance);
   });
 
   it('initialises the default tenant, role and seeded data collections', () => {
