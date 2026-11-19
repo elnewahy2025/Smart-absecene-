@@ -1,4 +1,5 @@
 import type {
+  AttendanceRecord,
   AttendanceSession,
   AttendanceStatus,
   AuditLog,
@@ -125,7 +126,7 @@ export function useSessionActions({
   const quickMarkGroupAsPresent = (sessionId: string, studentIds?: string[]) => {
     const targetSession = allSessions.find((s) => s.id === sessionId);
     if (!targetSession || !canEditSession(targetSession)) {
-      return { updatedCount: 0, message: 'غير مصرح لك بتعديل هذا الكشف وفق صلاحياتك الحالية.' };
+      return { updatedCount: 0, message: 'لا تملك صلاحية التعديل على هذا الكشف أو المستخدم غير مصرح له بتعديل هذا الكشف.' };
     }
     let affectedCount = 0;
     setAllSessions((prev) =>
@@ -178,8 +179,8 @@ export function useSessionActions({
       performerRole: currentUser.role,
       details:
         studentIds && studentIds.length > 0
-          ? `التحضير السريع (Quick Mark): تم تعيين ${studentIds.length} طالب كمجموعة إلى حالة 'حاضر' افتراضياً.`
-          : `التحضير السريع (Quick Mark): تم تعيين جميع طلاب الكشف كـ 'حاضر' لتسريع الرصد وحصر الغياب يدوياً.`,
+          ? `تمييز جماعي (Quick Mark): تم تعيين ${studentIds.length} طالب إلى الحالة 'حاضر' افتراضيًا.`
+          : `تمييز جماعي (Quick Mark): تم تعيين جميع الطلاب في الكشف 'حاضر' لتسريع التحديد وتقليل الغياب إلى الإدخال اليدوي.`,
       detailsEn:
         studentIds && studentIds.length > 0
           ? `Quick Mark: ${studentIds.length} students were assigned to the 'Present' status as a group by default.`
@@ -190,18 +191,18 @@ export function useSessionActions({
       updatedCount: affectedCount,
       message:
         studentIds && studentIds.length > 0
-          ? `تم تطبيق التحضير السريع على ${studentIds.length} طالب بنجاح.`
-          : `تم تعيين كامل الفصل حاضر افتراضياً بنجاح. يمكنك الآن تعديل الغائبين فقط لتوفير الوقت.`,
+          ? `تم تمييز ${studentIds.length} طالب باعتبارهم حاضرون.`
+          : `تم تمييز جميع الطلاب في الكشف باعتبارهم حاضرون. تم حفظ الدفعة بنجاح.`,
     };
   };
 
   const submitSession = (sessionId: string) => {
     const targetSession = sessions.find((s) => s.id === sessionId);
     if (!targetSession) {
-      return { success: false, message: 'الكشف غير موجود' };
+      return { success: false, message: 'تعذر العثور على الكشف.' };
     }
     if (!canEditSession(targetSession)) {
-      return { success: false, message: 'غير مصرح لك باعتماد هذا الكشف وفق قواعد الصلاحيات (RBAC).' };
+      return { success: false, message: 'لا تملك صلاحية اعتماد وتقديم الكشف (RBAC).' };
     }
 
     const now = new Date().toISOString();
@@ -213,13 +214,13 @@ export function useSessionActions({
         const student = students.find((s) => s.id === rec.studentId);
         if (student) {
           const isAbsent = rec.status === 'absent';
-          const defaultAbsentTpl = settings.absenceMessageTemplate || 'المكرم ولي أمر الطالب ({student_name}): نفيدكم بتسجيل غياب نجلكم عن ({subject}) بتاريخ {date}. يرجى تقديم العذر عبر الرابط المدرسي.';
-          const defaultLateTpl = settings.lateMessageTemplate || 'المكرم ولي أمر الطالب ({student_name}): تم تسجيل تأخر نجلكم ({minutes} دقيقة) عن دوام اليوم بتاريخ {date}.';
+          const defaultAbsentTpl = settings.absenceMessageTemplate || 'عزيزي ولي الأمر ({{student_name}}): نود إبلاغكم بغياب الطالب في مادة ({{subject}}) بتاريخ {{date}}. يرجى التواصل معنا بخصوص الغياب.';
+          const defaultLateTpl = settings.lateMessageTemplate || 'عزيزي ولي الأمر ({{student_name}}): نود إبلاغكم بتأخر الطالب ({{minutes}} دقيقة) في مادة ({{subject}}) بتاريخ {{date}}.';
 
           const msg = isAbsent
             ? defaultAbsentTpl
                 .replace('{student_name}', student.fullName)
-                .replace('{subject}', targetSession.subject || 'الدوام اليومي')
+                .replace('{subject}', targetSession.subject || 'حضور يومي')
                 .replace('{date}', targetSession.date)
             : defaultLateTpl
                 .replace('{student_name}', student.fullName)
@@ -229,14 +230,14 @@ export function useSessionActions({
           const ch: 'SMS' | 'WhatsApp' = settings.preferredChannel === 'WhatsApp' ? 'WhatsApp' : 'SMS';
 
           newNotifications.push({
-            id: `notif-${Date.now()}-${student.id}`,
+            id: `notify-${Date.now()}-${student.id}`,
             tenantId: tenantId,
             recipientPhone: student.guardianPhone,
             recipientName: student.guardianName,
             studentId: student.id,
             studentName: student.fullName,
             absenceDate: targetSession.date,
-            sessionTitle: `${targetSession.subject || 'حضور عام'} - ${targetSession.className}`,
+            sessionTitle: `${targetSession.subject || 'حضور يومي'} - ${targetSession.className}`,
             statusType: rec.status,
             category: isAbsent ? 'absence' : 'late',
             messageText: msg,
@@ -276,26 +277,26 @@ export function useSessionActions({
       performerId: currentUser.id,
       performerName: currentUser.name,
       performerRole: currentUser.role,
-      details: `تم اعتماد وإرسال كشف الحضور (${targetSession.subject || 'حضور يومي'}) للصف ${targetSession.className} وتوليد ${newNotifications.length} إشعار ولي أمر تلقائي.`,
+      details: `اعتماد كشف الحضور (مادة: ${targetSession.subject || 'حضور يومي'}) للصف ${targetSession.className} وإنشاء ${newNotifications.length} إشعارات ولي الأمر.`,
       detailsEn: `The attendance sheet (${targetSession.subject || 'Daily Attendance'}) for class ${targetSession.className} was approved and submitted, and ${newNotifications.length} automatic guardian notifications were generated.`,
     });
 
     return {
       success: true,
-      message: `تم اعتماد الكشف بنجاح وإرسال ${newNotifications.length} إشعار لولي الأمر عبر المنظومة.`,
+      message: `تم اعتماد وتقديم الكشف بنجاح وإنشاء ${newNotifications.length} إشعار للغائبين والمتأخرين.`,
     };
   };
 
   const reopenSession = (sessionId: string, reason: string) => {
     if (!canReopenSessions) {
-      return { success: false, message: 'صلاحية إعادة فتح الكشف محصورة بمدير المدرسة ومسجل شؤون الطلاب فقط.' };
+      return { success: false, message: 'لا تملك صلاحية إعادة فتح الكشف المعتمد (مدير أو مسجل فقط).' };
     }
     if (!reason || reason.trim().length < 5) {
-      return { success: false, message: 'يلزم كتابة سبب رسمي واضح لإعادة فتح الكشف وفق لوائح التدقيق.' };
+      return { success: false, message: 'يجب إدخال سبب إعادة الفتح بوضوح (5 أحرف على الأقل).' };
     }
 
     const targetSession = sessions.find((s) => s.id === sessionId);
-    if (!targetSession) return { success: false, message: 'الكشف غير موجود' };
+    if (!targetSession) return { success: false, message: 'تعذر العثور على الكشف.' };
 
     const now = new Date().toISOString();
 
@@ -338,19 +339,18 @@ export function useSessionActions({
     grade: string
   ): AttendanceSession => {
     const classStudents = getAttendanceRoster(students, className, classId);
-    const now = new Date().toISOString();
-    const today = now.split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
     const sessionId = `sess-${Date.now()}`;
     const records: AttendanceRecord[] = createAttendanceRecords(
       sessionId,
       classStudents,
       currentUser.name,
-      now
+      new Date().toISOString()
     );
 
     const newSession: AttendanceSession = {
       id: sessionId,
-      tenantId: tenantId,
+      tenantId,
       date: today,
       sessionType,
       periodNumber: sessionType === 'period' ? periodNumber : undefined,
@@ -390,6 +390,7 @@ export function useSessionActions({
 
     return newSession;
   };
+
   return {
     updateRecord,
     setAllPresentInDraft,
