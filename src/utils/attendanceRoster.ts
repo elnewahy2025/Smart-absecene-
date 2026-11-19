@@ -35,7 +35,7 @@ export function createAttendanceRecords(
     id: `${sessionId}-record-${student.id}`,
     sessionId,
     studentId: student.id,
-    status: 'present',
+    status: 'present' as const,
     updatedAt,
     updatedBy,
   }));
