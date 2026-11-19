@@ -12,6 +12,7 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toFirestoreData } from './attendanceContextSupport';
+import { createAttendanceRecords, getAttendanceRoster } from '../utils/attendanceRoster';
 
 interface UseSessionActionsParams {
   tenantId: string;
@@ -337,22 +338,19 @@ export function useSessionActions({
     classId: string,
     grade: string
   ): AttendanceSession => {
-    const classStudents = students.filter(
-      (s) => (s.classId === classId || s.className === className) && s.enrollmentStatus !== 'transferred'
+    const classStudents = getAttendanceRoster(students, className, classId);
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    const sessionId = `sess-${Date.now()}`;
+    const records: AttendanceRecord[] = createAttendanceRecords(
+      sessionId,
+      classStudents,
+      currentUser.name,
+      now
     );
-    const today = new Date().toISOString().split('T')[0];
-
-    const records: AttendanceRecord[] = classStudents.map((s, idx) => ({
-      id: `rec-new-${Date.now()}-${idx}`,
-      sessionId: `sess-${Date.now()}`,
-      studentId: s.id,
-      status: 'present', // Visual convenience in UI, status is 'draft'
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser.name,
-    }));
 
     const newSession: AttendanceSession = {
-      id: `sess-${Date.now()}`,
+      id: sessionId,
       tenantId: tenantId,
       date: today,
       sessionType,
