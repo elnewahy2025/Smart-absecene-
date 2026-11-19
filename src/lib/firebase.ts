@@ -1,5 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  inMemoryPersistence,
+  browserPopupRedirectResolver,
+  GoogleAuthProvider,
+  connectAuthEmulator,
+} from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, connectFirestoreEmulator } from 'firebase/firestore';
 
 const env = (import.meta as any).env || {};
@@ -29,7 +37,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig as any);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+// Use browserLocalPersistence instead of IndexedDB persistence to avoid cross-tab
+// IndexedDB lock timeouts (DB_TIMEOUT) and setInterval polling violations.
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence, inMemoryPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
 
 if (useEmulator && !(globalThis as any).__SMART_SCHOOL_EMULATORS__) {
   connectAuthEmulator(
