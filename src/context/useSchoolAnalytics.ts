@@ -46,7 +46,7 @@ export function useSchoolAnalytics({
       const transferredStudentsList = stList.filter((s) => s.enrollmentStatus === 'transferred');
       const cfgClass = configured.find((c) => c.name === className);
       const grade = cfgClass?.grade || stList[0]?.grade || 'المرحلة الدراسية';
-      const classId = cfgClass?.id || stList[0]?.classId || `class-${className.replace(/[^a-zA-Z0-9]/g, '')}`;
+      const classId = cfgClass?.id || stList.find((student) => student.classId?.trim())?.classId || '';
 
       const avgRate = activeStudentsList.length > 0
         ? Math.round(activeStudentsList.reduce((acc, s) => acc + (s.attendanceRate || 100), 0) / activeStudentsList.length)
