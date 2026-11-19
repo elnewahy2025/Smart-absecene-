@@ -219,8 +219,9 @@ const MainAppContent: React.FC = () => {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   }, [lang]);
 
-  // Strict RBAC: Guard unauthorized views based on role
+  // Strict RBAC: Guard unauthorized views based on role (only after auth & role finish resolving)
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     if (isParent) {
       if (
         activeTab !== 'parent_portal' &&
@@ -240,10 +241,10 @@ const MainAppContent: React.FC = () => {
         setActiveTab('dashboard');
       }
     }
-  }, [isParent, isTeacher, isRegistrar, activeTab]);
+  }, [authLoading, isAuthenticated, isParent, isTeacher, isRegistrar, activeTab]);
 
-  // Wait for Firebase Auth initial state before rendering LoginPage to avoid login flash on reload
-  if (authLoading && !isAuthenticated) {
+  // Wait for Firebase Auth & role resolution before rendering LoginPage or dashboard
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" dir="rtl">
         <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" aria-label="Loading" />
