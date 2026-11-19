@@ -33,11 +33,10 @@ export function getSystemChromePath(): string | undefined {
   return undefined;
 }
 
-// Only the Arabic webfonts and data: documents are reachable from the renderer.
-// External scripts (including cdn.tailwindcss.com), file://, loopback, and
-// internal network targets are aborted.
+// Only embedded images and the required Arabic webfont hosts are reachable.
+// Generic data: documents, scripts, file://, loopback, and internal network targets are blocked.
 export const isAllowedPdfRequest = (url: string): boolean =>
-  url.startsWith('data:') ||
+  url.startsWith('data:image/') ||
   url.startsWith('https://fonts.googleapis.com/') ||
   url.startsWith('https://fonts.gstatic.com/');
 
