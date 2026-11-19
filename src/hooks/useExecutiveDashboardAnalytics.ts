@@ -7,6 +7,12 @@ import {
   Student,
   TenantSchoolProfile,
 } from '../types/attendance';
+import {
+  isActiveStudent,
+  meanOrNull,
+  rateOrNull,
+  summarizeRecords,
+} from '../utils/attendanceMath';
 
 export interface UseExecutiveDashboardAnalyticsParams {
   sessions: AttendanceSession[];
@@ -38,22 +44,53 @@ const submittedTodaySessions = useMemo(
 
 // 2. Headcounts & attendance breakdown for today
 const activeStudents = useMemo(
-  () => students.filter((s) => !s.enrollmentStatus || s.enrollmentStatus === 'active'),
+  () => students.filter((s) => isActiveStudent(s)),
+  [students]
+);
+
+const transferredStudentIds = useMemo(
+  () => new Set(students.filter((s) => s.enrollmentStatus === 'transferred').map((s) => s.id)),
   [students]
 );
 
 const todayMetrics = useMemo(() => {
   if (submittedTodaySessions.length > 0) {
-    const present = submittedTodaySessions.reduce((acc, s) => acc + (s.presentCount || 0), 0);
-    const absent = submittedTodaySessions.reduce((acc, s) => acc + (s.absentCount || 0), 0);
-    const late = submittedTodaySessions.reduce((acc, s) => acc + (s.lateCount || 0), 0);
-    const excused = submittedTodaySessions.reduce((acc, s) => acc + (s.excusedCount || 0), 0);
-    const total = present + absent + late;
-    const rate = total > 0 ? Math.round((present / total) * 100) : schoolEnrollmentStats?.schoolAttendanceRate ?? 95;
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    let excused = 0;
+    let attended = 0;
+    let totalRecords = 0;
+
+    for (const s of submittedTodaySessions) {
+      if (s.records && s.records.length > 0) {
+        const activeRecords = s.records.filter((r) => !transferredStudentIds.has(r.studentId));
+        const totals = summarizeRecords(activeRecords);
+        present += totals.present;
+        absent += totals.absentTotal;
+        late += totals.late;
+        excused += totals.excusedTotal;
+        attended += totals.attendedTotal;
+        totalRecords += totals.total;
+      } else {
+        const sPresent = s.presentCount || 0;
+        const sAbsent = s.absentCount || 0;
+        const sLate = s.lateCount || 0;
+        const sExcused = s.excusedCount || 0;
+        present += sPresent;
+        absent += sAbsent;
+        late += sLate;
+        excused += sExcused;
+        attended += sPresent + sLate;
+        totalRecords += sPresent + sAbsent + sLate + sExcused;
+      }
+    }
+
+    const rate = totalRecords > 0 ? Math.round((attended / totalRecords) * 100) : 0;
     const unexcused = Math.max(0, absent - excused);
 
     return {
-      presentCount: present,
+      presentCount: attended,
       absentCount: absent,
       excusedCount: excused,
       unexcusedCount: unexcused,
@@ -63,24 +100,25 @@ const todayMetrics = useMemo(() => {
     };
   }
 
-  // Baseline fallback from enrollment stats
-  const avgRate = schoolEnrollmentStats?.schoolAttendanceRate ?? 95;
-  const estimatedPresent = Math.round((activeStudents.length * avgRate) / 100);
-  const estimatedAbsent = Math.max(0, activeStudents.length - estimatedPresent);
+  // Baseline fallback from enrollment stats (never fabricates a synthetic daily headcount)
+  const mean = activeStudents.length > 0
+    ? meanOrNull(activeStudents.map((s) => rateOrNull(s.attendanceRate)))
+    : null;
+  const avgRate = mean !== null ? Math.round(mean) : 0;
   const approvedExcusesToday = justifications.filter(
     (j) => j.status === 'approved' && j.absenceDate === todayStr
   ).length;
 
   return {
-    presentCount: estimatedPresent,
-    absentCount: estimatedAbsent,
+    presentCount: 0,
+    absentCount: 0,
     excusedCount: approvedExcusesToday,
-    unexcusedCount: Math.max(0, estimatedAbsent - approvedExcusesToday),
+    unexcusedCount: 0,
     lateCount: 0,
     attendanceRate: avgRate,
     hasSubmittedData: false,
   };
-}, [submittedTodaySessions, schoolEnrollmentStats, activeStudents, justifications, todayStr]);
+}, [submittedTodaySessions, transferredStudentIds, activeStudents, justifications, todayStr]);
 
 // 3. Data completeness (فصول معتمدة vs فصول لم تسجل بعد)
 const totalClassesCount = classesStats.length;

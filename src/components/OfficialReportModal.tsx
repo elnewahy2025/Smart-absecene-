@@ -5,6 +5,7 @@ import { Student } from '../types/attendance';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 import { useModalAccessibility } from '../hooks/useModalAccessibility';
 import { getCountryIdentitySpec, getCountryPreset } from '../config/countryPresets';
+import { isActiveStudent, meanOrNull, rateOrNull } from '../utils/attendanceMath';
 import {
   FileText,
   Printer,
@@ -21,7 +22,7 @@ import {
 interface OfficialReportModalProps {
   onClose: () => void;
   selectedClassFilter: string;
-  reportType: 'full' | 'chronic_only' | 'sessions';
+  reportType: 'full' | 'chronic_only' | 'tier2_warning' | 'tier3_critical' | 'sessions';
 }
 
 export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
@@ -33,28 +34,45 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Filter students based on selection
+  // Filter active students based on class & tier selection
   const filteredStudents = students.filter((s) => {
+    if (!isActiveStudent(s)) {
+      return false;
+    }
     if (selectedClassFilter !== 'all' && s.className !== selectedClassFilter) {
       return false;
     }
     if (reportType === 'chronic_only') {
       return s.totalAbsences >= 3;
     }
+    if (reportType === 'tier2_warning') {
+      return s.totalAbsences >= 5 && s.totalAbsences < 8;
+    }
+    if (reportType === 'tier3_critical') {
+      return s.totalAbsences >= 8;
+    }
     return true;
   });
 
   const totalEnrolled = filteredStudents.length;
-  const avgRate =
-    totalEnrolled > 0
-      ? (
-          filteredStudents.reduce((acc, s) => acc + s.attendanceRate, 0) /
-          totalEnrolled
-        ).toFixed(1)
-      : '100';
+  const meanRate = meanOrNull(filteredStudents.map((s) => rateOrNull(s.attendanceRate)));
+  const avgRate = meanRate !== null ? meanRate.toFixed(1) : '—';
 
   const criticalCount = filteredStudents.filter((s) => s.totalAbsences >= 8).length;
   const warningCount = filteredStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8).length;
+
+  const isChronicReport =
+    reportType === 'chronic_only' ||
+    reportType === 'tier2_warning' ||
+    reportType === 'tier3_critical';
+  const reportSubtitleAr =
+    reportType === 'tier3_critical'
+      ? 'كشف الحالات الحرجة (8+ أيام غياب)'
+      : reportType === 'tier2_warning'
+      ? 'كشف حالات الإنذار الثاني (5–7 أيام غياب)'
+      : reportType === 'chronic_only'
+      ? 'تقرير حالات الغياب المتكرر والإنذارات'
+      : 'التقرير الإحصائي الشامل للحضور';
 
   const todayStr = new Date().toLocaleDateString('ar-SA', {
     year: 'numeric',
@@ -70,9 +88,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
 
     setIsGeneratingPdf(true);
     const html = printAreaRef.current.innerHTML;
-    const reportTitle = `${currentTenant.name} - ${
-      reportType === 'chronic_only' ? 'تقرير حالات الغياب المتكرر والإنذارات' : 'التقرير الإحصائي الشامل للحضور'
-    }`;
+    const reportTitle = `${currentTenant.name} - ${reportSubtitleAr}`;
     const filename = `تقرير_حضور_${currentTenant.code}_${todayStr.replace(/\s+/g, '_')}.pdf`;
 
     await downloadNativePdfFromHtml({
@@ -86,9 +102,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
   const handleBrowserPrint = () => {
     if (printAreaRef.current) {
       const html = printAreaRef.current.innerHTML;
-      const reportTitle = `${currentTenant.name} - ${
-        reportType === 'chronic_only' ? 'تقرير حالات الغياب المتكرر والإنذارات' : 'التقرير الإحصائي الشامل للحضور'
-      }`;
+      const reportTitle = `${currentTenant.name} - ${reportSubtitleAr}`;
       printNativePdfFromHtml({
         htmlContent: html,
         title: reportTitle,
@@ -198,7 +212,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
               )}
               <div className="font-bold text-sm text-slate-900">تقرير الانضباط والحضور المدرسي</div>
               <div className="text-xs text-emerald-800 font-semibold">
-                {reportType === 'chronic_only' ? 'كشف حالات الغياب المتكرر والإنذارات' : 'التقرير الإحصائي الشامل للطلاب'}
+                {isChronicReport ? reportSubtitleAr : 'التقرير الإحصائي الشامل للطلاب'}
               </div>
             </div>
 
@@ -220,7 +234,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
             </div>
             <div>
               <span className="text-slate-500 block text-[11px]">متوسط نسبة الحضور:</span>
-              <strong className="text-base text-emerald-700 font-bold">{avgRate}%</strong>
+              <strong className="text-base text-emerald-700 font-bold">{avgRate === '—' ? '—' : `${avgRate}%`}</strong>
             </div>
             <div>
               <span className="text-slate-500 block text-[11px]">حالات الإنذار الثاني (5+ أيام):</span>
@@ -276,7 +290,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
                         </td>
                         <td className="py-2 px-2 border-l border-slate-200 text-center font-mono text-slate-600">{s.totalLates}</td>
                         <td className="py-2 px-2.5 border-l border-slate-200 text-center font-mono font-bold">
-                          {s.attendanceRate}%
+                          {rateOrNull(s.attendanceRate) !== null ? `${s.attendanceRate}%` : '—'}
                         </td>
                         <td className="py-2 px-3">
                           {isCritical ? (

@@ -17,10 +17,14 @@ export const ClassCalendarView: React.FC<Props> = ({
   lang,
 }) => {
   const { isOffDay } = useAttendance();
-  // Calendar month state (default to current month)
+  // Calendar month state (sorted latest session date parsed at local noon to avoid UTC shifts)
   const [currentDate, setCurrentDate] = useState(() => {
-    if (sessions.length > 0 && sessions[0].date) {
-      return new Date(sessions[0].date);
+    const dated = sessions.map((s) => s.date).filter(Boolean).sort();
+    const latestDate = dated[dated.length - 1];
+    if (latestDate) {
+      const normalized = latestDate.includes('T') ? latestDate : `${latestDate}T12:00:00`;
+      const parsed = new Date(normalized);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
     }
     return new Date();
   });

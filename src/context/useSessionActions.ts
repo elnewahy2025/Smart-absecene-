@@ -13,6 +13,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toFirestoreData } from './attendanceContextSupport';
 import { createAttendanceRecords, getAttendanceRoster } from '../utils/attendanceRoster';
+import { computeStudentMetricsFromSessions, recountSession } from '../utils/attendanceMath';
 
 interface UseSessionActionsParams {
   tenantId: string;
@@ -73,26 +74,10 @@ export function useSessionActions({
         });
 
         // Recalculate summary counts
-        const presentCount = updatedRecords.filter((r) => r.status === 'present').length;
-        const absentCount = updatedRecords.filter(
-          (r) => r.status === 'absent' || r.status === 'rejected_excuse'
-        ).length;
-        const lateCount = updatedRecords.filter((r) => r.status === 'late').length;
-        const excusedCount = updatedRecords.filter(
-          (r) =>
-            r.status === 'excused_absence' ||
-            r.status === 'excused_leave' ||
-            r.status === 'under_review'
-        ).length;
-
-        return {
+        return recountSession({
           ...sess,
           records: updatedRecords,
-          presentCount,
-          absentCount,
-          lateCount,
-          excusedCount,
-        };
+        });
       })
     );
   };
@@ -113,14 +98,10 @@ export function useSessionActions({
           updatedAt: new Date().toISOString(),
           updatedBy: currentUser.name,
         }));
-        return {
+        return recountSession({
           ...sess,
           records: updatedRecords,
-          presentCount: updatedRecords.length,
-          absentCount: 0,
-          lateCount: 0,
-          excusedCount: 0,
-        };
+        });
       })
     );
   };
@@ -130,14 +111,16 @@ export function useSessionActions({
     if (!targetSession || !canEditSession(targetSession)) {
       return { updatedCount: 0, message: 'لا تملك صلاحية التعديل على هذا الكشف أو المستخدم غير مصرح له بتعديل هذا الكشف.' };
     }
-    let affectedCount = 0;
+    const targetIdsSet = studentIds && studentIds.length > 0 ? new Set(studentIds) : null;
+    const affectedCount = targetIdsSet
+      ? (targetSession.records || []).filter((r) => targetIdsSet.has(r.studentId)).length
+      : (targetSession.records || []).length;
+
     setAllSessions((prev) =>
       prev.map((sess) => {
         if (sess.id !== sessionId) return sess;
-        const targetIdsSet = studentIds && studentIds.length > 0 ? new Set(studentIds) : null;
         const updatedRecords = (sess.records || []).map((r) => {
           if (!targetIdsSet || targetIdsSet.has(r.studentId)) {
-            affectedCount++;
             return {
               ...r,
               status: 'present' as AttendanceStatus,
@@ -149,26 +132,10 @@ export function useSessionActions({
           return r;
         });
 
-        const presentCount = updatedRecords.filter((r) => r.status === 'present').length;
-        const absentCount = updatedRecords.filter(
-          (r) => r.status === 'absent' || r.status === 'rejected_excuse'
-        ).length;
-        const lateCount = updatedRecords.filter((r) => r.status === 'late').length;
-        const excusedCount = updatedRecords.filter(
-          (r) =>
-            r.status === 'excused_absence' ||
-            r.status === 'excused_leave' ||
-            r.status === 'under_review'
-        ).length;
-
-        return {
+        return recountSession({
           ...sess,
           records: updatedRecords,
-          presentCount,
-          absentCount,
-          lateCount,
-          excusedCount,
-        };
+        });
       })
     );
 
@@ -270,40 +237,10 @@ export function useSessionActions({
       (s) => s.tenantId === tenantId && s.status === 'submitted'
     );
     const affectedStudentIds = new Set(targetSession.records.map((r) => r.studentId));
-    const computedMetrics = new Map<
-      string,
-      { totalAbsences: number; totalLates: number; attendanceRate: number }
-    >();
-
-    affectedStudentIds.forEach((studentId) => {
-      const absentDates = new Set<string>();
-      const attendedDates = new Set<string>();
-      let totalLates = 0;
-      let totalRecords = 0;
-      let attendedRecords = 0;
-
-      submittedTenantSessions.forEach((sess) => {
-        const rec = sess.records?.find((r) => r.studentId === studentId);
-        if (!rec) return;
-        totalRecords += 1;
-        if (rec.status === 'present' || rec.status === 'late' || rec.status === 'excused_leave') {
-          attendedRecords += 1;
-          attendedDates.add(sess.date);
-          if (rec.status === 'late') totalLates += 1;
-        } else if (rec.status === 'absent' || rec.status === 'excused_absence') {
-          absentDates.add(sess.date);
-        }
-      });
-
-      let totalAbsences = 0;
-      absentDates.forEach((date) => {
-        if (!attendedDates.has(date)) totalAbsences += 1;
-      });
-      const attendanceRate =
-        totalRecords > 0 ? parseFloat(((attendedRecords / totalRecords) * 100).toFixed(1)) : 100;
-
-      computedMetrics.set(studentId, { totalAbsences, totalLates, attendanceRate });
-    });
+    const computedMetrics = computeStudentMetricsFromSessions(
+      submittedTenantSessions,
+      affectedStudentIds
+    );
 
     if (computedMetrics.size > 0) {
       setAllStudents((prev) =>
@@ -313,7 +250,10 @@ export function useSessionActions({
         })
       );
 
-      if (firebaseUser && ['admin', 'registrar', 'super_admin'].includes(currentUser.role)) {
+      if (
+        firebaseUser &&
+        ['admin', 'registrar', 'super_admin', 'teacher'].includes(currentUser.role)
+      ) {
         computedMetrics.forEach((metrics, studentId) => {
           void setDoc(doc(db, 'students', studentId), metrics, { merge: true }).catch((error) =>
             console.error('[SESSIONS] Could not update student attendance metrics:', error)

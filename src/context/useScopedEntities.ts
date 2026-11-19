@@ -1,5 +1,6 @@
 import { buildParentSessions } from './attendanceContextSupport';
 import { isChildOfGuardian as isChildOfGuardianRule } from '../utils/attendanceAccess';
+import { computeStudentMetricsFromSessions } from '../utils/attendanceMath';
 import type {
   AttendanceSession,
   AuditLog,
@@ -54,15 +55,22 @@ export function useScopedEntities({
         .map((s) => s.id)
     : [];
 
-  // Data filtered strictly by tenantId AND Parent-Child Privacy Isolation
-  // A parent must NEVER see or know any other students, ONLY their child/children.
-  const students = currentUserRole === 'parent'
-    ? allStudents.filter((s) => s.tenantId === tenantId && parentChildIds.includes(s.id))
-    : allStudents.filter((s) => s.tenantId === tenantId);
-
   const sessions = currentUserRole === 'parent'
     ? buildParentSessions(parentAttendanceRecords)
     : allSessions.filter((s) => s.tenantId === tenantId);
+
+  const derivedMetricsByStudent = computeStudentMetricsFromSessions(sessions);
+
+  // Data filtered strictly by tenantId AND Parent-Child Privacy Isolation
+  // A parent must NEVER see or know any other students, ONLY their child/children.
+  const baseStudents = currentUserRole === 'parent'
+    ? allStudents.filter((s) => s.tenantId === tenantId && parentChildIds.includes(s.id))
+    : allStudents.filter((s) => s.tenantId === tenantId);
+
+  const students = baseStudents.map((s) => {
+    const metrics = derivedMetricsByStudent.get(s.id);
+    return metrics ? { ...s, ...metrics } : s;
+  });
 
   const justifications = currentUserRole === 'parent'
     ? allJustifications.filter((j) => j.tenantId === tenantId && parentChildIds.includes(j.studentId))

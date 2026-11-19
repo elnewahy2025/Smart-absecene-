@@ -6,6 +6,7 @@ import { Printer, Download, X, Layers, CheckCircle2, FileText, Loader2 } from 'l
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../../utils/pdfExport';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import { getCountryPreset } from '../../config/countryPresets';
+import { isActiveStudent, rateOrNull } from '../../utils/attendanceMath';
 
 interface Props {
   isOpen: boolean;
@@ -24,9 +25,10 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
 
   if (!isOpen) return null;
 
-  const classNames = Array.from(new Set(students.map((s) => s.className).filter(Boolean))).sort();
+  const activeStudents = students.filter((s) => isActiveStudent(s));
+  const classNames = Array.from(new Set(activeStudents.map((s) => s.className).filter(Boolean))).sort();
 
-  const filteredStudents = students.filter((s) => {
+  const filteredStudents = activeStudents.filter((s) => {
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
     if (selectedDocType === 'warning_notice') return s.totalAbsences >= 3;
     return true;
@@ -198,7 +200,9 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
                       {s.totalAbsences}
                     </span>
                   </td>
-                  <td className="p-2 border border-slate-200 text-center font-bold font-mono">{s.attendanceRate}%</td>
+                  <td className="p-2 border border-slate-200 text-center font-bold font-mono">
+                    {rateOrNull(s.attendanceRate) !== null ? `${s.attendanceRate}%` : '—'}
+                  </td>
                   <td className="p-2 border border-slate-200 font-mono text-slate-600" dir="ltr">{s.guardianPhone}</td>
                 </tr>
               ))}

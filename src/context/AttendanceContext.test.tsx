@@ -735,8 +735,44 @@ describe('AttendanceContext provider harness', () => {
       quick = value.quickMarkGroupAsPresent(session.id, ids);
     });
     expect(quick.message).toContain('بنجاح');
+    expect(quick.updatedCount).toBe(ids.length);
+    let wholeClassQuick: any;
+    act(() => {
+      wholeClassQuick = (captured as AttendanceContextType).quickMarkGroupAsPresent(session.id);
+    });
     after = (captured as AttendanceContextType).sessions.find((s) => s.id === session.id)!;
+    expect(wholeClassQuick.updatedCount).toBe(after.records.length);
     expect(after.records.filter((r) => r.status === 'present').length).toBe(after.records.length);
+  });
+
+  it('updates student attendance metrics when a teacher submits an assigned session', async () => {
+    authState.user = { uid: 'teacher-uid', email: 'teacher@school.test' };
+    renderProvider();
+    act(() => {
+      (captured as AttendanceContextType).setUserRole('admin');
+    });
+    let value = captured as AttendanceContextType;
+    const student = await seedStudent(value);
+    value = captured as AttendanceContextType;
+    let session: any;
+    act(() => {
+      session = value.createNewSession('daily', 1, '', student.className, student.classId, student.grade);
+    });
+    act(() => {
+      (captured as AttendanceContextType).setUserRole('teacher');
+    });
+    value = captured as AttendanceContextType;
+    act(() => {
+      value.updateRecord(session.id, student.id, 'absent');
+    });
+    let res: any;
+    act(() => {
+      res = (captured as AttendanceContextType).submitSession(session.id);
+    });
+    expect(res.success).toBe(true);
+    const updatedStudent = (captured as AttendanceContextType).students.find((s) => s.id === student.id)!;
+    expect(updatedStudent.attendanceRate).toBeLessThan(100);
+    expect(updatedStudent.totalAbsences).toBeGreaterThanOrEqual(1);
   });
 
   it('submits a session and queues guardian notifications for absences', async () => {
@@ -886,6 +922,48 @@ describe('AttendanceContext provider harness', () => {
     expect(after.justifications.find((j) => j.id === just.id)?.status).toBe('approved');
     expect(after.notifications.length).toBeGreaterThan(notificationsBefore);
     expect(after.notifications[0].category).toBe('excuse_approved');
+  });
+
+  it('recounts session absentCount and excusedCount when filing and reviewing excuses', async () => {
+    authState.user = { uid: 'admin-uid', email: 'admin@school.test' };
+    renderProvider();
+    act(() => {
+      (captured as AttendanceContextType).setUserRole('admin');
+    });
+    let value = captured as AttendanceContextType;
+    const student = await seedStudent(value);
+    value = captured as AttendanceContextType;
+    let session: any;
+    act(() => {
+      session = value.createNewSession('daily', 1, '', student.className, student.classId, student.grade);
+    });
+    value = captured as AttendanceContextType;
+    act(() => {
+      value.updateRecord(session.id, student.id, 'absent');
+    });
+    let sessBefore = (captured as AttendanceContextType).sessions.find((s) => s.id === session.id)!;
+    const absentBefore = sessBefore.absentCount;
+    const excusedBefore = sessBefore.excusedCount;
+
+    let just: any;
+    await act(async () => {
+      just = await (captured as AttendanceContextType).createJustification(
+        student.id,
+        session.date,
+        'medical',
+        'عذر طبي'
+      );
+    });
+    const afterCreate = (captured as AttendanceContextType).sessions.find((s) => s.id === session.id)!;
+    expect(afterCreate.absentCount).toBe(absentBefore - 1);
+    expect(afterCreate.excusedCount).toBe(excusedBefore + 1);
+
+    act(() => {
+      (captured as AttendanceContextType).reviewJustification(just.id, 'rejected', 'مرفوض');
+    });
+    const afterReject = (captured as AttendanceContextType).sessions.find((s) => s.id === session.id)!;
+    expect(afterReject.absentCount).toBe(absentBefore);
+    expect(afterReject.excusedCount).toBe(excusedBefore);
   });
 
   it('ignores review attempts from unauthorised roles', async () => {

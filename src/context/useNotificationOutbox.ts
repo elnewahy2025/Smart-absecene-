@@ -10,6 +10,7 @@ import type {
   Student,
   UserProfile,
 } from '../types/attendance';
+import { isActiveStudent } from '../utils/attendanceMath';
 
 interface UseNotificationOutboxParams {
   tenantId: string;
@@ -484,11 +485,16 @@ export function useNotificationOutbox({
     return true;
   };
 
-  const sendAllChronicWarningNotifications = (tierThreshold = 3): number => {
-    const eligibleStudents = students.filter((s) => s.totalAbsences >= tierThreshold);
+  const sendAllChronicWarningNotifications = (tierThreshold = 3, classFilter?: string): number => {
+    const eligibleStudents = students.filter(
+      (s) =>
+        isActiveStudent(s) &&
+        (!classFilter || classFilter === 'all' || s.className === classFilter) &&
+        s.totalAbsences >= tierThreshold
+    );
     let sent = 0;
     eligibleStudents.forEach((s) => {
-      const tier = s.totalAbsences >= 7 ? 3 : s.totalAbsences >= 5 ? 2 : 1;
+      const tier = s.totalAbsences >= 8 ? 3 : s.totalAbsences >= 5 ? 2 : 1;
       if (sendChronicWarningNotification(s.id, tier)) {
         sent++;
       }

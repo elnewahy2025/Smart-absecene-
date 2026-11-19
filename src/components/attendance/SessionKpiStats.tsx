@@ -1,11 +1,13 @@
 import React from 'react';
 import { AttendanceSession } from '../../types/attendance';
+import { summarizeRecords } from '../../utils/attendanceMath';
 
 interface SessionKpiStatsProps {
   lang: 'ar' | 'en';
   session: AttendanceSession;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  transferredStudentIds?: ReadonlySet<string>;
 }
 
 export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
@@ -13,7 +15,22 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
   session,
   statusFilter,
   onStatusFilterChange,
+  transferredStudentIds,
 }) => {
+  const hasRecords = Boolean(session.records && session.records.length > 0);
+  const activeRecords = hasRecords
+    ? transferredStudentIds && transferredStudentIds.size > 0
+      ? session.records.filter((r) => !transferredStudentIds.has(r.studentId))
+      : session.records
+    : [];
+  const totals = hasRecords ? summarizeRecords(activeRecords) : null;
+
+  const totalCount = totals ? totals.total : session.totalStudents || 0;
+  const presentCount = totals ? totals.present : session.presentCount || 0;
+  const absentCount = totals ? totals.absentTotal : session.absentCount || 0;
+  const lateCount = totals ? totals.late : session.lateCount || 0;
+  const excusedCount = totals ? totals.excusedTotal : session.excusedCount || 0;
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-slate-200">
       {/* Total enrolled */}
@@ -32,7 +49,7 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
         </div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-slate-900 font-mono">
-            {session.totalStudents}
+            {totalCount}
           </span>
           <span className="text-xs text-slate-500 font-medium">
             {lang === 'ar' ? 'طالب' : 'students'}
@@ -56,12 +73,12 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
         </div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-emerald-800 font-mono">
-            %{session.totalStudents > 0
-              ? Math.round((session.presentCount / session.totalStudents) * 100)
+            %{totalCount > 0
+              ? Math.round((presentCount / totalCount) * 100)
               : 0}
           </span>
           <span className="text-xs text-emerald-700 font-semibold">
-            ({session.presentCount})
+            ({presentCount})
           </span>
         </div>
       </div>
@@ -82,12 +99,12 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
         </div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-rose-800 font-mono">
-            %{session.totalStudents > 0
-              ? Math.round((session.absentCount / session.totalStudents) * 100)
+            %{totalCount > 0
+              ? Math.round((absentCount / totalCount) * 100)
               : 0}
           </span>
           <span className="text-xs text-rose-700 font-semibold">
-            ({session.absentCount})
+            ({absentCount})
           </span>
         </div>
       </div>
@@ -108,12 +125,12 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
         </div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-amber-800 font-mono">
-            %{session.totalStudents > 0
-              ? Math.round((session.lateCount / session.totalStudents) * 100)
+            %{totalCount > 0
+              ? Math.round((lateCount / totalCount) * 100)
               : 0}
           </span>
           <span className="text-xs text-amber-700 font-semibold">
-            ({session.lateCount})
+            ({lateCount})
           </span>
         </div>
       </div>
@@ -134,12 +151,12 @@ export const SessionKpiStats: React.FC<SessionKpiStatsProps> = ({
         </div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-indigo-800 font-mono">
-            %{session.totalStudents > 0
-              ? Math.round((session.excusedCount / session.totalStudents) * 100)
+            %{totalCount > 0
+              ? Math.round((excusedCount / totalCount) * 100)
               : 0}
           </span>
           <span className="text-xs text-indigo-700 font-semibold">
-            ({session.excusedCount})
+            ({excusedCount})
           </span>
         </div>
       </div>

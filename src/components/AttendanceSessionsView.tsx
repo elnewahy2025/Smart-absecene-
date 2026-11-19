@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { AttendanceStatus } from '../types/attendance';
 import {
+  attendedRateRounded,
+  matchesStatusFilter,
+  summarizeRecords,
+} from '../utils/attendanceMath';
+import {
   Calendar,
   PlusCircle,
   CheckCircle2,
@@ -40,6 +45,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     reopenSession,
     createNewSession,
     canEditSession,
+    canReopenSessions,
     classesStats,
     schoolProfile,
     isOffDay,
@@ -51,7 +57,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     sessions[0]?.id || ''
   );
   const [filterDate, setFilterDate] = useState<string>(
-    sessions[0]?.date || new Date().toISOString().split('T')[0]
+    sessions[0]?.date || ''
   );
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -69,7 +75,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
   const [pendingBulkStatus, setPendingBulkStatus] = useState<AttendanceStatus>('absent');
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
-  const [celebrationStats, setCelebrationStats] = useState({ rate: 100, present: 0, total: 0 });
+  const [celebrationStats, setCelebrationStats] = useState({ rate: 0, present: 0, total: 0 });
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(initialOpenEmergencyModal);
 
   React.useEffect(() => {
@@ -78,8 +84,21 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     }
   }, [initialOpenEmergencyModal]);
 
+  const dateFilteredSessions = filterDate
+    ? sessions.filter((s) => s.date === filterDate)
+    : sessions;
 
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId) || sessions[0];
+  const selectedSession =
+    dateFilteredSessions.find((s) => s.id === selectedSessionId) || dateFilteredSessions[0];
+
+  React.useEffect(() => {
+    setSelectedStudentIdsForGroup([]);
+  }, [selectedSession?.id]);
+
+  const transferredStudentIds = React.useMemo(
+    () => new Set(students.filter((s) => s.enrollmentStatus === 'transferred').map((s) => s.id)),
+    [students]
+  );
 
   // Filtered session records (excludes transferred students from active roll-call)
   const sessionStudents = (selectedSession?.records ?? []).map((rec) => {
@@ -98,7 +117,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
         guardianName: 'غير معروف',
         guardianPhone: '---',
         guardianRelationship: 'الأب',
-        attendanceRate: 90,
+        attendanceRate: 0,
         totalAbsences: 0,
         totalLates: 0,
       },
@@ -113,8 +132,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
       item.student.studentNumber.includes(searchStudent);
 
     if (!matchesSearch) return false;
-    if (statusFilter === 'all') return true;
-    return item.record.status === statusFilter;
+    return matchesStatusFilter(item.record.status, statusFilter);
   }) || [];
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
@@ -163,7 +181,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
   const handleQuickMarkWholeClass = () => {
     if (!selectedSession) return;
     if (selectedSession.status === 'submitted') {
-      if (currentUser.role === 'admin' || currentUser.role === 'registrar' || currentUser.role === 'super_admin') {
+      if (canReopenSessions) {
         const proceed = confirm(
           lang === 'ar'
             ? 'الكشف معتمد حالياً. يلزم إعادة فتح الكشف أولاً لاستخدام التحضير السريع. هل تريد فتح نافذة إعادة الفتح؟'
@@ -177,6 +195,14 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
             : 'Session is locked. Admin must reopen first.'
         );
       }
+      return;
+    }
+    if (!canEditSession(selectedSession)) {
+      alert(
+        lang === 'ar'
+          ? 'هذا الكشف ليس ضمن الصفوف المسندة لك كمعلم (صلاحية قراءة فقط).'
+          : 'You do not have permission to edit this session.'
+      );
       return;
     }
 
@@ -194,7 +220,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
   // Quick Mark: Mark Selected Group of Students as Present
   const handleQuickMarkSelectedGroup = () => {
     if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
-    if (selectedSession.status === 'submitted' && currentUser.role !== 'admin' && currentUser.role !== 'super_admin') {
+    if (selectedSession.status === 'submitted' && !canReopenSessions) {
       alert(
         lang === 'ar'
           ? 'الكشف معتمد رسمياً ومقفل. يلزم إعادة فتح الكشف أولاً.'
@@ -202,16 +228,23 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
       );
       return;
     }
+    if (!canEditSession(selectedSession)) {
+      alert(
+        lang === 'ar'
+          ? 'لا تملك صلاحية التعديل على هذا الكشف.'
+          : 'You do not have permission to edit this session.'
+      );
+      return;
+    }
 
-    const count = selectedStudentIdsForGroup.length;
     const res = quickMarkGroupAsPresent(selectedSession.id, selectedStudentIdsForGroup);
     setIsQuickMarkActive(true);
     setIsQuickMarkMenuOpen(false);
     setSelectedStudentIdsForGroup([]);
     setNotificationBanner(
       lang === 'ar'
-        ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${count} طالب) كـ 'حاضر'.`
-        : `⚡ Quick Mark applied to ${count} students as Present.`
+        ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${res.updatedCount} طالب) كـ 'حاضر'.`
+        : `⚡ Quick Mark applied to ${res.updatedCount} students as Present.`
     );
   };
 
@@ -222,7 +255,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     setIsBulkConfirmOpen(true);
   };
 
-  // Open confirmation before bulk Quick Mark as Present (if more than 3 students)
+  // Open confirmation before bulk Quick Mark as Present (if more than 5 students)
   const handleRequestQuickMarkPresent = () => {
     if (!selectedSession || selectedStudentIdsForGroup.length === 0) return;
     if (selectedStudentIdsForGroup.length > 5) {
@@ -239,15 +272,24 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
       setIsBulkConfirmOpen(false);
       return;
     }
+    if (!canEditSession(selectedSession)) {
+      setIsBulkConfirmOpen(false);
+      alert(
+        lang === 'ar'
+          ? 'لا تملك صلاحية التعديل على هذا الكشف.'
+          : 'You do not have permission to edit this session.'
+      );
+      return;
+    }
     const count = selectedStudentIdsForGroup.length;
 
     if (pendingBulkStatus === 'present') {
-      quickMarkGroupAsPresent(selectedSession.id, selectedStudentIdsForGroup);
+      const res = quickMarkGroupAsPresent(selectedSession.id, selectedStudentIdsForGroup);
       setIsQuickMarkActive(true);
       setNotificationBanner(
         lang === 'ar'
-          ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${count} طالب) كـ 'حاضر'.`
-          : `⚡ Quick Mark applied to ${count} students as Present.`
+          ? `⚡ تم تطبيق التحضير السريع على المجموعة المحددة (${res.updatedCount} طالب) كـ 'حاضر'.`
+          : `⚡ Quick Mark applied to ${res.updatedCount} students as Present.`
       );
     } else {
       selectedStudentIdsForGroup.forEach((id) => {
@@ -282,11 +324,13 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     if (res.success) {
       setNotificationBanner(res.message);
       setTimeout(() => setNotificationBanner(null), 6000);
-      // Trigger gamified celebration
-      const total = selectedSession.records.length;
-      const present = selectedSession.records.filter((r) => r.status === 'present').length;
-      const rate = total > 0 ? Math.round((present / total) * 100) : 100;
-      setCelebrationStats({ rate, present, total });
+      // Trigger gamified celebration with canonical attended rate
+      const activeRecords = (selectedSession.records || []).filter(
+        (r) => !transferredStudentIds.has(r.studentId)
+      );
+      const totals = summarizeRecords(activeRecords);
+      const rate = attendedRateRounded(totals) ?? 0;
+      setCelebrationStats({ rate, present: totals.attendedTotal, total: totals.total });
       setIsCelebrationOpen(true);
     } else {
       alert(res.message);
@@ -311,7 +355,8 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
 
       {/* Official Holiday / Weekend Alert Banner when current filter date is an off-day */}
       {(() => {
-        const offDayCheck = isOffDay(filterDate);
+        const activeDate = filterDate || selectedSession?.date || new Date().toISOString().split('T')[0];
+        const offDayCheck = isOffDay(activeDate);
         if (offDayCheck.isOff) {
           return (
             <div className="bg-purple-50 border border-purple-200 text-purple-950 p-3.5 rounded-xl flex items-center justify-between text-xs shadow-2xs">
@@ -328,13 +373,13 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
                   </div>
                   <p className="text-[11px] text-purple-800 mt-0.5">
                     {lang === 'ar'
-                      ? `التاريخ المختار (${filterDate}) يوافق عطلة رسمية أو نهاية أسبوع. وفقاً للائحة الانضباط، لا يتم احتساب أي غياب للطلاب ولا يؤثر هذا اليوم على نسب الحضور.`
-                      : `Selected date (${filterDate}) is an official holiday or weekend. Absences are not calculated or recorded for students.`}
+                      ? `التاريخ المختار (${activeDate}) يوافق عطلة رسمية أو نهاية أسبوع. وفقاً للائحة الانضباط، لا يتم احتساب أي غياب للطلاب ولا يؤثر هذا اليوم على نسب الحضور.`
+                      : `Selected date (${activeDate}) is an official holiday or weekend. Absences are not calculated or recorded for students.`}
                   </p>
                 </div>
               </div>
               <span className="font-mono text-[11px] text-purple-700 bg-white px-2 py-1 rounded-lg border border-purple-200 hidden sm:inline">
-                {filterDate}
+                {activeDate}
               </span>
             </div>
           );
@@ -356,9 +401,26 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
                 id="filter-date-input"
                 type="date"
                 value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setFilterDate(nextDate);
+                  const matching = nextDate ? sessions.filter((s) => s.date === nextDate) : sessions;
+                  if (matching.length > 0 && !matching.some((s) => s.id === selectedSessionId)) {
+                    setSelectedSessionId(matching[0].id);
+                  }
+                }}
                 className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer"
               />
+              {filterDate && (
+                <button
+                  type="button"
+                  onClick={() => setFilterDate('')}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold px-1.5 py-0.5 rounded bg-slate-200/70 cursor-pointer"
+                  title={lang === 'ar' ? 'عرض جميع التواريخ' : 'Show all dates'}
+                >
+                  {lang === 'ar' ? 'الكل' : 'All'}
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -367,11 +429,11 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
               </label>
               <select
                 id="session-select"
-                value={selectedSessionId}
+                value={selectedSession?.id || ''}
                 onChange={(e) => setSelectedSessionId(e.target.value)}
                 className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
-                {sessions.map((s) => (
+                {dateFilteredSessions.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.className} - {s.subject || 'حضور يومي'} ({s.sessionType === 'period' ? `الحصة ${s.periodNumber}` : 'يومي'}) - [{s.status === 'submitted' ? 'معتمد' : s.status === 'draft' ? 'مسودة' : 'معاد فتحه'}]
                   </option>
@@ -433,8 +495,10 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
       {viewMode === 'calendar' && (
         <ClassCalendarView
           sessions={sessions}
-          selectedSessionId={selectedSessionId}
+          selectedSessionId={selectedSession?.id || selectedSessionId}
           onSelectSession={(sessId) => {
+            const picked = sessions.find((s) => s.id === sessId);
+            if (picked?.date) setFilterDate(picked.date);
             setSelectedSessionId(sessId);
             setViewMode('table');
           }}
@@ -466,6 +530,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
               session={selectedSession}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
+              transferredStudentIds={transferredStudentIds}
             />
 
             {/* Quick Mark Active Workflow Banner & Absentee Live Adjuster */}

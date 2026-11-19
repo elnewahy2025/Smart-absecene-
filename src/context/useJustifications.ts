@@ -14,6 +14,7 @@ import type {
   UserRole,
 } from '../types/attendance';
 import { toFirestoreData } from './attendanceContextSupport';
+import { recountSession } from '../utils/attendanceMath';
 
 interface UseJustificationsParams {
   tenantId: string;
@@ -133,7 +134,7 @@ export function useJustifications({
             }
             return r;
           });
-          const updatedSess = { ...sess, records: recs };
+          const updatedSess = recountSession({ ...sess, records: recs });
           if (firebaseUser) {
             setDoc(doc(db, 'attendance_sessions', updatedSess.id), updatedSess, { merge: true }).catch((err) => {
               handleFirestoreError(err, OperationType.UPDATE, `attendance_sessions/${updatedSess.id}`);
@@ -219,7 +220,13 @@ export function useJustifications({
             }
             return rec;
           });
-          return { ...sess, records: updatedRecs };
+          const updatedSess = recountSession({ ...sess, records: updatedRecs });
+          if (firebaseUser) {
+            setDoc(doc(db, 'attendance_sessions', updatedSess.id), updatedSess, { merge: true }).catch((err) => {
+              handleFirestoreError(err, OperationType.UPDATE, `attendance_sessions/${updatedSess.id}`);
+            });
+          }
+          return updatedSess;
         }
         return sess;
       })

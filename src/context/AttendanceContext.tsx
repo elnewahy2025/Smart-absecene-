@@ -262,6 +262,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const { classesStats, schoolEnrollmentStats } = useSchoolAnalytics({
     allStudents,
     allUsers,
+    allSessions,
     tenantId,
     configuredClasses: schoolProfile.classes,
   });

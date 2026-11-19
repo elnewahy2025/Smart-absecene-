@@ -23,6 +23,7 @@ import { AbsenceHeatmapCard } from './reports/AbsenceHeatmapCard';
 import { StudentEngagementSection } from './reports/StudentEngagementSection';
 import { BatchPrintCenterModal } from './reports/BatchPrintCenterModal';
 import { buildCsvReport, buildExcelReportHtml, downloadReportFile } from '../utils/reportExports';
+import { isActiveStudent, meanOrNull, rateOrNull } from '../utils/attendanceMath';
 
 export const ReportsView: React.FC = () => {
   const {
@@ -43,8 +44,8 @@ export const ReportsView: React.FC = () => {
   const [sentWarningIds, setSentWarningIds] = useState<string[]>([]);
   const [batchWarningAlert, setBatchWarningAlert] = useState<string | null>(null);
 
-  // Active students only (excluding transferred students from active calculations)
-  const activeStudents = students.filter((s) => s.enrollmentStatus !== 'transferred');
+  // Active students only (excluding transferred/inactive students from active calculations)
+  const activeStudents = students.filter((s) => isActiveStudent(s));
   const classScopedStudents = activeStudents.filter(
     (s) => selectedClass === 'all' || s.className === selectedClass
   );
@@ -60,38 +61,38 @@ export const ReportsView: React.FC = () => {
   // Calculate KPI metrics scoped to active students in the selected class
   const totalStudents = activeStudents.length;
   const scopedCount = classScopedStudents.length;
+  const scopedMean = meanOrNull(classScopedStudents.map((s) => rateOrNull(s.attendanceRate)));
   const averageAttendanceRate =
-    scopedCount > 0
-      ? (classScopedStudents.reduce((acc, s) => acc + s.attendanceRate, 0) / scopedCount).toFixed(1)
-      : '100';
+    scopedMean !== null ? scopedMean.toFixed(1) : '—';
 
   // Chronic absence risk tiers (active students in the selected class)
   const tier3Plus = classScopedStudents.filter((s) => s.totalAbsences >= 3 && s.totalAbsences < 5);
   const tier5Plus = classScopedStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8);
   const tier8Plus = classScopedStudents.filter((s) => s.totalAbsences >= 8);
 
-  // Group by Class (Active students)
-  const classBreakdown: Record<string, { total: number; rateSum: number; avgRate: number }> = {};
-  activeStudents.forEach((s) => {
+  // Group by Class (scoped to selectedClass)
+  const classBreakdown: Record<string, { total: number; rateSum: number; validCount: number; avgRate: number }> = {};
+  classScopedStudents.forEach((s) => {
     if (!classBreakdown[s.className]) {
-      classBreakdown[s.className] = { total: 0, rateSum: 0, avgRate: 0 };
+      classBreakdown[s.className] = { total: 0, rateSum: 0, validCount: 0, avgRate: 0 };
     }
     classBreakdown[s.className].total += 1;
-    classBreakdown[s.className].rateSum += s.attendanceRate;
+    const rate = rateOrNull(s.attendanceRate);
+    if (rate !== null) {
+      classBreakdown[s.className].rateSum += rate;
+      classBreakdown[s.className].validCount += 1;
+    }
   });
 
   Object.keys(classBreakdown).forEach((cName) => {
     const item = classBreakdown[cName];
-    item.avgRate = item.total > 0 ? parseFloat((item.rateSum / item.total).toFixed(1)) : 100;
+    item.avgRate =
+      item.validCount > 0 ? parseFloat((item.rateSum / item.validCount).toFixed(1)) : 0;
   });
 
+  const filteredMean = meanOrNull(filteredStudents.map((s) => rateOrNull(s.attendanceRate)));
   const filteredAverageRate =
-    filteredStudents.length > 0
-      ? (
-          filteredStudents.reduce((acc, s) => acc + s.attendanceRate, 0) /
-          filteredStudents.length
-        ).toFixed(1)
-      : '100';
+    filteredMean !== null ? filteredMean.toFixed(1) : '—';
 
   // 1. Download formatted Excel Workbook (.xls with native styling & RTL)
   const handleDownloadExcelWorkbook = () => {
@@ -251,7 +252,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-primary">
-              {scopedCount > 0 ? `%${averageAttendanceRate}` : '—'}
+              {scopedCount > 0 && averageAttendanceRate !== '—' ? `%${averageAttendanceRate}` : '—'}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({scopedCount} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
           </div>
@@ -275,7 +276,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono" style={{ color: 'var(--app-text-main)' }}>
-              %{students.length > 0 ? Math.round((totalStudents / students.length) * 100) : 100}
+              {students.length > 0 ? `%${Math.round((totalStudents / students.length) * 100)}` : '—'}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({totalStudents} / {students.length})</span>
           </div>
@@ -431,7 +432,7 @@ export const ReportsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const count = sendAllChronicWarningNotifications(3);
+                  const count = sendAllChronicWarningNotifications(3, selectedClass);
                   setBatchWarningAlert(
                     lang === 'ar'
                       ? `تم بنجاح إرسال وبث ${count} إنذار رسمي لجميع أولياء الأمور المستحقين وتوثيقها في طابور الرسائل.`
@@ -533,7 +534,7 @@ export const ReportsView: React.FC = () => {
       {isPdfModalOpen && (
         <OfficialReportModal
           selectedClassFilter={selectedClass}
-          reportType={reportType === 'tier2_warning' || reportType === 'tier3_critical' ? 'chronic_only' : reportType}
+          reportType={reportType}
           onClose={() => setIsPdfModalOpen(false)}
         />
       )}
@@ -542,7 +543,7 @@ export const ReportsView: React.FC = () => {
       <BatchPrintCenterModal
         isOpen={isBatchPrintModalOpen}
         onClose={() => setIsBatchPrintModalOpen(false)}
-        students={students}
+        students={activeStudents}
       />
     </div>
   );

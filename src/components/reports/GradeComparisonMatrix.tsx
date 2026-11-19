@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layers, Sparkles } from 'lucide-react';
 import type { GradeAnalysisItem } from '../../utils/gradeAbsencePatterns';
+import { clampPercent } from '../../utils/attendanceMath';
 
 interface GradeComparisonMatrixProps {
   lang: 'ar' | 'en';
@@ -48,7 +49,7 @@ export const GradeComparisonMatrix: React.FC<GradeComparisonMatrixProps> = ({
                 const isSelected = selectedGradeFocus === item.gradeName;
                 const justifiedPercent =
                   item.totalAbsenceDays > 0
-                    ? Math.round((item.excusedCount / item.totalAbsenceDays) * 100)
+                    ? clampPercent(Math.round((item.excusedCount / item.totalAbsenceDays) * 100))
                     : 100;
   
                 return (

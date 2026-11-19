@@ -123,6 +123,23 @@ describe('GradeComparisonMatrix', () => {
     expect(screen.getByTitle('غير مبرر: 0%')).toBeTruthy();
   });
 
+  it('clamps justifiedPercent to 100% and avoids negative unexcused width when excuses exceed absences', () => {
+    setup({
+      gradeData: [
+        grade({
+          gradeName: 'الصف المبرر',
+          totalAbsenceDays: 5,
+          excusedCount: 9,
+          unexcusedCount: 0,
+        }),
+      ],
+    });
+    const excusedBar = screen.getByTitle('مبرر: 100%');
+    const unexcusedBar = screen.getByTitle('غير مبرر: 0%');
+    expect(excusedBar.style.width).toBe('100%');
+    expect(unexcusedBar.style.width).toBe('0%');
+  });
+
   it('shows chronic counts, critical badges and attendance labels', () => {
     setup();
     expect(screen.getByText('4 طالب')).toBeTruthy();

@@ -1,4 +1,5 @@
 import type { Justification, Student } from '../types/attendance';
+import { meanOrNull, rateOrNull } from './attendanceMath';
 
 export type ChartMetricView = 'excuses_breakdown' | 'risk_distribution' | 'averages_and_rates';
 
@@ -51,14 +52,16 @@ export function buildGradeAbsencePatterns(
     const items: GradeAnalysisItem[] = Object.keys(map).map((gradeName) => {
       const gStudents = map[gradeName].students;
       const count = gStudents.length;
-      const totalAbsenceDays = gStudents.reduce((sum, s) => sum + s.totalAbsences, 0);
-      const totalLates = gStudents.reduce((sum, s) => sum + s.totalLates, 0);
-      const avgRate =
-        count > 0
-          ? parseFloat(
-              (gStudents.reduce((sum, s) => sum + s.attendanceRate, 0) / count).toFixed(1)
-            )
-          : 100;
+      const totalAbsenceDays = gStudents.reduce(
+        (sum, s) => sum + (typeof s.totalAbsences === 'number' && Number.isFinite(s.totalAbsences) ? s.totalAbsences : 0),
+        0
+      );
+      const totalLates = gStudents.reduce(
+        (sum, s) => sum + (typeof s.totalLates === 'number' && Number.isFinite(s.totalLates) ? s.totalLates : 0),
+        0
+      );
+      const mean = meanOrNull(gStudents.map((s) => rateOrNull(s.attendanceRate)));
+      const avgRate = mean !== null ? parseFloat(mean.toFixed(1)) : 0;
       const avgAbs = count > 0 ? parseFloat((totalAbsenceDays / count).toFixed(1)) : 0;
 
       // Risk stratifications

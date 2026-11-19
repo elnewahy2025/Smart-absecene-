@@ -24,6 +24,7 @@ import type { OffDayCheckResult } from '../utils/holidayUtils';
 import { TENANT_REGISTRY, TenantDomainConfig } from '../config/tenantRegistry';
 import type { User as FirebaseUser, UserCredential } from 'firebase/auth';
 import type { SubscriptionEvaluation, TenantSubscription } from '../config/subscription';
+import { recountSession } from '../utils/attendanceMath';
 
 export const REGISTRY_TENANTS: Tenant[] = Object.values(TENANT_REGISTRY).map((config) => ({
   id: config.tenantId,
@@ -83,16 +84,7 @@ export const buildParentSessions = (records: StudentAttendanceRecord[]): Attenda
     });
   }
 
-  return Array.from(bySession.values()).map((session) => ({
-    ...session,
-    totalStudents: session.records.length,
-    presentCount: session.records.filter((item) => item.status === 'present').length,
-    absentCount: session.records.filter((item) => item.status === 'absent').length,
-    lateCount: session.records.filter((item) => item.status === 'late').length,
-    excusedCount: session.records.filter((item) =>
-      ['excused_absence', 'excused_leave', 'under_review'].includes(item.status)
-    ).length,
-  }));
+  return Array.from(bySession.values()).map((session) => recountSession(session));
 };
 
 export interface UserAccountResult {
@@ -214,7 +206,7 @@ export interface AttendanceContextType {
     absenceDate?: string;
   }) => number;
   sendChronicWarningNotification: (studentId: string, warningTier: number) => boolean;
-  sendAllChronicWarningNotifications: (tierThreshold?: number) => number;
+  sendAllChronicWarningNotifications: (tierThreshold?: number, classFilter?: string) => number;
 
   // Audit
   addAuditLog: (entry: Omit<AuditLog, 'id' | 'tenantId' | 'timestamp'>) => void;
