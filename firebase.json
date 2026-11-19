@@ -4,11 +4,8 @@
       "emailPassword": true,
       "googleSignIn": {
         "oAuthBrandDisplayName": "Smart Absence School Portal",
-        "supportEmail": "elnewahy2025@gmail.com",
+        "supportEmail": "support@example.com",
         "authorizedRedirectUris": [
-          "https://smart-absecene.vercel.app",
-          "https://smart-absecene.vercel.app/__/auth/handler",
-          "https://smart-absence-school.firebaseapp.com/__/auth/handler",
           "http://localhost:5050",
           "http://localhost",
           "http://127.0.0.1:5050"

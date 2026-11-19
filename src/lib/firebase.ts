@@ -7,7 +7,7 @@ const env = (import.meta as any).env || {};
 const useEmulator = String((import.meta as any).env?.VITE_USE_FIREBASE_EMULATOR || '').toLowerCase() === 'true';
 
 if (env.PROD && !useEmulator && (!env.VITE_FIREBASE_PROJECT_ID || !env.VITE_FIREBASE_API_KEY)) {
-  console.error('[FIREBASE] Missing VITE_FIREBASE_PROJECT_ID or VITE_FIREBASE_API_KEY in production build.');
+  throw new Error('[FIREBASE] Missing VITE_FIREBASE_PROJECT_ID or VITE_FIREBASE_API_KEY in production build.');
 }
 
 const firebaseConfig = {

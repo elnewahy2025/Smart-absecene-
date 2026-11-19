@@ -97,9 +97,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     setApiTenantOverride(tenantId);
   }, [tenantId]);
 
-  const [currentUserRole, setCurrentUserRoleState] = useState<UserRole>(() => {
-    return ((typeof localCache !== 'undefined' && localCache.getItem('school_current_user_role')) as UserRole) || 'parent';
-  });
+  const [currentUserRole, setCurrentUserRoleState] = useState<UserRole>('parent');
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 

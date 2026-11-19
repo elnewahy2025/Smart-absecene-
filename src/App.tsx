@@ -94,16 +94,11 @@ const MainAppContent: React.FC = () => {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return typeof localStorage !== 'undefined' && localStorage.getItem('school_user_authenticated') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
-  // Automatically authenticate if returning from a cloud redirect or if a persistent Firebase session exists
+  // Derive authenticated UI state from Firebase Auth (never trust localStorage alone)
   useEffect(() => {
     if (firebaseUser) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('school_user_authenticated', 'true');
-      }
       const userEmail = (firebaseUser.email || '').toLowerCase();
       const ownerEmails = ((import.meta as any).env?.VITE_PLATFORM_OWNER_EMAILS || '')
         .split(',')
@@ -113,6 +108,11 @@ const MainAppContent: React.FC = () => {
         setUserRole('super_admin');
       }
       setIsAuthenticated(true);
+    } else {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('school_user_authenticated');
+      }
+      setIsAuthenticated(false);
     }
   }, [firebaseUser]);
 
@@ -137,12 +137,6 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleLoginSuccess = (userProfile: any) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('school_user_authenticated', 'true');
-      if (userProfile?.role) {
-        localStorage.setItem('school_current_user_role', userProfile.role);
-      }
-    }
     setUserRole(userProfile.role);
     if (userProfile.role === 'parent') {
       setActiveTab('parent_portal');
