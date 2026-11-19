@@ -24,6 +24,7 @@ interface UseSessionActionsParams {
   sessions: AttendanceSession[];
   setAllSessions: React.Dispatch<React.SetStateAction<AttendanceSession[]>>;
   students: Student[];
+  setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   settings: SchoolSettings;
   setAllNotifications: React.Dispatch<React.SetStateAction<NotificationOutboxItem[]>>;
   addAuditLog: (entry: Omit<AuditLog, 'id' | 'tenantId' | 'timestamp'>) => void;
@@ -39,6 +40,7 @@ export function useSessionActions({
   sessions,
   setAllSessions,
   students,
+  setAllStudents,
   settings,
   setAllNotifications,
   addAuditLog,
@@ -251,18 +253,74 @@ export function useSessionActions({
     });
 
     // Update Session
-    setAllSessions((prev) =>
-      prev.map((s) =>
-        s.id === sessionId
-          ? {
-              ...s,
-              status: 'submitted',
-              submittedAt: now,
-              submittedBy: currentUser.name,
-            }
-          : s
-      )
+    const updatedSessions = allSessions.map((s) =>
+      s.id === sessionId
+        ? {
+            ...s,
+            status: 'submitted' as const,
+            submittedAt: now,
+            submittedBy: currentUser.name,
+          }
+        : s
     );
+    setAllSessions(updatedSessions);
+
+    // Recalculate student attendance metrics from all submitted sessions in this tenant
+    const submittedTenantSessions = updatedSessions.filter(
+      (s) => s.tenantId === tenantId && s.status === 'submitted'
+    );
+    const affectedStudentIds = new Set(targetSession.records.map((r) => r.studentId));
+    const computedMetrics = new Map<
+      string,
+      { totalAbsences: number; totalLates: number; attendanceRate: number }
+    >();
+
+    affectedStudentIds.forEach((studentId) => {
+      const absentDates = new Set<string>();
+      const attendedDates = new Set<string>();
+      let totalLates = 0;
+      let totalRecords = 0;
+      let attendedRecords = 0;
+
+      submittedTenantSessions.forEach((sess) => {
+        const rec = sess.records?.find((r) => r.studentId === studentId);
+        if (!rec) return;
+        totalRecords += 1;
+        if (rec.status === 'present' || rec.status === 'late' || rec.status === 'excused_leave') {
+          attendedRecords += 1;
+          attendedDates.add(sess.date);
+          if (rec.status === 'late') totalLates += 1;
+        } else if (rec.status === 'absent' || rec.status === 'excused_absence') {
+          absentDates.add(sess.date);
+        }
+      });
+
+      let totalAbsences = 0;
+      absentDates.forEach((date) => {
+        if (!attendedDates.has(date)) totalAbsences += 1;
+      });
+      const attendanceRate =
+        totalRecords > 0 ? parseFloat(((attendedRecords / totalRecords) * 100).toFixed(1)) : 100;
+
+      computedMetrics.set(studentId, { totalAbsences, totalLates, attendanceRate });
+    });
+
+    if (computedMetrics.size > 0) {
+      setAllStudents((prev) =>
+        prev.map((s) => {
+          const metrics = computedMetrics.get(s.id);
+          return metrics ? { ...s, ...metrics } : s;
+        })
+      );
+
+      if (firebaseUser && ['admin', 'registrar', 'super_admin'].includes(currentUser.role)) {
+        computedMetrics.forEach((metrics, studentId) => {
+          void setDoc(doc(db, 'students', studentId), metrics, { merge: true }).catch((error) =>
+            console.error('[SESSIONS] Could not update student attendance metrics:', error)
+          );
+        });
+      }
+    }
 
     // Queue notifications if any
     if (newNotifications.length > 0) {

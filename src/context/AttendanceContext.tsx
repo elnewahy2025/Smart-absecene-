@@ -302,6 +302,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     sessions,
     setAllSessions,
     students,
+    setAllStudents,
     settings,
     setAllNotifications,
     addAuditLog,
