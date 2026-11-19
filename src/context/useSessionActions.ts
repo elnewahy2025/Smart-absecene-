@@ -1,5 +1,4 @@
 import type {
-  AttendanceRecord,
   AttendanceSession,
   AttendanceStatus,
   AuditLog,
