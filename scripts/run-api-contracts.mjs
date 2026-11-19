@@ -10,7 +10,10 @@ import newman from 'newman';
 
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:5051';
 const AUTH_EMULATOR = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
-const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD || 'FiazjEUvaWJhD26HZTR9bESu';
+const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD;
+if (!SEED_PASSWORD) {
+  throw new Error('EMULATOR_SEED_PASSWORD environment variable is required to run API contract tests.');
+}
 
 async function getIdToken(email) {
   const res = await fetch(`http://${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`, {

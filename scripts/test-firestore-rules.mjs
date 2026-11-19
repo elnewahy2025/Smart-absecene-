@@ -730,6 +730,27 @@ await expectDenied('email-only parent cannot read another child student doc', ge
 await expectDenied('email-only parent cannot read another child attendance record', getDoc(doc(emailParentDb, 'attendance_records', 'record2')));
 await expectDenied('email-only parent cannot read another child justification', getDoc(doc(emailParentDb, 'justifications', 'just2')));
 
+// H1: tenantId must be immutable on update across attendance_sessions, justifications, and notification_outbox
+await expectDenied('school-1 admin cannot change attendance_sessions tenantId to school-2', updateDoc(doc(adminDb, 'attendance_sessions', 'draft1'), {
+  tenantId: 'school-2',
+}));
+await expectDenied('school-1 admin cannot change justifications tenantId to school-2', updateDoc(doc(adminDb, 'justifications', 'just1'), {
+  tenantId: 'school-2',
+}));
+await expectDenied('school-1 admin cannot change notification_outbox tenantId to school-2', updateDoc(doc(adminDb, 'notification_outbox', 'notif1'), {
+  tenantId: 'school-2',
+}));
+
+await expectAllowed('school-1 admin can perform same-tenant update on attendance_sessions', updateDoc(doc(adminDb, 'attendance_sessions', 'draft1'), {
+  status: 'reopened',
+}));
+await expectAllowed('school-1 admin can perform same-tenant update on justifications', updateDoc(doc(adminDb, 'justifications', 'just1'), {
+  status: 'approved',
+}));
+await expectAllowed('school-1 admin can perform same-tenant update on notification_outbox', updateDoc(doc(adminDb, 'notification_outbox', 'notif1'), {
+  status: 'failed',
+}));
+
 await testEnv.cleanup();
 
 console.log(`\n${failures === 0 ? 'All rules tests passed.' : `${failures} rules test(s) failed.`}`);

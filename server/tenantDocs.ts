@@ -22,26 +22,41 @@ export function createTenantDocsSync({ isFirebaseAdminReady, baseDir }: TenantDo
   // without a restart. Cheap: one stat() per request, re-read only on mtime change.
   let tenantDocsCache: TenantDomainConfig[] = [];
   let tenantDocsLoadedAt = 0;
+  let tenantDocsFailedAt = 0;
   let tenantDocsLoading = false;
+  const REFRESH_TTL_MS = 30_000;
+  const FAILURE_BACKOFF_MS = 30_000;
+  const FIRESTORE_FETCH_TIMEOUT_MS = 3_000;
 
   // Firestore is the tenant source of truth; the static registry is only a bootstrap fallback.
   async function refreshTenantDocs(force = false): Promise<void> {
     if (!isFirebaseAdminReady() || tenantDocsLoading) return;
-    if (!force && Date.now() - tenantDocsLoadedAt < 30000) return;
+    const now = Date.now();
+    if (!force && now - tenantDocsLoadedAt < REFRESH_TTL_MS) return;
+    if (now - tenantDocsFailedAt < FAILURE_BACKOFF_MS) return;
 
     tenantDocsLoading = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const snapshot = await admin.firestore().collection('tenants').get();
+      const snapshot = await Promise.race([
+        admin.firestore().collection('tenants').get(),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Firestore tenant registry timeout')), FIRESTORE_FETCH_TIMEOUT_MS);
+        }),
+      ]);
       tenantDocsCache = snapshot.docs.map((doc) => ({
         ...(doc.data() as Partial<TenantDomainConfig>),
         tenantId: doc.id,
       })) as TenantDomainConfig[];
       setRuntimeTenantDocs(tenantDocsCache);
       tenantDocsLoadedAt = Date.now();
+      tenantDocsFailedAt = 0;
     } catch (error: unknown) {
+      tenantDocsFailedAt = Date.now();
       const msg = error instanceof Error ? error.message : String(error);
-      console.warn('[TENANTS] Could not load Firestore tenant registry:', msg);
+      console.warn('[TENANTS] Could not load Firestore tenant registry (serving cached/static fallback):', msg);
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       tenantDocsLoading = false;
     }
   }
@@ -61,6 +76,7 @@ export function createTenantDocsSync({ isFirebaseAdminReady, baseDir }: TenantDo
 
   function resetTenantDocsCache(): void {
     tenantDocsLoadedAt = 0;
+    tenantDocsFailedAt = 0;
   }
 
   function invalidateDynamicTenants(): void {

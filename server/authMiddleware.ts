@@ -312,8 +312,8 @@ const requireTenant = (req: express.Request, res: express.Response, next: expres
     }
   }
 
-  // 2. Enforce target payload tenantId matches user tenant (platform owners excepted)
-  const targetTenantId = req.body?.tenantId || req.query?.tenantId;
+  // 2. Enforce target payload/query/param tenantId matches user tenant (platform owners excepted)
+  const targetTenantId = req.params?.tenantId || req.body?.tenantId || req.query?.tenantId;
   if (targetTenantId && user?.tenantId && !isPlatformOwner(user)) {
     if (targetTenantId !== user.tenantId) {
       return res.status(403).json({

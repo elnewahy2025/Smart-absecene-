@@ -11,9 +11,14 @@ export function applyRequestHardening(app: express.Express, { isProduction }: Re
   // Trust proxy is opt-in. Unless TRUST_PROXY is configured, X-Forwarded-* headers are
   // ignored entirely, so a client cannot spoof its own Host / school via those headers.
   const parseTrustProxy = (value?: string): boolean | number | string => {
-    if (!value) return false;
+    if (!value) {
+      return process.env.VERCEL || process.env.RENDER ? 1 : false;
+    }
     const trimmed = value.trim();
-    if (trimmed === 'true') return true;
+    if (trimmed === 'true') {
+      // Never blindly trust arbitrary X-Forwarded-For chains; cap to 1 proxy hop.
+      return 1;
+    }
     if (trimmed === 'false') return false;
     if (/^\d+$/.test(trimmed)) return Number(trimmed);
     return trimmed;

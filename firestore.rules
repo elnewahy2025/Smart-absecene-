@@ -285,6 +285,7 @@ service cloud.firestore {
       // If submitted: ONLY Admin or Registrar can reopen/edit!
       // If draft or reopened: Admin, Registrar, or assigned Teacher
       allow update: if isSignedIn() && isValidId(sessionId) && isValidAttendanceSession(incoming()) &&
+                    incoming().tenantId == existing().tenantId &&
                     isTenantUser(resource.data.tenantId) && (
                       isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
                       (resource.data.status in ['draft', 'reopened'] && isTeacherAssigned(resource.data))
@@ -344,6 +345,7 @@ service cloud.firestore {
                     );
       // Reviewing (status change to approved/rejected): ONLY Admin and Registrar!
       allow update: if isSignedIn() && isValidId(justificationId) && isValidJustification(incoming()) &&
+                    incoming().tenantId == existing().tenantId &&
                     isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
       allow delete: if isSignedIn() && isValidId(justificationId) &&
                     isTenantRole(resource.data.tenantId, ['admin']);
@@ -373,6 +375,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
                     isTenantRole(incoming().tenantId, ['admin', 'registrar', 'teacher']);
       allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) &&
+                    incoming().tenantId == existing().tenantId &&
                     isTenantRole(resource.data.tenantId, ['admin', 'registrar']);
       allow delete: if isSignedIn() && isValidId(notificationId) &&
                     isTenantRole(resource.data.tenantId, ['admin']);

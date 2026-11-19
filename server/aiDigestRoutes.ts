@@ -149,8 +149,16 @@ ${highRiskSummary}
       const { recipients = [], subject, htmlContent, scheduledTime = '06:45' } = req.body;
       const tenantId = resolveTargetTenantId(req);
 
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
       const validRecipients = Array.isArray(recipients)
-        ? recipients.filter((r) => typeof r === 'string' && r.includes('@')).slice(0, 50)
+        ? Array.from(
+            new Set(
+              recipients
+                .filter((r): r is string => typeof r === 'string')
+                .map((r) => r.trim().toLowerCase())
+                .filter((r) => emailPattern.test(r))
+            )
+          ).slice(0, 50)
         : [];
 
       if (validRecipients.length === 0) {
@@ -161,7 +169,11 @@ ${highRiskSummary}
       }
 
       const safeSubject = sanitizeText(subject, 'Daily Digest');
-      const safeHtml = typeof htmlContent === 'string' ? htmlContent.slice(0, 200000) : '';
+      const rawHtml = typeof htmlContent === 'string' ? htmlContent.slice(0, 200000) : '';
+      const safeHtml = rawHtml
+        .replace(/<(script|iframe|object|embed)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, '')
+        .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .trim();
       if (!safeHtml) {
         return res.status(400).json({ success: false, error: 'The daily digest email body is empty.' });
       }

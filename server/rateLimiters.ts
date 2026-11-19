@@ -1,10 +1,15 @@
+import type express from 'express';
 import rateLimit from 'express-rate-limit';
+
+const tenantUserKey = (req: express.Request): string =>
+  req.user?.uid ? `${req.user.tenantId || 'default'}:${req.user.uid}` : req.ip || 'anonymous';
 
 export const apiGeneralLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: tenantUserKey,
   message: { error: 'Too many requests. Please slow down.' },
 });
 
@@ -21,6 +26,7 @@ export const chatLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: tenantUserKey,
   message: { error: 'Chat rate limit exceeded (max 20 requests per minute). Please slow down.' },
 });
 
@@ -29,6 +35,7 @@ export const analyzeImageLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: tenantUserKey,
   message: { error: 'Image analysis rate limit exceeded (max 10 requests per minute). Please slow down.' },
 });
 
@@ -37,6 +44,7 @@ export const dailyDigestLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: tenantUserKey,
   message: { error: 'Daily digest rate limit exceeded. Please slow down.' },
 });
 
@@ -45,5 +53,6 @@ export const notificationDispatchLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: tenantUserKey,
   message: { error: 'Notification dispatch rate limit exceeded. Please slow down.' },
 });

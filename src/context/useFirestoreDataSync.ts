@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
@@ -49,13 +49,16 @@ export function useFirestoreDataSync({
   sessionsSeededRef,
   sessionsRef,
 }: UseFirestoreDataSyncParams) {
+  const allUsersRef = useRef(allUsers);
+  allUsersRef.current = allUsers;
+
   // Sync all entities from Firestore in real-time when authenticated
   useEffect(() => {
     if (!firebaseUser || !tenantId || tenantId.trim() === '') return;
 
     const isParentUser = currentUserRole === 'parent';
     const parentProfile = isParentUser
-      ? allUsers.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
+      ? allUsersRef.current.find((user) => user.email.toLowerCase() === (firebaseUser.email || '').toLowerCase())
       : undefined;
     const parentPhone = authenticatedPhone || parentProfile?.phone || '';
     const parentEmail = (firebaseUser.email || parentProfile?.email || '').trim().toLowerCase();
@@ -283,7 +286,7 @@ export function useFirestoreDataSync({
       unsubNotifications();
       unsubAudit();
     };
-  }, [firebaseUser, tenantId, currentUserRole, allUsers, authenticatedPhone]);
+  }, [firebaseUser, tenantId, currentUserRole, authenticatedPhone]);
 
   // Staff directory: keep the tenant's user list in sync with Firestore so new
   // accounts appear on every device instead of only in the creating session.

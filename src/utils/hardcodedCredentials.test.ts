@@ -5,6 +5,7 @@ import { INITIAL_USERS } from '../data/mockData';
 
 // Built from fragments so this test does not match itself.
 const FORBIDDEN_DEFAULT_CREDENTIAL = 'pass' + 'word' + '123';
+const FORBIDDEN_LEAKED_SEED = 'FiazjEUv' + 'aWJhD26H' + 'ZTR9bESu';
 
 function collectSourceFiles(entry: string): string[] {
   if (!fs.existsSync(entry)) return [];
@@ -29,16 +30,18 @@ describe('Hardcoded credential guard', () => {
     }
   });
 
-  it('the source tree contains no shared default password literal', () => {
+  it('the source tree contains no shared default or leaked seed password literals', () => {
     const files = [
       ...collectSourceFiles('src'),
       ...collectSourceFiles('scripts'),
+      ...collectSourceFiles('server'),
       'server.ts',
     ].filter((file) => !file.endsWith('.test.ts'));
 
-    const offenders = files.filter((file) =>
-      fs.readFileSync(file, 'utf8').includes(FORBIDDEN_DEFAULT_CREDENTIAL)
-    );
+    const offenders = files.filter((file) => {
+      const content = fs.readFileSync(file, 'utf8');
+      return content.includes(FORBIDDEN_DEFAULT_CREDENTIAL) || content.includes(FORBIDDEN_LEAKED_SEED);
+    });
 
     expect(offenders).toEqual([]);
   });

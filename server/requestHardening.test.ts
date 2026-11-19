@@ -33,7 +33,7 @@ describe('applyRequestHardening / TRUST_PROXY', () => {
   it.each([
     [undefined, false],
     ['false', false],
-    ['true', true],
+    ['true', 1],
     ['0', 0],
     ['1', 1],
     ['2', 2],

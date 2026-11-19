@@ -101,14 +101,14 @@ export function registerAiTenantSettingsRoutes({
       const tenantId = resolveTargetTenantId(req);
       const { testKey } = req.body;
 
-      let keyToTest = (testKey && typeof testKey === 'string' && testKey.trim().length > 8)
+      const keyToTest = (testKey && typeof testKey === 'string' && testKey.trim().length > 8)
         ? testKey.trim()
-        : getTenantApiKey(tenantId) || process.env.GEMINI_API_KEY || '';
+        : getTenantApiKey(tenantId) || '';
 
       if (!keyToTest) {
         return res.status(400).json({
           success: false,
-          error: 'لا يوجد مفتاح مفحوص حالياً. يرجى إدخال المفتاح أولاً.',
+          error: 'لا يوجد مفتاح مفحوص خاص بالمدرسة حالياً. يرجى إدخال المفتاح أولاً.',
         });
       }
 
@@ -141,11 +141,11 @@ export function registerAiTenantSettingsRoutes({
       }
 
       const detailMsg = lastError instanceof Error ? lastError.message : String(lastError || 'Unknown verification error');
+      console.warn(`[TENANT-AI:${tenantId}] Gemini key verification failed:`, detailMsg);
       res.status(400).json({
         success: false,
         status: 'failed',
-        error: 'فشل التحقق من المفتاح من قِبل Google API',
-        details: detailMsg,
+        error: 'فشل التحقق من المفتاح من قِبل Google API. تأكد من صلاحية المفتاح وصلاحيات المشروع.',
       });
     } catch (err: unknown) {
       console.error('Error in tenant ai test:', err);

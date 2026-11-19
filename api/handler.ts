@@ -27,8 +27,7 @@ export default async function handler(req: any, res: any) {
     console.error('[VERCEL_BOOT_ERROR]', error);
     res.status(500).json({
       code: 'FUNCTION_BOOT_ERROR',
-      name: error?.name,
-      message: String(error?.message || error).slice(0, 300),
+      error: 'Server initialization failed.',
     });
     return;
   }
