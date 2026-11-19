@@ -246,8 +246,13 @@ const MainAppContent: React.FC = () => {
   // Wait for Firebase Auth & role resolution before rendering LoginPage or dashboard
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" dir="rtl">
-        <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" aria-label="Loading" />
+      <div
+        role="status"
+        aria-label="Loading"
+        className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"
+        dir="rtl"
+      >
+        <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" />
       </div>
     );
   }

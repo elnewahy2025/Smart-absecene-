@@ -17,7 +17,7 @@ interface AuthStateSyncDeps {
   setAuthenticatedPhone: (phone: string) => void;
   setAllUsers: React.Dispatch<React.SetStateAction<UserProfile[]>>;
   setFirebaseUser: (user: FirebaseUser | null) => void;
-  setAuthLoading?: (loading: boolean) => void;
+  setAuthLoading: (loading: boolean) => void;
 }
 
 /**
@@ -51,7 +51,12 @@ export function useAuthStateSync({
 
   // Listen to Firebase Auth state and synchronize user role & tenant from Firestore
   useEffect(() => {
+    const authTimeout = setTimeout(() => {
+      setAuthLoading(false);
+    }, 8000);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      clearTimeout(authTimeout);
       setFirebaseUser(user);
       try {
         if (user) {
@@ -153,10 +158,13 @@ export function useAuthStateSync({
           }
         }
       } finally {
-        setAuthLoading?.(false);
+        setAuthLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(authTimeout);
+      unsubscribe();
+    };
   }, [requestedTenantId]);
 }
