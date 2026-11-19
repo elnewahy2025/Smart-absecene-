@@ -85,7 +85,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({
     }
 
     const matchedClass = classesStats.find((c) => c.className === resolvedClass);
-    const targetClassId = matchedClass?.classId || `class-${resolvedClass.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const targetClassId = matchedClass?.classId || '';
     const targetGrade = matchedClass?.grade || 'المرحلة الدراسية';
 
     const created = createNewSession(
