@@ -51,14 +51,17 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
     isOffDay,
   } = useAttendance();
 
+  const sortedSessions = React.useMemo(
+    () => [...sessions].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [sessions]
+  );
+
   // State
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [selectedSessionId, setSelectedSessionId] = useState<string>(
-    sessions[0]?.id || ''
+    sortedSessions[0]?.id || ''
   );
-  const [filterDate, setFilterDate] = useState<string>(
-    sessions[0]?.date || ''
-  );
+  const [filterDate, setFilterDate] = useState<string>('');
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
@@ -85,8 +88,8 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
   }, [initialOpenEmergencyModal]);
 
   const dateFilteredSessions = filterDate
-    ? sessions.filter((s) => s.date === filterDate)
-    : sessions;
+    ? sortedSessions.filter((s) => s.date === filterDate)
+    : sortedSessions;
 
   const selectedSession =
     dateFilteredSessions.find((s) => s.id === selectedSessionId) || dateFilteredSessions[0];
@@ -404,7 +407,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
                 onChange={(e) => {
                   const nextDate = e.target.value;
                   setFilterDate(nextDate);
-                  const matching = nextDate ? sessions.filter((s) => s.date === nextDate) : sessions;
+                  const matching = nextDate ? sortedSessions.filter((s) => s.date === nextDate) : sortedSessions;
                   if (matching.length > 0 && !matching.some((s) => s.id === selectedSessionId)) {
                     setSelectedSessionId(matching[0].id);
                   }
@@ -435,6 +438,7 @@ export const AttendanceSessionsView: React.FC<AttendanceSessionsViewProps> = ({
               >
                 {dateFilteredSessions.map((s) => (
                   <option key={s.id} value={s.id}>
+                    {!filterDate && s.date ? `${s.date} · ` : ''}
                     {s.className} - {s.subject || 'حضور يومي'} ({s.sessionType === 'period' ? `الحصة ${s.periodNumber}` : 'يومي'}) - [{s.status === 'submitted' ? 'معتمد' : s.status === 'draft' ? 'مسودة' : 'معاد فتحه'}]
                   </option>
                 ))}

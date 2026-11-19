@@ -9,7 +9,7 @@ interface ExecutiveActionPanelsProps {
   isAr: boolean;
   onNavigateTab: (tab: ActiveTab) => void;
   classesByAbsence: ExecutiveAnalytics['classesByAbsence'];
-  onCampusCount: number;
+  onCampusCount: number | null;
   activeStudentsCount: number;
   pendingJustifications: ExecutiveAnalytics['pendingJustifications'];
   atRiskStudents: ExecutiveAnalytics['atRiskStudents'];
@@ -119,11 +119,14 @@ export const ExecutiveActionPanels: React.FC<ExecutiveActionPanelsProps> = ({
           </div>
           <div className="flex items-center gap-3 font-medium">
             <span className="text-emerald-300">
-              {isAr ? 'بالمبنى:' : 'On Campus:'} <strong className="font-mono text-white">{onCampusCount}</strong>
+              {isAr ? 'بالمبنى:' : 'On Campus:'}{' '}
+              <strong className="font-mono text-white">{onCampusCount ?? '—'}</strong>
             </span>
             <span className="text-rose-300">
               {isAr ? 'غائبون:' : 'Absent:'}{' '}
-              <strong className="font-mono text-white">{Math.max(0, activeStudentsCount - onCampusCount)}</strong>
+              <strong className="font-mono text-white">
+                {onCampusCount === null ? '—' : Math.max(0, activeStudentsCount - onCampusCount)}
+              </strong>
             </span>
             <button
               onClick={() => onNavigateTab('emergency')}

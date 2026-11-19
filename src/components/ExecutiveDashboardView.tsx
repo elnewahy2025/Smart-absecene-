@@ -22,6 +22,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
     justifications,
     classesStats,
     schoolEnrollmentStats,
+    dataReady,
   } = useAttendance();
 
   const isAr = lang === 'ar';
@@ -108,6 +109,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({ 
         recordedClassesCount={recordedClassesCount}
         totalClassesCount={totalClassesCount}
         unrecordedClassesCount={unrecordedClassesCount}
+        dataReady={dataReady}
       />
       {/* =========================================================================
           ANALYTICAL ENGINE: 5-DAY WEEKLY ATTENDANCE TREND (PRESERVED & REUSED)

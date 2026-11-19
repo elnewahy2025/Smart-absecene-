@@ -3,6 +3,7 @@ import { Student } from '../../types/attendance';
 import { Award, Zap, Trophy, Medal, Star, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 
 import { useAttendance } from '../../context/AttendanceContext';
+import { rateOrNull } from '../../utils/attendanceMath';
 
 interface Props {
   students: Student[];
@@ -62,30 +63,33 @@ export const StudentEngagementSection: React.FC<Props> = ({ students, lang }) =>
       }
     }
 
-    // Engagement points derived from actual attendance rate and attendance streak
-    const points = Math.max(0, Math.round(std.attendanceRate * 10 + streakDays * 5 - std.totalAbsences * 10 - std.totalLates * 5));
+    // Engagement points derived from guarded attendance metrics and attendance streak
+    const rate = rateOrNull(std.attendanceRate) ?? 0;
+    const totalAbsences = Number.isFinite(std.totalAbsences) ? std.totalAbsences : 0;
+    const totalLates = Number.isFinite(std.totalLates) ? std.totalLates : 0;
+    const points = Math.max(0, Math.round(rate * 10 + streakDays * 5 - totalAbsences * 10 - totalLates * 5));
 
     let badgeLevel: StudentEngagementMetrics['badgeLevel'] = 'starter';
     let badgeTitleAr = 'بداية الالتزام';
     let badgeTitleEn = 'Commitment Start';
     let badgeColor = 'bg-slate-100 text-slate-700 border-slate-300';
 
-    if (std.totalAbsences === 0 && std.totalLates === 0 && std.attendanceRate >= 99) {
+    if (totalAbsences === 0 && totalLates === 0 && rate >= 99) {
       badgeLevel = 'diamond';
       badgeTitleAr = 'وسام المثالية الماسية';
       badgeTitleEn = 'Diamond Excellence Badge';
       badgeColor = 'bg-cyan-50 text-cyan-800 border-cyan-300';
-    } else if (std.attendanceRate >= 95 && std.totalAbsences <= 1) {
+    } else if (rate >= 95 && totalAbsences <= 1) {
       badgeLevel = 'gold';
       badgeTitleAr = 'وسام الانضباط الذهبي';
       badgeTitleEn = 'Gold Discipline Badge';
       badgeColor = 'bg-amber-50 text-amber-800 border-amber-300';
-    } else if (std.attendanceRate >= 90 && std.totalAbsences <= 2) {
+    } else if (rate >= 90 && totalAbsences <= 2) {
       badgeLevel = 'silver';
       badgeTitleAr = 'وسام المواظبة الفضي';
       badgeTitleEn = 'Silver Attendance Badge';
       badgeColor = 'bg-slate-100 text-slate-800 border-slate-300';
-    } else if (std.attendanceRate >= 85) {
+    } else if (rate >= 85) {
       badgeLevel = 'bronze';
       badgeTitleAr = 'وسام الالتزام البرونزي';
       badgeTitleEn = 'Bronze Commitment Badge';

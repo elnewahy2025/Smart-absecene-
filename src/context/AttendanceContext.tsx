@@ -160,7 +160,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     setAuthLoading,
   });
 
-  useFirestoreDataSync({
+  const { dataReady: syncDataReady } = useFirestoreDataSync({
     firebaseUser,
     tenantId,
     currentUserRole,
@@ -177,6 +177,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     sessionsSeededRef,
     sessionsRef,
   });
+
+  const dataReady = !authLoading && syncDataReady;
 
   const { signInWithGoogle, signOutGoogle, signInWithCredentials } = useAuthActions({
     tenantId,
@@ -409,6 +411,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
         signOutGoogle,
         signInWithCredentials,
         currentTenant,
+        dataReady,
         tenantDomainConfig,
         tenantSubscription,
         subscriptionAccess,

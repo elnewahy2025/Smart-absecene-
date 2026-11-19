@@ -166,7 +166,13 @@ export const GradeComparisonMatrix: React.FC<GradeComparisonMatrixProps> = ({
                                 ? 'bg-amber-500'
                                 : 'bg-rose-500'
                             }`}
-                            style={{ width: `${Math.min(100, Math.max(10, item.averageAttendanceRate))}%` }}
+                            style={{
+                              width: `${
+                                item.averageAttendanceRate > 0
+                                  ? Math.min(100, Math.max(4, item.averageAttendanceRate))
+                                  : 0
+                              }%`,
+                            }}
                           />
                         </div>
                       </div>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAttendance } from '../../context/AttendanceContext';
+import { isActiveStudent } from '../../utils/attendanceMath';
 import { Flame, Calendar, Filter, Info } from 'lucide-react';
 
 interface DayPeriodAbsence {
@@ -49,8 +50,8 @@ export const AbsenceHeatmapCard: React.FC = () => {
       if (s.sessionType === 'daily' || !s.periodNumber || s.periodNumber < 1 || s.periodNumber > 7) return;
       if (selectedClass !== 'all' && s.className !== selectedClass) return;
 
-      const dateStr = s.date.includes('T') ? s.date : `${s.date}T12:00:00`;
-      const d = new Date(dateStr);
+      const normalizedDate = s.date ? `${s.date.slice(0, 10)}T12:00:00` : '';
+      const d = new Date(normalizedDate);
       if (Number.isNaN(d.getTime())) return;
       const dayIdx = d.getDay(); // 0 is Sunday
       const periodNum = s.periodNumber;
@@ -58,7 +59,12 @@ export const AbsenceHeatmapCard: React.FC = () => {
       if (grid[`${dayIdx}-${periodNum}`]) {
         s.records.forEach((rec) => {
           grid[`${dayIdx}-${periodNum}`].total += 1;
-          if (rec.status === 'absent' || rec.status === 'excused_absence') {
+          if (
+            rec.status === 'absent' ||
+            rec.status === 'excused_absence' ||
+            rec.status === 'rejected_excuse' ||
+            rec.status === 'under_review'
+          ) {
             grid[`${dayIdx}-${periodNum}`].absent += 1;
           }
         });
@@ -78,7 +84,7 @@ export const AbsenceHeatmapCard: React.FC = () => {
   const classNames = Array.from(
     new Set(
       students
-        .filter((s) => s.enrollmentStatus !== 'transferred')
+        .filter((s) => isActiveStudent(s))
         .map((s) => s.className)
         .filter(Boolean)
     )

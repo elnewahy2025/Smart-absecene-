@@ -12,6 +12,7 @@ interface SchoolClassStatsCardsProps {
   selectedGradeFilter?: string;
   onSelectGradeFilter?: (grade: string) => void;
   lang: 'ar' | 'en';
+  dataReady?: boolean;
 }
 
 export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
@@ -24,6 +25,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
   selectedGradeFilter = 'all',
   onSelectGradeFilter,
   lang,
+  dataReady = true,
 }) => {
   const isAr = lang === 'ar';
 
@@ -31,6 +33,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
   const gradesList = Array.from(new Set(classesStats.map((c) => c.grade))).filter(Boolean);
 
   // Compute active students attendance rate strictly from active counts
+  const hasOverallData = dataReady && enrollmentStats.activeStudentsCount > 0;
   const attendanceRate = enrollmentStats.schoolAttendanceRate;
 
   // Find currently selected class summary if one is clicked
@@ -65,7 +68,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
           <div className="mt-2 flex items-baseline gap-2">
             {/* Primary Prominent Percentage */}
             <span className="text-3xl font-black text-teal-800 tracking-tight font-mono">
-              %{attendanceRate}
+              {hasOverallData ? `%${attendanceRate}` : '—'}
             </span>
             {/* Actual count beside it */}
             <span className="text-xs text-slate-500 font-semibold">
@@ -75,14 +78,20 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
           <div className="mt-2 flex items-center justify-between text-[11px]">
             <span
               className={`font-bold px-2 py-0.5 rounded-full ${
-                attendanceRate >= 92
+                !hasOverallData
+                  ? 'bg-slate-100 text-slate-500'
+                  : attendanceRate >= 92
                   ? 'bg-emerald-100 text-emerald-800'
                   : attendanceRate >= 85
                   ? 'bg-amber-100 text-amber-800'
                   : 'bg-rose-100 text-rose-800'
               }`}
             >
-              {attendanceRate >= 92 ? (isAr ? 'انضباط ممتاز' : 'Excellent') : (isAr ? 'بحاجة لمتابعة' : 'Attention')}
+              {!hasOverallData
+                ? isAr ? 'لا توجد بيانات' : 'No data'
+                : attendanceRate >= 92
+                ? isAr ? 'انضباط ممتاز' : 'Excellent'
+                : isAr ? 'بحاجة لمتابعة' : 'Attention'}
             </span>
             <span className="text-teal-700 font-bold hover:underline">
               {isAr ? 'عرض الكل ←' : 'View all →'}
@@ -301,6 +310,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
             .map((c) => {
               const isSelected = selectedClass === c.className;
               const rate = c.attendanceRate;
+              const hasClassData = dataReady && c.activeStudents > 0;
 
               return (
                 <div
@@ -324,21 +334,33 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                   <div className="my-1.5 flex items-baseline justify-between">
                     <span
                       className={`text-2xl font-black font-mono tracking-tight ${
-                        rate >= 92 ? 'text-emerald-700' : rate >= 85 ? 'text-amber-700' : 'text-rose-700'
+                        !hasClassData
+                          ? 'text-slate-400'
+                          : rate >= 92
+                          ? 'text-emerald-700'
+                          : rate >= 85
+                          ? 'text-amber-700'
+                          : 'text-rose-700'
                       }`}
                     >
-                      %{rate}
+                      {hasClassData ? `%${rate}` : '—'}
                     </span>
                     <span
                       className={`text-[9px] px-1 py-0.2 rounded font-bold ${
-                        rate >= 92
+                        !hasClassData
+                          ? 'bg-slate-100 text-slate-500'
+                          : rate >= 92
                           ? 'bg-emerald-100 text-emerald-800'
                           : rate >= 85
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      {rate >= 92 ? (isAr ? 'منضبط' : 'Good') : (isAr ? 'تدخل' : 'Alert')}
+                      {!hasClassData
+                        ? isAr ? 'فارغ' : 'Empty'
+                        : rate >= 92
+                        ? isAr ? 'منضبط' : 'Good'
+                        : isAr ? 'تدخل' : 'Alert'}
                     </span>
                   </div>
 
@@ -346,9 +368,15 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        rate >= 92 ? 'bg-emerald-500' : rate >= 85 ? 'bg-amber-500' : 'bg-rose-500'
+                        !hasClassData
+                          ? 'bg-slate-300'
+                          : rate >= 92
+                          ? 'bg-emerald-500'
+                          : rate >= 85
+                          ? 'bg-amber-500'
+                          : 'bg-rose-500'
                       }`}
-                      style={{ width: `${rate}%` }}
+                      style={{ width: `${hasClassData ? rate : 0}%` }}
                     />
                   </div>
                 </div>

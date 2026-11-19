@@ -250,10 +250,11 @@ export function useSessionActions({
         })
       );
 
-      if (
-        firebaseUser &&
-        ['admin', 'registrar', 'super_admin', 'teacher'].includes(currentUser.role)
-      ) {
+      // Firestore rules only allow admin/registrar (and the platform owner) to
+      // update students/{id}. Teacher submissions still refresh these metrics:
+      // they are re-derived from the submitted attendance_sessions on every load
+      // (useScopedEntities / useSchoolAnalytics), so no write is attempted here.
+      if (firebaseUser && ['admin', 'registrar', 'super_admin'].includes(currentUser.role)) {
         computedMetrics.forEach((metrics, studentId) => {
           void setDoc(doc(db, 'students', studentId), metrics, { merge: true }).catch((error) =>
             console.error('[SESSIONS] Could not update student attendance metrics:', error)

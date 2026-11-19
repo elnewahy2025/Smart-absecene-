@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
@@ -52,9 +52,19 @@ export function useFirestoreDataSync({
   const allUsersRef = useRef(allUsers);
   allUsersRef.current = allUsers;
 
+  const activeSyncKey =
+    firebaseUser && tenantId && tenantId.trim() !== ''
+      ? `${firebaseUser.uid}:${tenantId}:${currentUserRole}:${authenticatedPhone}`
+      : null;
+
+  const [studentsReadyKey, setStudentsReadyKey] = useState<string | null>(null);
+  const [sessionsReadyKey, setSessionsReadyKey] = useState<string | null>(null);
+
   // Sync all entities from Firestore in real-time when authenticated
   useEffect(() => {
-    if (!firebaseUser || !tenantId || tenantId.trim() === '') return;
+    if (!firebaseUser || !activeSyncKey) {
+      return;
+    }
 
     const isParentUser = currentUserRole === 'parent';
     const parentProfile = isParentUser
@@ -79,10 +89,27 @@ export function useFirestoreDataSync({
             : []),
         ]
       : [query(collection(db, 'students'), where('tenantId', '==', tenantId))];
-    const unsubStudentsList = studentQueries.map((qStudents) =>
+
+    const pendingStudentQueries = new Set<number>(studentQueries.map((_, idx) => idx));
+    if (studentQueries.length === 0) {
+      setStudentsReadyKey(activeSyncKey);
+    }
+    if (isParentUser) {
+      setSessionsReadyKey(activeSyncKey);
+    }
+
+    const markStudentQueryDone = (idx: number) => {
+      pendingStudentQueries.delete(idx);
+      if (pendingStudentQueries.size === 0) {
+        setStudentsReadyKey(activeSyncKey);
+      }
+    };
+
+    const unsubStudentsList = studentQueries.map((qStudents, idx) =>
       onSnapshot(
         qStudents,
         (snapshot) => {
+          markStudentQueryDone(idx);
           if (snapshot.empty && !isParentUser) {
             setAllStudents([]);
             return;
@@ -129,6 +156,7 @@ export function useFirestoreDataSync({
           }
         },
         (error) => {
+          markStudentQueryDone(idx);
           handleFirestoreError(error, OperationType.GET, 'students');
         }
       )
@@ -160,6 +188,7 @@ export function useFirestoreDataSync({
           }
         }
         sessionsHydratedRef.current = true;
+        setSessionsReadyKey(activeSyncKey);
         if (!sessionsSeededRef.current) {
           for (const session of sessionsRef.current) {
             sessionHashesRef.current[session.id] = JSON.stringify(session);
@@ -169,6 +198,7 @@ export function useFirestoreDataSync({
       },
       (error) => {
         sessionsHydratedRef.current = true;
+        setSessionsReadyKey(activeSyncKey);
         if (!sessionsSeededRef.current) {
           for (const session of sessionsRef.current) {
             sessionHashesRef.current[session.id] = JSON.stringify(session);
@@ -316,4 +346,12 @@ export function useFirestoreDataSync({
 
     return () => unsubUsers();
   }, [firebaseUser, tenantId, currentUserRole]);
+
+  return {
+    dataReady:
+      !firebaseUser ||
+      (activeSyncKey !== null &&
+        studentsReadyKey === activeSyncKey &&
+        sessionsReadyKey === activeSyncKey),
+  };
 }

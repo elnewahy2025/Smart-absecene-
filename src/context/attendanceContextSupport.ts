@@ -108,6 +108,7 @@ export interface AttendanceContextType {
 
   // Tenant & Role
   currentTenant: Tenant;
+  dataReady: boolean;
   tenantDomainConfig?: TenantDomainConfig;
   /** Owner-managed subscription policy for the current school (null until loaded). */
   tenantSubscription: TenantSubscription | null;

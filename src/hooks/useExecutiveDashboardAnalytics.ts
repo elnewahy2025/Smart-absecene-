@@ -8,8 +8,12 @@ import {
   TenantSchoolProfile,
 } from '../types/attendance';
 import {
+  attendedRateRounded,
+  dailyFirstRank,
   isActiveStudent,
+  latestPeriodRank,
   meanOrNull,
+  pickOneRecordPerStudent,
   rateOrNull,
   summarizeRecords,
 } from '../utils/attendanceMath';
@@ -55,46 +59,48 @@ const transferredStudentIds = useMemo(
 
 const todayMetrics = useMemo(() => {
   if (submittedTodaySessions.length > 0) {
-    let present = 0;
-    let absent = 0;
-    let late = 0;
-    let excused = 0;
-    let attended = 0;
-    let totalRecords = 0;
+    const hasAnyRecords = submittedTodaySessions.some((s) => s.records && s.records.length > 0);
+    if (hasAnyRecords) {
+      const dailyRecords = pickOneRecordPerStudent(
+        submittedTodaySessions,
+        dailyFirstRank,
+        transferredStudentIds
+      );
+      const totals = summarizeRecords(dailyRecords);
 
-    for (const s of submittedTodaySessions) {
-      if (s.records && s.records.length > 0) {
-        const activeRecords = s.records.filter((r) => !transferredStudentIds.has(r.studentId));
-        const totals = summarizeRecords(activeRecords);
-        present += totals.present;
-        absent += totals.absentTotal;
-        late += totals.late;
-        excused += totals.excusedTotal;
-        attended += totals.attendedTotal;
-        totalRecords += totals.total;
-      } else {
-        const sPresent = s.presentCount || 0;
-        const sAbsent = s.absentCount || 0;
-        const sLate = s.lateCount || 0;
-        const sExcused = s.excusedCount || 0;
-        present += sPresent;
-        absent += sAbsent;
-        late += sLate;
-        excused += sExcused;
-        attended += sPresent + sLate;
-        totalRecords += sPresent + sAbsent + sLate + sExcused;
-      }
+      return {
+        presentCount: totals.attendedTotal,
+        absentCount: totals.absentTotal + totals.excusedAbsence + totals.underReview,
+        excusedCount: totals.excusedAbsence,
+        excusedLeaveCount: totals.excusedLeave,
+        unexcusedCount: totals.absentTotal,
+        lateCount: totals.late,
+        attendanceRate: attendedRateRounded(totals),
+        hasSubmittedData: true,
+      };
     }
 
-    const rate = totalRecords > 0 ? Math.round((attended / totalRecords) * 100) : 0;
-    const unexcused = Math.max(0, absent - excused);
+    let sPresent = 0;
+    let sAbsent = 0;
+    let sLate = 0;
+    let sExcused = 0;
+    for (const s of submittedTodaySessions) {
+      sPresent += s.presentCount || 0;
+      sAbsent += s.absentCount || 0;
+      sLate += s.lateCount || 0;
+      sExcused += s.excusedCount || 0;
+    }
+    const attended = sPresent + sLate;
+    const total = sPresent + sAbsent + sLate + sExcused;
+    const rate = total > 0 ? Math.round((attended / total) * 100) : null;
 
     return {
       presentCount: attended,
-      absentCount: absent,
-      excusedCount: excused,
-      unexcusedCount: unexcused,
-      lateCount: late,
+      absentCount: sAbsent,
+      excusedCount: sExcused,
+      excusedLeaveCount: 0,
+      unexcusedCount: sAbsent,
+      lateCount: sLate,
       attendanceRate: rate,
       hasSubmittedData: true,
     };
@@ -104,7 +110,6 @@ const todayMetrics = useMemo(() => {
   const mean = activeStudents.length > 0
     ? meanOrNull(activeStudents.map((s) => rateOrNull(s.attendanceRate)))
     : null;
-  const avgRate = mean !== null ? Math.round(mean) : 0;
   const approvedExcusesToday = justifications.filter(
     (j) => j.status === 'approved' && j.absenceDate === todayStr
   ).length;
@@ -113,9 +118,10 @@ const todayMetrics = useMemo(() => {
     presentCount: 0,
     absentCount: 0,
     excusedCount: approvedExcusesToday,
+    excusedLeaveCount: 0,
     unexcusedCount: 0,
     lateCount: 0,
-    attendanceRate: avgRate,
+    attendanceRate: mean !== null ? Math.round(mean) : null,
     hasSubmittedData: false,
   };
 }, [submittedTodaySessions, transferredStudentIds, activeStudents, justifications, todayStr]);
@@ -132,6 +138,7 @@ const unrecordedClassesCount = Math.max(0, totalClassesCount - recordedClassesCo
 // 4. Classes ranked by highest absence rate (Bottom performers needing attention)
 const classesByAbsence = useMemo(() => {
   return [...classesStats]
+    .filter((c) => c.activeStudents > 0)
     .map((c) => ({
       ...c,
       absenceRate: Math.max(0, 100 - c.attendanceRate),
@@ -144,7 +151,7 @@ const classesByAbsence = useMemo(() => {
 const warningLimit = schoolProfile?.unexcusedWarningThreshold ?? 3;
 const atRiskStudents = useMemo(() => {
   return students
-    .filter((s) => (!s.enrollmentStatus || s.enrollmentStatus === 'active') && s.totalAbsences >= warningLimit)
+    .filter((s) => isActiveStudent(s) && s.totalAbsences >= warningLimit)
     .sort((a, b) => b.totalAbsences - a.totalAbsences);
 }, [students, warningLimit]);
 
@@ -154,12 +161,27 @@ const pendingJustifications = useMemo(() => {
 }, [justifications]);
 
 // 7. Headcount estimate on campus
-const onCampusCount = useMemo(() => {
-  if (submittedTodaySessions.length === 0) return todayMetrics.presentCount;
-  const latest = submittedTodaySessions[submittedTodaySessions.length - 1];
-  const presentRecords = (latest.presentCount || 0) + (latest.lateCount || 0);
-  return presentRecords > 0 ? presentRecords : todayMetrics.presentCount;
-}, [submittedTodaySessions, todayMetrics]);
+const onCampusCount = useMemo<number | null>(() => {
+  if (submittedTodaySessions.length === 0) return null;
+  const hasAnyRecords = submittedTodaySessions.some((s) => s.records && s.records.length > 0);
+  if (hasAnyRecords) {
+    const latestRecords = pickOneRecordPerStudent(
+      submittedTodaySessions,
+      latestPeriodRank,
+      transferredStudentIds
+    );
+    return latestRecords.filter((r) => r.status === 'present' || r.status === 'late').length;
+  }
+  const latestByClass = new Map<string, AttendanceSession>();
+  for (const s of submittedTodaySessions) {
+    latestByClass.set(s.className, s);
+  }
+  let count = 0;
+  latestByClass.forEach((s) => {
+    count += (s.presentCount || 0) + (s.lateCount || 0);
+  });
+  return count;
+}, [submittedTodaySessions, transferredStudentIds]);
 
 // 8. Visual Chart 1: Absence Reasons & Excuses Decomposition (Donut Chart)
 const absenceDecompositionData = useMemo(() => {
@@ -177,8 +199,8 @@ const absenceDecompositionData = useMemo(() => {
   ).length;
   // Total approved
   const totalApproved = medicalCount + familyCount + otherExcusedCount;
-  // Total school unexcused absences
-  const totalAbsencesRecorded = students.reduce((acc, s) => acc + (s.totalAbsences || 0), 0);
+  // Total active school unexcused absences
+  const totalAbsencesRecorded = activeStudents.reduce((acc, s) => acc + (s.totalAbsences || 0), 0);
   const unexcusedCount = Math.max(0, totalAbsencesRecorded - totalApproved);
 
   const items = [
@@ -188,25 +210,25 @@ const absenceDecompositionData = useMemo(() => {
     { name: isAr ? 'أعذار أخرى' : 'Other', value: otherExcusedCount, color: '#f59e0b' },
   ];
   return items.filter((item) => item.value > 0);
-}, [justifications, students, isAr]);
+}, [justifications, activeStudents, isAr]);
 
 // 9. Visual Chart 2: Grade Absence Comparison (Bar Chart - Real Database Derivation)
 const gradeComparisonData = useMemo(() => {
-  // Group classesStats by Grade
-  const gradeMap: Record<string, { totalStudents: number; totalAbsenceWeight: number; count: number }> = {};
+  // Group non-empty classesStats by Grade weighted by activeStudents
+  const gradeMap: Record<string, { totalStudents: number; weightedAbsence: number }> = {};
   classesStats.forEach((c) => {
+    if (c.activeStudents <= 0) return;
     const gName = c.grade || (isAr ? 'الصف العام' : 'General');
     if (!gradeMap[gName]) {
-      gradeMap[gName] = { totalStudents: 0, totalAbsenceWeight: 0, count: 0 };
+      gradeMap[gName] = { totalStudents: 0, weightedAbsence: 0 };
     }
     const absenceRate = Math.max(0, 100 - c.attendanceRate);
-    gradeMap[gName].totalStudents += c.activeStudents || 1;
-    gradeMap[gName].totalAbsenceWeight += absenceRate;
-    gradeMap[gName].count += 1;
+    gradeMap[gName].totalStudents += c.activeStudents;
+    gradeMap[gName].weightedAbsence += absenceRate * c.activeStudents;
   });
 
   return Object.entries(gradeMap).map(([gradeName, data]) => {
-    const avgAbsence = Math.round(data.totalAbsenceWeight / Math.max(1, data.count));
+    const avgAbsence = data.totalStudents > 0 ? Math.round(data.weightedAbsence / data.totalStudents) : 0;
     const avgAttendance = 100 - avgAbsence;
     return {
       gradeName: gradeName.replace('الصف ', ''),
@@ -241,7 +263,7 @@ const weekdayAbsenceData = useMemo(() => {
     let avgAbsenceRate = 0;
     if (matched.length > 0) {
       const totalAbs = matched.reduce((acc, s) => acc + (s.absentCount || 0), 0);
-      const totalStud = matched.reduce((acc, s) => acc + (s.totalStudents || 1), 0);
+      const totalStud = matched.reduce((acc, s) => acc + (s.records?.length || s.totalStudents || 0), 0);
       avgAbsenceRate = totalStud > 0 ? Math.round((totalAbs / totalStud) * 100) : 0;
     }
 

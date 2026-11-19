@@ -8,6 +8,7 @@ import type {
 } from '../types/attendance';
 import {
   computeStudentMetricsFromSessions,
+  isActiveStudent,
   meanOrNull,
   rateOrNull,
 } from '../utils/attendanceMath';
@@ -63,7 +64,7 @@ export function useSchoolAnalytics({
     });
 
     return Array.from(classMap.entries()).map(([className, stList]) => {
-      const activeStudentsList = stList.filter((s) => s.enrollmentStatus !== 'transferred');
+      const activeStudentsList = stList.filter((s) => isActiveStudent(s));
       const transferredStudentsList = stList.filter((s) => s.enrollmentStatus === 'transferred');
       const cfgClass = configured.find((c) => c.name === className);
       const grade = cfgClass?.grade || stList[0]?.grade || 'المرحلة الدراسية';
@@ -90,7 +91,7 @@ export function useSchoolAnalytics({
   }, [effectiveTenantStudents, allUsers, tenantId, configuredClasses]);
 
   const schoolEnrollmentStats: SchoolEnrollmentStats = useMemo(() => {
-    const active = effectiveTenantStudents.filter((s) => s.enrollmentStatus !== 'transferred');
+    const active = effectiveTenantStudents.filter((s) => isActiveStudent(s));
     const transferred = effectiveTenantStudents.filter((s) => s.enrollmentStatus === 'transferred');
     const uniqueClasses = new Set(active.map((s) => s.className)).size;
     const avgSize = uniqueClasses > 0 ? Math.round(active.length / uniqueClasses) : 0;

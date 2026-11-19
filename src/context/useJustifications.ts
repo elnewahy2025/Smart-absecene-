@@ -135,8 +135,8 @@ export function useJustifications({
             return r;
           });
           const updatedSess = recountSession({ ...sess, records: recs });
-          if (firebaseUser) {
-            setDoc(doc(db, 'attendance_sessions', updatedSess.id), updatedSess, { merge: true }).catch((err) => {
+          if (firebaseUser && currentUserRole !== 'parent') {
+            setDoc(doc(db, 'attendance_sessions', updatedSess.id), toFirestoreData(updatedSess), { merge: true }).catch((err) => {
               handleFirestoreError(err, OperationType.UPDATE, `attendance_sessions/${updatedSess.id}`);
             });
           }
@@ -222,7 +222,7 @@ export function useJustifications({
           });
           const updatedSess = recountSession({ ...sess, records: updatedRecs });
           if (firebaseUser) {
-            setDoc(doc(db, 'attendance_sessions', updatedSess.id), updatedSess, { merge: true }).catch((err) => {
+            setDoc(doc(db, 'attendance_sessions', updatedSess.id), toFirestoreData(updatedSess), { merge: true }).catch((err) => {
               handleFirestoreError(err, OperationType.UPDATE, `attendance_sessions/${updatedSess.id}`);
             });
           }

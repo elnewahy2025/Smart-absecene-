@@ -52,7 +52,7 @@ import {
   signInWithRedirect,
   signOut,
 } from 'firebase/auth';
-import { getDoc } from 'firebase/firestore';
+import { getDoc, collection, onSnapshot, query } from 'firebase/firestore';
 
 const EXPECTED_CONTEXT_KEYS = [
   'addAuditLog',
@@ -74,6 +74,7 @@ const EXPECTED_CONTEXT_KEYS = [
   'createUser',
   'currentTenant',
   'currentUser',
+  'dataReady',
   'deleteStudent',
   'deleteUser',
   'digestConfig',
@@ -1314,5 +1315,45 @@ describe('AttendanceContext provider harness', () => {
       (captured as AttendanceContextType).setUserRole('parent');
     });
     expect((captured as AttendanceContextType).behaviourIncidents).toHaveLength(0);
+  });
+
+  it('gates dataReady until both students and sessions Firestore snapshots fire (even if empty)', async () => {
+    const callbacks = new Map<string, (snap: any) => void>();
+    vi.mocked(collection).mockImplementation((_db: unknown, name: string) => ({ __col: name }) as any);
+    vi.mocked(query).mockImplementation((col: any) => col);
+    vi.mocked(onSnapshot).mockImplementation((q: any, onNext: any) => {
+      if (q && q.__col) callbacks.set(q.__col, onNext);
+      return () => {};
+    });
+    vi.mocked(getDoc)
+      .mockResolvedValueOnce({ exists: () => false } as any)
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ tenantId: 'school-1', role: 'admin', status: 'active', name: 'Admin' }),
+      } as any);
+
+    try {
+      authState.user = { uid: 'admin-uid', email: 'admin@school.test' };
+      renderProvider();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect((captured as AttendanceContextType).dataReady).toBe(false);
+
+      act(() => {
+        callbacks.get('students')?.({ empty: true, forEach: () => {} });
+      });
+      expect((captured as AttendanceContextType).dataReady).toBe(false);
+
+      act(() => {
+        callbacks.get('attendance_sessions')?.({ empty: true, forEach: () => {} });
+      });
+      expect((captured as AttendanceContextType).dataReady).toBe(true);
+    } finally {
+      vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => undefined } as any);
+      vi.mocked(collection).mockImplementation(() => ({}) as any);
+      vi.mocked(query).mockImplementation(() => ({}) as any);
+      vi.mocked(onSnapshot).mockImplementation(() => () => {});
+    }
   });
 });

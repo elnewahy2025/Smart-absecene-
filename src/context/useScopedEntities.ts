@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { buildParentSessions } from './attendanceContextSupport';
 import { isChildOfGuardian as isChildOfGuardianRule } from '../utils/attendanceAccess';
 import { computeStudentMetricsFromSessions } from '../utils/attendanceMath';
@@ -55,11 +56,19 @@ export function useScopedEntities({
         .map((s) => s.id)
     : [];
 
-  const sessions = currentUserRole === 'parent'
-    ? buildParentSessions(parentAttendanceRecords)
-    : allSessions.filter((s) => s.tenantId === tenantId);
+  const sessions = useMemo(
+    () =>
+      currentUserRole === 'parent'
+        ? buildParentSessions(parentAttendanceRecords)
+        : allSessions.filter((s) => s.tenantId === tenantId),
+    [currentUserRole, parentAttendanceRecords, allSessions, tenantId]
+  );
 
-  const derivedMetricsByStudent = computeStudentMetricsFromSessions(sessions);
+  // Recomputed only when sessions change, not on every provider render.
+  const derivedMetricsByStudent = useMemo(
+    () => computeStudentMetricsFromSessions(sessions),
+    [sessions]
+  );
 
   // Data filtered strictly by tenantId AND Parent-Child Privacy Isolation
   // A parent must NEVER see or know any other students, ONLY their child/children.

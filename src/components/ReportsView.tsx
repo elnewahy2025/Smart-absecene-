@@ -32,6 +32,7 @@ export const ReportsView: React.FC = () => {
     justifications,
     lang,
     currentTenant,
+    dataReady,
     sendChronicWarningNotification,
     sendAllChronicWarningNotifications,
   } = useAttendance();
@@ -252,7 +253,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono text-primary">
-              {scopedCount > 0 && averageAttendanceRate !== '—' ? `%${averageAttendanceRate}` : '—'}
+              {dataReady !== false && scopedCount > 0 && averageAttendanceRate !== '—' ? `%${averageAttendanceRate}` : '—'}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({scopedCount} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
           </div>
@@ -276,7 +277,7 @@ export const ReportsView: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black font-mono" style={{ color: 'var(--app-text-main)' }}>
-              {students.length > 0 ? `%${Math.round((totalStudents / students.length) * 100)}` : '—'}
+              {dataReady !== false && students.length > 0 ? `%${Math.round((totalStudents / students.length) * 100)}` : '—'}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({totalStudents} / {students.length})</span>
           </div>
@@ -406,7 +407,11 @@ export const ReportsView: React.FC = () => {
                         ? 'bg-amber-500'
                         : 'bg-rose-500'
                     }`}
-                    style={{ width: `${Math.min(100, Math.max(10, data.avgRate))}%` }}
+                    style={{
+                      width: `${
+                        data.avgRate > 0 ? Math.min(100, Math.max(4, data.avgRate)) : 0
+                      }%`,
+                    }}
                   />
                 </div>
               </div>

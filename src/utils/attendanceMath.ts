@@ -160,7 +160,8 @@ export interface DerivedStudentMetrics {
 
 /**
  * Derives per-student metrics from submitted sessions using distinct-date absence
- * deduplication (`attended` = `present | late | excused_leave`; `absent` = `absent | excused_absence | rejected_excuse`).
+ * deduplication (`attended` = `present | late | excused_leave`;
+ * `absent` = `absent | excused_absence | rejected_excuse | under_review`).
  */
 export function computeStudentMetricsFromSessions(
   sessions: ReadonlyArray<AttendanceSession>,
@@ -205,8 +206,11 @@ export function computeStudentMetricsFromSessions(
       } else if (
         rec.status === 'absent' ||
         rec.status === 'excused_absence' ||
-        rec.status === 'rejected_excuse'
+        rec.status === 'rejected_excuse' ||
+        rec.status === 'under_review'
       ) {
+        // A pending excuse is still a missed day until it is decided; dropping it
+        // would make absences vanish from warning tiers while a review is open.
         acc.absentDates.add(sess.date);
       }
     }
@@ -239,3 +243,35 @@ export function computeStudentMetricsFromSessions(
 
   return result;
 }
+
+/**
+ * Picks exactly one record per student from a set of sessions (e.g. all of today's
+ * submitted sessions), so a student who appears in a daily session and several
+ * period sessions is counted once. The record from the highest-ranked session wins.
+ */
+export function pickOneRecordPerStudent(
+  sessions: ReadonlyArray<AttendanceSession>,
+  rank: (session: AttendanceSession) => number,
+  excludeStudentIds?: ReadonlySet<string>
+): AttendanceRecord[] {
+  const best = new Map<string, { record: AttendanceRecord; rank: number }>();
+  for (const sess of sessions) {
+    const r = rank(sess);
+    for (const rec of sess.records || []) {
+      if (excludeStudentIds?.has(rec.studentId)) continue;
+      const current = best.get(rec.studentId);
+      if (!current || r > current.rank) {
+        best.set(rec.studentId, { record: rec, rank: r });
+      }
+    }
+  }
+  return Array.from(best.values(), (entry) => entry.record);
+}
+
+/** Daily roll-call is authoritative for the day; otherwise the latest period wins. */
+export const dailyFirstRank = (s: AttendanceSession): number =>
+  s.sessionType === 'daily' ? Number.MAX_SAFE_INTEGER : s.periodNumber ?? 0;
+
+/** The most recent roll-call wins (used for "who is on campus right now"). */
+export const latestPeriodRank = (s: AttendanceSession): number =>
+  s.sessionType === 'daily' ? 0 : s.periodNumber ?? 0;

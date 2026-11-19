@@ -5,9 +5,12 @@ import {
   attendedRateRounded,
   clampPercent,
   computeStudentMetricsFromSessions,
+  dailyFirstRank,
   isActiveStudent,
+  latestPeriodRank,
   matchesStatusFilter,
   meanOrNull,
+  pickOneRecordPerStudent,
   rateOrNull,
   recountSession,
   summarizeRecords,
@@ -200,5 +203,89 @@ describe('attendanceMath', () => {
     expect(d.getFullYear()).toBe(2026);
     expect(d.getMonth()).toBe(10); // November (0-indexed)
     expect(d.getDate()).toBe(1);
+  });
+
+  it('treats under_review as an absent day in computeStudentMetricsFromSessions', () => {
+    const sessions: AttendanceSession[] = [
+      {
+        id: 'sess-review',
+        tenantId: 't1',
+        date: '2026-11-04',
+        sessionType: 'daily',
+        classId: 'c1',
+        className: '10/A',
+        grade: '10',
+        teacherId: 'teacher-1',
+        teacherName: 'T',
+        status: 'submitted',
+        totalStudents: 1,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        excusedCount: 1,
+        records: [{ ...makeRecord('1', 'under_review'), studentId: 'std-1' }],
+      },
+    ];
+
+    const metrics = computeStudentMetricsFromSessions(sessions).get('std-1');
+    expect(metrics).toEqual({
+      totalAbsences: 1,
+      totalLates: 0,
+      attendanceRate: 0,
+    });
+  });
+
+  it('deduplicates student records across daily and period sessions according to rank', () => {
+    const sessions: AttendanceSession[] = [
+      {
+        id: 'daily',
+        tenantId: 't1',
+        date: '2026-11-05',
+        sessionType: 'daily',
+        classId: 'c1',
+        className: '10/A',
+        grade: '10',
+        teacherId: 'teacher-1',
+        teacherName: 'T',
+        status: 'submitted',
+        totalStudents: 2,
+        presentCount: 1,
+        absentCount: 1,
+        lateCount: 0,
+        excusedCount: 0,
+        records: [
+          { ...makeRecord('1', 'present'), studentId: 'std-1' },
+          { ...makeRecord('2', 'absent'), studentId: 'std-tr' },
+        ],
+      },
+      {
+        id: 'p3',
+        tenantId: 't1',
+        date: '2026-11-05',
+        sessionType: 'period',
+        periodNumber: 3,
+        classId: 'c1',
+        className: '10/A',
+        grade: '10',
+        teacherId: 'teacher-1',
+        teacherName: 'T',
+        status: 'submitted',
+        totalStudents: 1,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        excusedCount: 1,
+        records: [{ ...makeRecord('3', 'excused_leave'), studentId: 'std-1' }],
+      },
+    ];
+
+    const excluded = new Set(['std-tr']);
+    const dailyPreferred = pickOneRecordPerStudent(sessions, dailyFirstRank, excluded);
+    expect(dailyPreferred).toHaveLength(1);
+    expect(dailyPreferred[0].status).toBe('present');
+
+    const latestPreferred = pickOneRecordPerStudent(sessions, latestPeriodRank, excluded);
+    expect(latestPreferred).toHaveLength(1);
+    expect(latestPreferred[0].status).toBe('excused_leave');
   });
 });

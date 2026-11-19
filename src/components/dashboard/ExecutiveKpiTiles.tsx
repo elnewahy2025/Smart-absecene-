@@ -13,6 +13,7 @@ interface ExecutiveKpiTilesProps {
   recordedClassesCount: number;
   totalClassesCount: number;
   unrecordedClassesCount: number;
+  dataReady?: boolean;
 }
 
 // 4 DISTINCT EXECUTIVE DECISION TILES (ZERO DUPLICATION)
@@ -24,7 +25,12 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
   recordedClassesCount,
   totalClassesCount,
   unrecordedClassesCount,
-}) => (
+  dataReady = true,
+}) => {
+  const rateValue = todayMetrics.attendanceRate;
+  const showEmpty = !dataReady || activeStudentsCount === 0 || rateValue === null;
+
+  return (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     {/* Tile 1: Overall School Attendance Rate */}
     <div
@@ -42,10 +48,12 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
       </div>
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-black text-primary">
-          {activeStudentsCount === 0 ? '—' : `${todayMetrics.attendanceRate}%`}
+          {showEmpty ? '—' : `${rateValue}%`}
         </span>
         <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-          {activeStudentsCount === 0
+          {!dataReady
+            ? isAr ? '(جارٍ التحميل...)' : '(Loading...)'
+            : showEmpty
             ? isAr ? '(لا توجد بيانات)' : '(No data)'
             : !todayMetrics.hasSubmittedData
             ? isAr
@@ -59,19 +67,19 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
       <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mt-3 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            activeStudentsCount === 0
+            showEmpty
               ? 'bg-slate-300 dark:bg-slate-600'
-              : todayMetrics.attendanceRate >= 90
+              : rateValue >= 90
               ? 'bg-primary'
-              : todayMetrics.attendanceRate >= 80
+              : rateValue >= 80
               ? 'bg-amber-500'
               : 'bg-rose-500'
           }`}
           style={{
             width: `${
-              activeStudentsCount === 0
+              showEmpty
                 ? 0
-                : Math.min(100, Math.max(0, todayMetrics.attendanceRate))
+                : Math.min(100, Math.max(0, rateValue))
             }%`,
           }}
         />
@@ -159,7 +167,7 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
           {isAr ? 'انصراف مبكر / مستأذنون:' : 'Early dismissals:'}
         </span>
         <span className="font-black text-amber-800 dark:text-amber-100 font-mono text-sm">
-          {todayMetrics.excusedCount}
+          {todayMetrics.excusedLeaveCount}
         </span>
       </div>
       <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
@@ -214,4 +222,5 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
       </div>
     </div>
   </div>
-);
+  );
+};
