@@ -42,7 +42,7 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
       </div>
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-black text-primary">
-          {todayMetrics.attendanceRate}%
+          {activeStudentsCount === 0 && !todayMetrics.hasSubmittedData ? '—' : `${todayMetrics.attendanceRate}%`}
         </span>
         <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
           {isAr
@@ -53,13 +53,21 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
       <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mt-3 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            todayMetrics.attendanceRate >= 90
+            activeStudentsCount === 0 && !todayMetrics.hasSubmittedData
+              ? 'bg-slate-300 dark:bg-slate-600'
+              : todayMetrics.attendanceRate >= 90
               ? 'bg-primary'
               : todayMetrics.attendanceRate >= 80
               ? 'bg-amber-500'
               : 'bg-rose-500'
           }`}
-          style={{ width: `${Math.min(100, Math.max(0, todayMetrics.attendanceRate))}%` }}
+          style={{
+            width: `${
+              activeStudentsCount === 0 && !todayMetrics.hasSubmittedData
+                ? 0
+                : Math.min(100, Math.max(0, todayMetrics.attendanceRate))
+            }%`,
+          }}
         />
       </div>
       <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">

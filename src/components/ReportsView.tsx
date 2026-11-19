@@ -250,7 +250,9 @@ export const ReportsView: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-primary" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black font-mono text-primary">%{averageAttendanceRate}</span>
+            <span className="text-3xl font-black font-mono text-primary">
+              {scopedCount > 0 ? `%${averageAttendanceRate}` : '—'}
+            </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">({scopedCount} {lang === 'ar' ? 'طالب نشط' : 'active students'})</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">

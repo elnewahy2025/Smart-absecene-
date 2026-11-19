@@ -49,7 +49,12 @@ export function useSchoolAnalytics({
       const classId = cfgClass?.id || stList.find((student) => student.classId?.trim())?.classId || '';
 
       const avgRate = activeStudentsList.length > 0
-        ? Math.round(activeStudentsList.reduce((acc, s) => acc + (s.attendanceRate || 100), 0) / activeStudentsList.length)
+        ? Math.round(
+            activeStudentsList.reduce(
+              (acc, s) => acc + (typeof s.attendanceRate === 'number' ? s.attendanceRate : 100),
+              0
+            ) / activeStudentsList.length
+          )
         : 100;
 
       const assignedTeachersCount = tenantTeachers.filter((t) =>
@@ -76,7 +81,12 @@ export function useSchoolAnalytics({
     const uniqueClasses = new Set(active.map((s) => s.className)).size;
     const avgSize = uniqueClasses > 0 ? Math.round(active.length / uniqueClasses) : 0;
     const avgRate = active.length > 0
-      ? Math.round(active.reduce((acc, s) => acc + (s.attendanceRate || 100), 0) / active.length)
+      ? Math.round(
+          active.reduce(
+            (acc, s) => acc + (typeof s.attendanceRate === 'number' ? s.attendanceRate : 100),
+            0
+          ) / active.length
+        )
       : 100;
 
     return {
