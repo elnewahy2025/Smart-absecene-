@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD || 'FiazjEUvaWJhD26HZTR9bESu';
+const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD || '';
 
 test.describe('E2E Authentication & RBAC Isolation', () => {
+  test.beforeEach(() => {
+    test.skip(!SEED_PASSWORD, 'EMULATOR_SEED_PASSWORD is not configured');
+  });
 
   test('1. Admin can sign in and view Executive Dashboard and Admin controls', async ({ page }) => {
     await page.goto('/');

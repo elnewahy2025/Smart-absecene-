@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD || 'FiazjEUvaWJhD26HZTR9bESu';
+const SEED_PASSWORD = process.env.EMULATOR_SEED_PASSWORD || '';
 
 test.describe('E2E Attendance Workflow — Teacher Lifecycle', () => {
+  test.beforeEach(() => {
+    test.skip(!SEED_PASSWORD, 'EMULATOR_SEED_PASSWORD is not configured');
+  });
 
   test('1. Teacher logs in, reviews assigned session, applies quick-mark present, and submits session', async ({ page }) => {
     await page.goto('/');

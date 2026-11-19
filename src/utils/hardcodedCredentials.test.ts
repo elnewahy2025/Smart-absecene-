@@ -35,6 +35,7 @@ describe('Hardcoded credential guard', () => {
       ...collectSourceFiles('src'),
       ...collectSourceFiles('scripts'),
       ...collectSourceFiles('server'),
+      ...collectSourceFiles('e2e'),
       'server.ts',
     ].filter((file) => !file.endsWith('.test.ts'));
 

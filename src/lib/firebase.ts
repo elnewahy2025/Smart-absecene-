@@ -6,6 +6,10 @@ const env = (import.meta as any).env || {};
 
 const useEmulator = String((import.meta as any).env?.VITE_USE_FIREBASE_EMULATOR || '').toLowerCase() === 'true';
 
+if (env.PROD && !useEmulator && (!env.VITE_FIREBASE_PROJECT_ID || !env.VITE_FIREBASE_API_KEY)) {
+  console.error('[FIREBASE] Missing VITE_FIREBASE_PROJECT_ID or VITE_FIREBASE_API_KEY in production build.');
+}
+
 const firebaseConfig = {
   projectId: import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true'
     ? (env.VITE_FIREBASE_EMULATOR_PROJECT_ID || 'demo-smart-school')
@@ -126,14 +130,15 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-// Check on boot and network status changes
+// Check on browser boot (outside unit tests) and network status changes
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => testConnection());
   window.addEventListener('offline', () => {
     currentStatus = 'offline';
     statusListeners.forEach((fn) => fn(currentStatus));
   });
+  if (env.MODE !== 'test') {
+    void testConnection();
+  }
 }
-
-testConnection();
 
