@@ -92,7 +92,7 @@ export function useFirestoreDataSync({
                 fullName: data.fullName || '',
                 grade: data.grade || 'الصف العاشر',
                 className: data.className || '',
-                classId: data.classId || 'class-1a',
+                classId: typeof data.classId === 'string' ? data.classId.trim() : '',
                 guardianName: data.guardianName || 'ولي أمر معتمد',
                 guardianPhone: data.guardianPhone || '',
                 guardianEmail: data.guardianEmail || '',
@@ -101,15 +101,23 @@ export function useFirestoreDataSync({
                 totalAbsences: data.totalAbsences || 0,
                 totalLates: data.totalLates || 0,
                 attendanceRate: data.attendanceRate || 100,
+                enrollmentStatus: data.enrollmentStatus,
               });
             });
-            if (remoteStudents.length > 0) {
-              setAllStudents((prev) => {
-                const map = new Map<string, Student>();
-                prev.forEach((s) => map.set(s.id, s));
-                remoteStudents.forEach((s) => map.set(s.id, s));
-                return Array.from(map.values());
-              });
+            if (isParentUser) {
+              if (remoteStudents.length > 0) {
+                setAllStudents((prev) => {
+                  const map = new Map<string, Student>();
+                  prev.forEach((s) => map.set(s.id, s));
+                  remoteStudents.forEach((s) => map.set(s.id, s));
+                  return Array.from(map.values());
+                });
+              }
+            } else {
+              // This tenant-scoped snapshot is authoritative. Replace the prior
+              // roster (including on an empty snapshot) so deleted students and
+              // stale local cache entries cannot enter new attendance sessions.
+              setAllStudents(remoteStudents);
             }
           }
         },
