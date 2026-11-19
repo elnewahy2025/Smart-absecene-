@@ -80,7 +80,9 @@ export const DigestHighRiskSection: React.FC<DigestHighRiskSectionProps> = ({ cu
                       {s.totalAbsences} يوم
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-700 dark:text-emerald-400">{s.attendanceRate}%</td>
+                  <td className="py-2.5 px-3 font-bold text-emerald-700 dark:text-emerald-400">
+                    {s.attendanceRate !== null ? `${s.attendanceRate}%` : '—'}
+                  </td>
                   <td className="py-2.5 px-3">
                     {s.riskTier === 'tier_8_plus' ? (
                       <span className="bg-red-600 text-white font-bold text-[10px] px-2 py-0.5 rounded-full">

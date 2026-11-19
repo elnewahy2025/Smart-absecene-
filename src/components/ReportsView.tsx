@@ -23,7 +23,7 @@ import { AbsenceHeatmapCard } from './reports/AbsenceHeatmapCard';
 import { StudentEngagementSection } from './reports/StudentEngagementSection';
 import { BatchPrintCenterModal } from './reports/BatchPrintCenterModal';
 import { buildCsvReport, buildExcelReportHtml, downloadReportFile } from '../utils/reportExports';
-import { isActiveStudent, meanOrNull, rateOrNull } from '../utils/attendanceMath';
+import { isActiveStudent, meanOrNull, rateOrNull, selectReportStudents } from '../utils/attendanceMath';
 
 export const ReportsView: React.FC = () => {
   const {
@@ -51,13 +51,8 @@ export const ReportsView: React.FC = () => {
     (s) => selectedClass === 'all' || s.className === selectedClass
   );
 
-  // Filtered dataset
-  const filteredStudents = classScopedStudents.filter((s) => {
-    if (reportType === 'chronic_only') return s.totalAbsences >= 3;
-    if (reportType === 'tier2_warning') return s.totalAbsences >= 5 && s.totalAbsences < 8;
-    if (reportType === 'tier3_critical') return s.totalAbsences >= 8;
-    return true;
-  });
+  // Filtered dataset (shared scope helper keeps cards and exports in lockstep)
+  const filteredStudents = selectReportStudents(classScopedStudents, { reportType });
 
   // Calculate KPI metrics scoped to active students in the selected class
   const totalStudents = activeStudents.length;

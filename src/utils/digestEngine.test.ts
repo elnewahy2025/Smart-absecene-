@@ -109,4 +109,44 @@ describe('digestEngine', () => {
     expect(html).toContain('مدرسة الأندلس');
     expect(html).toContain('<!DOCTYPE html>');
   });
+
+  it('keeps unknown rates unknown end-to-end instead of fabricating 100', () => {
+    const data = computeDailyDigestData({
+      tenantId: 'school-1',
+      tenantName: 'مدرسة التجربة',
+      students: sampleStudents.map((s) => ({ ...s, attendanceRate: null, totalAbsences: 0 })),
+      sessions: [],
+      justifications: [],
+      config: dummyConfig,
+      dateStr: '2026-10-11',
+    });
+
+    expect(data.overallAttendanceRate).toBeNull();
+    expect(data.highRiskStudents).toEqual([]);
+
+    const html = generateHtmlEmailTemplate(
+      { ...data, id: 'digest-null', dispatchedAt: '2026-10-11T06:45:00Z', status: 'scheduled' as const },
+      'مدرسة الأندلس'
+    );
+    expect(html).not.toContain('null%');
+    expect(html).not.toContain('margin-top: 4px;">100%');
+    expect(html).toContain('—');
+  });
+
+  it('excludes unknown rates from the overall mean rather than averaging them as 100', () => {
+    const data = computeDailyDigestData({
+      tenantId: 'school-1',
+      tenantName: 'مدرسة التجربة',
+      students: [
+        { ...sampleStudents[0], attendanceRate: 80, totalAbsences: 0 },
+        { ...sampleStudents[1], attendanceRate: null, totalAbsences: 0 },
+      ],
+      sessions: [],
+      justifications: [],
+      config: dummyConfig,
+      dateStr: '2026-10-11',
+    });
+
+    expect(data.overallAttendanceRate).toBe(80);
+  });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRightLeft, Award, Calendar, QrCode, RotateCcw, Trash2 } from 'lucide-react';
 import type { Student, StudentBehaviourIncident } from '../../types/attendance';
+import { rateOrNull } from '../../utils/attendanceMath';
 import { getCountryIdentitySpec } from '../../config/countryPresets';
 
 interface StudentsRegistryTableProps {
@@ -61,6 +62,7 @@ export const StudentsRegistryTable: React.FC<StudentsRegistryTableProps> = ({
               const studentIncidents = behaviourIncidents.filter((b) => b.studentId === s.id);
               const pointsSum = studentIncidents.reduce((sum, item) => sum + item.points, 0);
               const isTransferred = s.enrollmentStatus === 'transferred';
+              const rate = rateOrNull(s.attendanceRate);
 
               return (
                 <tr key={s.id} className={`hover:bg-slate-50 transition-colors ${isTransferred ? 'bg-amber-50/30' : ''}`}>
@@ -108,24 +110,26 @@ export const StudentsRegistryTable: React.FC<StudentsRegistryTableProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs inline-block transition-transform group-hover:scale-105 ${
-                            s.attendanceRate >= 95
+                            rate === null
+                              ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                              : rate >= 95
                               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              : s.attendanceRate >= 85
+                              : rate >= 85
                               ? 'bg-amber-50 text-amber-800 border border-amber-200'
                               : 'bg-rose-50 text-rose-800 border border-rose-300 font-black'
                           }`}
                         >
-                          %{s.attendanceRate}
+                          {rate !== null ? `%${rate}` : '—'}
                         </span>
                         <span className="text-[11px] text-slate-500 font-medium font-mono">
                           ({s.totalAbsences} {lang === 'ar' ? 'غياب' : 'abs'})
                         </span>
                       </div>
-                      {s.attendanceRate < 85 || s.totalAbsences >= 5 ? (
+                      {(rate !== null && rate < 85) || s.totalAbsences >= 5 ? (
                         <span className="text-[10px] text-rose-700 font-bold mt-0.5 flex items-center gap-0.5">
                           ⚠️ {lang === 'ar' ? 'بحاجة لتدخل عاجل' : 'Needs Intervention'}
                         </span>
-                      ) : s.attendanceRate < 90 || s.totalAbsences >= 3 ? (
+                      ) : (rate !== null && rate < 90) || s.totalAbsences >= 3 ? (
                         <span className="text-[10px] text-amber-700 font-medium mt-0.5">
                           ⚡ {lang === 'ar' ? 'إنذار متابعة' : 'Watch list'}
                         </span>

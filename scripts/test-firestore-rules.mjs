@@ -613,6 +613,30 @@ await expectAllowed('registrar can update students', updateDoc(doc(registrarDb, 
 await expectDenied('registrar cannot change enrollment status directly', updateDoc(doc(registrarDb, 'students', 'registrar-student'), { enrollmentStatus: 'transferred' }));
 await expectDenied('registrar cannot move students between tenants', updateDoc(doc(registrarDb, 'students', 'registrar-student'), { tenantId: 'school-2' }));
 await expectDenied('registrar cannot delete students', deleteDoc(doc(registrarDb, 'students', 'registrar-student')));
+// --- Derived metrics must persist for every submitting role ------------------
+// Assigned teachers may refresh only the three roll-call-derived counters on
+// their own students; profile/tenant/lifecycle fields stay admin/registrar-only.
+await expectAllowed(
+  'assigned teacher can persist derived metrics (including null for no data)',
+  updateDoc(doc(teacherDb, 'students', 'student1'), {
+    totalAbsences: 2,
+    totalLates: 1,
+    attendanceRate: null,
+  })
+);
+await expectDenied(
+  'teacher cannot persist metrics for an unassigned class',
+  updateDoc(doc(teacherDb, 'students', 'student2'), { totalAbsences: 2 })
+);
+await expectDenied(
+  'teacher metric update cannot touch profile fields',
+  updateDoc(doc(teacherDb, 'students', 'student1'), { totalAbsences: 3, fullName: 'Tampered' })
+);
+await expectAllowed(
+  'registrar can store null for an unknown attendance rate',
+  updateDoc(doc(registrarDb, 'students', 'registrar-student'), { attendanceRate: null })
+);
+
 await expectDenied('registrar cannot read private settings', getDoc(doc(registrarDb, 'settings_private', 'school-1')));
 await expectAllowed('registrar can read audit logs', getDoc(doc(registrarDb, 'audit_logs', 'audit1')));
 await expectDenied('registrar cannot write tenant registry', setDoc(doc(registrarDb, 'tenants', 'school-1'), { nameEn: 'hijacked' }, { merge: true }));

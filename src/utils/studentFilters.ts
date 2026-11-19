@@ -1,9 +1,11 @@
 import type { Student } from '../types/attendance';
+import { rateOrNull } from './attendanceMath';
 
 export const DEFAULT_GRADE_FALLBACK = ['الصف العاشر', 'الصف الحادي عشر', 'الصف الثاني عشر'];
 
 export function isInterventionStudent(student: Student, warningThreshold: number): boolean {
-  return student.attendanceRate < 90 || student.totalAbsences >= warningThreshold;
+  const rate = rateOrNull(student.attendanceRate);
+  return (rate !== null && rate < 90) || student.totalAbsences >= warningThreshold;
 }
 
 export function countActiveStudents(students: Student[]): number {
@@ -42,7 +44,7 @@ export function filterStudents(students: Student[], criteria: StudentFilterCrite
   return students.filter((s) => {
     if (statusFilter === 'active' && s.enrollmentStatus === 'transferred') return false;
     if (statusFilter === 'transferred' && s.enrollmentStatus !== 'transferred') return false;
-    if (interventionOnly && (s.attendanceRate >= 90 && s.totalAbsences < warningThreshold)) return false;
+    if (interventionOnly && !isInterventionStudent(s, warningThreshold)) return false;
     if (selectedGrade !== 'all' && s.grade !== selectedGrade) return false;
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
     if (searchQuery) {

@@ -133,6 +133,26 @@ describe('buildExcelReportHtml', () => {
     expect(html).toContain('<td dir="ltr">0555000000</td>');
     expect(html).toContain('<td>O+</td>');
   });
+
+  it('never emits the misleading "—%" for an empty average', () => {
+    const html = buildExcelReportHtml([], tenant, '—', '2026-10-21');
+    expect(html).toContain('متوسط الحضور: —');
+    expect(html).not.toContain('—%');
+  });
+});
+
+describe('percent rendering parity', () => {
+  it('keeps real rates unchanged in both exports', () => {
+    expect(buildCsvReport([student({ attendanceRate: 70 })])).toContain('"70%"');
+    expect(buildExcelReportHtml([student()], tenant, '88.3', '2026-10-21')).toContain('متوسط الحضور: 88.3%');
+  });
+
+  it('renders a missing per-student rate as — rather than —%', () => {
+    const missing = { ...student(), attendanceRate: undefined } as unknown as Student;
+    const csv = buildCsvReport([missing]);
+    expect(csv).not.toContain('—%');
+    expect(csv).toContain('"—"');
+  });
 });
 
 describe('downloadReportFile', () => {

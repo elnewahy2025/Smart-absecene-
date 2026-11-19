@@ -114,7 +114,7 @@ describe('absence-analysis bridge', () => {
     expect(bridged!.records).toEqual([]);
     expect(bridged!.absentDaysCount).toBe(0);
     expect(bridged!.lateDaysCount).toBe(0);
-    expect(bridged!.attendanceRate).toBe(100);
+    expect(bridged!.attendanceRate).toBeNull();
   });
 
   it('returns null without a current student', () => {

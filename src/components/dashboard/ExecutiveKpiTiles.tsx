@@ -60,8 +60,8 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
               ? `(متوسط تراكمي · ${activeStudentsCount} طالب نشط)`
               : `(Historical avg · ${activeStudentsCount} active)`
             : isAr
-            ? `(حاضر ${todayMetrics.presentCount} من ${activeStudentsCount})`
-            : `(${todayMetrics.presentCount} of ${activeStudentsCount})`}
+            ? `(منتظم ${todayMetrics.attendedCount} من ${todayMetrics.recordedCount} مسجّل)`
+            : `(attended ${todayMetrics.attendedCount} of ${todayMetrics.recordedCount} recorded)`}
         </span>
       </div>
       <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mt-3 overflow-hidden">
@@ -114,7 +114,7 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
           {isAr ? 'إجمالي الغائبين اليوم' : 'total absentees'}
         </span>
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2 text-center text-xs">
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center text-xs">
         <div className="bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl p-2 shadow-2xs">
           <span className="text-[11px] text-rose-800 dark:text-rose-300 block font-bold">
             {isAr ? 'بدون عذر (مخالف)' : 'Unexcused'}
@@ -129,6 +129,14 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
           </span>
           <span className="text-lg font-black text-sky-700 dark:text-sky-200 font-mono">
             {todayMetrics.excusedCount}
+          </span>
+        </div>
+        <div className="bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/40 rounded-xl p-2 shadow-2xs">
+          <span className="text-[11px] text-slate-700 dark:text-slate-300 block font-bold">
+            {isAr ? 'قيد المراجعة' : 'Under review'}
+          </span>
+          <span className="text-lg font-black text-slate-700 dark:text-slate-200 font-mono">
+            {todayMetrics.underReviewCount}
           </span>
         </div>
       </div>
@@ -167,7 +175,7 @@ export const ExecutiveKpiTiles: React.FC<ExecutiveKpiTilesProps> = ({
           {isAr ? 'انصراف مبكر / مستأذنون:' : 'Early dismissals:'}
         </span>
         <span className="font-black text-amber-800 dark:text-amber-100 font-mono text-sm">
-          {todayMetrics.excusedLeaveCount}
+          {todayMetrics.excusedLeaveCount ?? '—'}
         </span>
       </div>
       <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">

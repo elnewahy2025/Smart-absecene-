@@ -117,10 +117,11 @@ describe('GradeComparisonMatrix', () => {
     expect(unexcusedBar.style.width).toBe('20%');
   });
 
-  it('treats a grade with no absence days as fully justified', () => {
+  it('renders no justification bar (not a misleading 100%) when a grade has no absence days', () => {
     setup();
-    expect(screen.getByTitle('مبرر: 100%')).toBeTruthy();
-    expect(screen.getByTitle('غير مبرر: 0%')).toBeTruthy();
+    expect(screen.getByText('— لا توجد أيام غياب')).toBeTruthy();
+    expect(screen.queryByTitle('مبرر: 100%')).toBeNull();
+    expect(screen.queryByTitle('غير مبرر: 0%')).toBeNull();
   });
 
   it('clamps justifiedPercent to 100% and avoids negative unexcused width when excuses exceed absences', () => {

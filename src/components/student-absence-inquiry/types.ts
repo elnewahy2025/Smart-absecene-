@@ -42,7 +42,7 @@ export interface StudentAbsenceAnalysis {
   excusedDaysCount: number;
   unexcusedDaysCount: number;
   totalMinutesLate: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
   records: StudentAbsenceEntry[];
   isRejected?: boolean;
   rejectionReason?: string | null;

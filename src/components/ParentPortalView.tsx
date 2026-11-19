@@ -135,14 +135,14 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({ onOpenExcuse
         {/* Attendance Rate */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base sm:text-lg shrink-0">
-            {activeStudent.attendanceRate}%
+            {activeStudent.attendanceRate !== null ? `${activeStudent.attendanceRate}%` : '—'}
           </div>
           <div>
             <span className="text-[11px] text-slate-500 block">
               {lang === 'ar' ? 'نسبة الحضور الفصلي' : 'Attendance Rate'}
             </span>
             <span className="text-xs sm:text-sm font-bold text-slate-900">
-              {activeStudent.attendanceRate >= 90
+              {activeStudent.attendanceRate !== null && activeStudent.attendanceRate >= 90
                 ? lang === 'ar'
                   ? 'ممتاز ومثالي'
                   : 'Excellent'

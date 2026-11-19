@@ -80,7 +80,8 @@ export interface Student {
   emergencyContact?: string;
   totalAbsences: number;
   totalLates: number;
-  attendanceRate: number;
+  /** null when no submitted sessions exist — never a fabricated 100%. */
+  attendanceRate: number | null;
   enrollmentStatus?: StudentEnrollmentStatus;
   transferredAt?: string;
   transferReason?: string;
@@ -94,7 +95,7 @@ export interface SchoolClassSummary {
   totalStudents: number;
   activeStudents: number;
   transferredStudents: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
   assignedTeachersCount: number;
 }
 
@@ -104,7 +105,7 @@ export interface SchoolEnrollmentStats {
   transferredStudentsCount: number;
   totalClassesCount: number;
   averageClassSize: number;
-  schoolAttendanceRate: number;
+  schoolAttendanceRate: number | null;
 }
 
 export interface AttendanceRecord {
@@ -347,7 +348,7 @@ export interface DailyDigestHighRiskStudent {
   className: string;
   totalAbsences: number;
   totalLates: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
   riskTier: 'tier_8_plus' | 'tier_5_plus' | 'tier_3_plus';
   guardianName: string;
   guardianPhone: string;
@@ -377,7 +378,7 @@ export interface DailyEmailDigestItem {
   recipients: string[];
   subject: string;
   status: 'delivered' | 'failed' | 'scheduled';
-  overallAttendanceRate: number;
+  overallAttendanceRate: number | null;
   totalStudents: number;
   anomaliesCount: number;
   pendingJustificationsCount: number;

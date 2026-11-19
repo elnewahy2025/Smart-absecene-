@@ -25,6 +25,7 @@ import { AddStudentModal } from './students/AddStudentModal';
 import { TransferStudentModal } from './students/TransferStudentModal';
 import { DeleteStudentConfirmationModal } from './students/DeleteStudentConfirmationModal';
 import { StudentAbsenceDrawer } from './students/StudentAbsenceDrawer';
+import { SchoolClassStatsCards } from './students/SchoolClassStatsCards';
 import {
   countActiveStudents,
   countInterventionStudents,
@@ -54,6 +55,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     deleteStudent,
     classesStats,
     schoolEnrollmentStats,
+    dataReady,
     schoolProfile,
     lang,
     currentTenant,
@@ -229,6 +231,20 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Enrolment KPIs + grade/class attendance drilldown (hydrated only) */}
+      <SchoolClassStatsCards
+        enrollmentStats={schoolEnrollmentStats}
+        classesStats={classesStats}
+        selectedClass={selectedClass}
+        onSelectClass={setSelectedClass}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        selectedGradeFilter={selectedGradeFilter}
+        onSelectGradeFilter={setSelectedGradeFilter}
+        lang={lang}
+        dataReady={dataReady}
+      />
 
       {/* Filter and Search Bar with Quick Intervention Drilldown */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">

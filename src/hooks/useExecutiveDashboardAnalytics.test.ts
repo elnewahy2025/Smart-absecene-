@@ -8,8 +8,9 @@ import type {
   Student,
 } from '../types/attendance';
 import { useExecutiveDashboardAnalytics } from './useExecutiveDashboardAnalytics';
+import { localDateKey } from '../utils/attendanceMath';
 
-const todayStr = new Date().toISOString().split('T')[0];
+const todayStr = localDateKey();
 
 const makeStudent = (id: string, overrides: Partial<Student> = {}): Student =>
   ({
@@ -123,10 +124,13 @@ describe('useExecutiveDashboardAnalytics', () => {
     const { todayMetrics, onCampusCount } = result.current;
     // Daily session wins over period for todayMetrics -> 7 active students counted once
     expect(todayMetrics.hasSubmittedData).toBe(true);
-    expect(todayMetrics.presentCount).toBe(3); // s1 present + s2 late + s3 excused_leave
+    expect(todayMetrics.presentCount).toBe(1); // strictly 'present' — s1 only
+    expect(todayMetrics.attendedCount).toBe(3); // s1 present + s2 late + s3 excused_leave
+    expect(todayMetrics.recordedCount).toBe(7); // transferred student excluded
     expect(todayMetrics.unexcusedCount).toBe(2); // s5 absent + s6 rejected_excuse (not reduced by excusedCount)
     expect(todayMetrics.excusedCount).toBe(1); // s4 excused_absence only
     expect(todayMetrics.excusedLeaveCount).toBe(1); // s3 excused_leave
+    expect(todayMetrics.underReviewCount).toBe(1); // s7
     expect(todayMetrics.absentCount).toBe(4); // absent(1) + rejected_excuse(1) + excused_absence(1) + under_review(1)
     expect(todayMetrics.lateCount).toBe(1); // s2
     expect(todayMetrics.attendanceRate).toBe(43); // round(3 / 7 * 100)
@@ -155,6 +159,9 @@ describe('useExecutiveDashboardAnalytics', () => {
     expect(result.current.todayMetrics.hasSubmittedData).toBe(false);
     expect(result.current.todayMetrics.attendanceRate).toBe(95);
     expect(result.current.todayMetrics.presentCount).toBe(0);
+    expect(result.current.todayMetrics.attendedCount).toBe(0);
+    expect(result.current.todayMetrics.recordedCount).toBe(0);
+    expect(result.current.todayMetrics.excusedLeaveCount).toBeNull(); // unknown, never fabricated as 0
     expect(result.current.onCampusCount).toBeNull();
 
     const emptyHook = renderHook(() =>
@@ -203,6 +210,52 @@ describe('useExecutiveDashboardAnalytics', () => {
         justifications: [],
         classesStats,
         schoolEnrollmentStats: makeEnrollmentStats({ activeStudentsCount: 1 }),
+        isAr: false,
+      })
+    );
+
+    expect(result.current.classesByAbsence.map((c) => c.className)).toEqual(['10/أ']);
+    expect(result.current.gradeComparisonData).toEqual([
+      {
+        gradeName: 'العاشر',
+        attendanceRate: 96,
+        absenceRate: 4,
+        studentCount: 10,
+      },
+    ]);
+  });
+
+  it('excludes classes with an unknown rate from absence ranking and grade comparison', () => {
+    const classesStats: SchoolClassSummary[] = [
+      {
+        className: '10/أ',
+        grade: 'الصف العاشر',
+        classId: 'c1',
+        totalStudents: 10,
+        activeStudents: 10,
+        transferredStudents: 0,
+        attendanceRate: 96,
+        assignedTeachersCount: 1,
+      },
+      {
+        className: '10/ب',
+        grade: 'الصف العاشر',
+        classId: 'c2',
+        totalStudents: 8,
+        activeStudents: 8,
+        transferredStudents: 0,
+        attendanceRate: null,
+        assignedTeachersCount: 1,
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useExecutiveDashboardAnalytics({
+        sessions: [],
+        students: [makeStudent('s1')],
+        justifications: [],
+        classesStats,
+        schoolEnrollmentStats: makeEnrollmentStats({ activeStudentsCount: 18 }),
         isAr: false,
       })
     );

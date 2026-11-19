@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Student, AttendanceSession, SchoolClassSummary, SchoolEnrollmentStats } from '../types/attendance';
+import { meanOrNull, rateOrNull } from './attendanceMath';
 import {
   isSchoolOffDay,
   getSchoolWeekDays,
@@ -13,16 +14,16 @@ export const calculateStudentAttendanceRate = (
   totalAbsences: number,
   totalPossibleDays = 20
 ): number => {
-  if (totalPossibleDays <= 0) return 100;
+  // Unknown denominator must never be reported as a perfect score.
+  if (totalPossibleDays <= 0) return NaN;
   const attended = Math.max(0, totalPossibleDays - totalAbsences);
   return parseFloat(((attended / totalPossibleDays) * 100).toFixed(1));
 };
 
 export const calculateSchoolAverageAttendance = (students: Student[]): string => {
   const activeStudents = students.filter((s) => s.enrollmentStatus !== 'transferred');
-  if (activeStudents.length === 0) return '100';
-  const sum = activeStudents.reduce((acc, s) => acc + s.attendanceRate, 0);
-  return (sum / activeStudents.length).toFixed(1);
+  const mean = meanOrNull(activeStudents.map((s) => rateOrNull(s.attendanceRate)));
+  return mean !== null ? mean.toFixed(1) : '—';
 };
 
 export const classifyChronicAbsenceRiskTier = (totalAbsences: number): 'normal' | 'tier1_warning' | 'tier2_high' | 'tier3_critical' => {
@@ -41,7 +42,7 @@ export const aggregateClassSummaries = (students: Student[]): Record<string, { t
     result[s.className].total += 1;
     if (s.enrollmentStatus !== 'transferred') {
       result[s.className].active += 1;
-      result[s.className].rateSum += s.attendanceRate;
+      result[s.className].rateSum += rateOrNull(s.attendanceRate) ?? 0;
     }
   });
 
@@ -207,7 +208,7 @@ describe('Comprehensive Calculations, KPIs & Data Lineage Audit Suite', () => {
     });
 
     it('Gracefully handles 0 possible days by returning 100% without NaN or division by zero', () => {
-      expect(calculateStudentAttendanceRate(0, 0)).toBe(100.0);
+      expect(calculateStudentAttendanceRate(0, 0)).toBeNaN();
     });
   });
 
@@ -242,8 +243,8 @@ describe('Comprehensive Calculations, KPIs & Data Lineage Audit Suite', () => {
       expect(avg).toBe('80.0');
     });
 
-    it('Returns clean 100 for an empty school student roster without NaN', () => {
-      expect(calculateSchoolAverageAttendance([])).toBe('100');
+    it('Returns — for an empty school student roster instead of a fabricated 100%', () => {
+      expect(calculateSchoolAverageAttendance([])).toBe('—');
     });
 
     it('Accurately breaks down class statistics with active vs transferred split', () => {

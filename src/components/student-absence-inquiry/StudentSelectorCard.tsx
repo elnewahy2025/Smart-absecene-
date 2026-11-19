@@ -1,6 +1,7 @@
 import type { Student } from '../../types/attendance';
 import { Filter, Search, X } from 'lucide-react';
 import { getCountryIdentitySpec } from '../../config/countryPresets';
+import { rateOrNull } from '../../utils/attendanceMath';
 
 interface StudentSelectorCardProps {
   isAr: boolean;
@@ -152,6 +153,7 @@ export function StudentSelectorCard({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredStudents.map((s, idx) => {
                   const isSelected = s.id === selectedStudentId;
+                  const rate = rateOrNull(s.attendanceRate);
                   return (
                     <tr
                       key={s.id}
@@ -190,14 +192,16 @@ export function StudentSelectorCard({
                       <td className="py-2.5 px-3 text-center font-mono font-bold">
                         <span
                           className={
-                            (s.attendanceRate || 100) >= 90
+                            rate === null
+                              ? 'text-slate-400 dark:text-slate-500'
+                              : rate >= 90
                               ? 'text-primary'
-                              : (s.attendanceRate || 100) >= 80
+                              : rate >= 80
                               ? 'text-amber-600 dark:text-amber-400'
                               : 'text-rose-600 dark:text-rose-400'
                           }
                         >
-                          %{s.attendanceRate || 100}
+                          {rate !== null ? `%${rate}` : '—'}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">

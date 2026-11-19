@@ -21,6 +21,7 @@ import { AbsenceKpiCards } from './AbsenceKpiCards';
 import { AbsenceRecordsTable } from './AbsenceRecordsTable';
 import { AbsenceConductSection } from './AbsenceConductSection';
 import { buildStudentAbsenceAnalysis } from '../../utils/studentAbsenceAnalysis';
+import { rateOrNull } from '../../utils/attendanceMath';
 
 interface StudentAbsenceDrawerProps {
   student: Student | null;
@@ -134,9 +135,11 @@ export const StudentAbsenceDrawer: React.FC<StudentAbsenceDrawerProps> = ({
 
   const handleWhatsAppContact = () => {
     if (!student || !student.guardianPhone) return;
+    const rate = studentAbsenceAnalysis?.attendanceRate ?? rateOrNull(student.attendanceRate);
+    const rateText = rate !== null && Number.isFinite(rate) ? `${rate}%` : '—';
     const message = isAr
-      ? `السلام عليكم ورحمة الله، المكرم ولي أمر الطالب (${student.fullName}): نود التواصل معكم بخصوص سجل المواظبة والغياب بمدرسة (${schoolProfile?.schoolName || 'المدرسة'}). نسبة الحضور الحالية: ${studentAbsenceAnalysis?.attendanceRate ?? student.attendanceRate}%، إجمالي أيام الغياب: ${studentAbsenceAnalysis?.unexcusedDaysCount ?? student.totalAbsences} يوم. يرجى متابعة السجل وتقديم الأعذار المعتمدة عبر المنصة.`
-      : `Dear Guardian of ${student.fullName}: Following up on attendance records at ${schoolProfile?.schoolName || 'School'}. Current attendance: ${studentAbsenceAnalysis?.attendanceRate ?? student.attendanceRate}%.`;
+      ? `السلام عليكم ورحمة الله، المكرم ولي أمر الطالب (${student.fullName}): نود التواصل معكم بخصوص سجل المواظبة والغياب بمدرسة (${schoolProfile?.schoolName || 'المدرسة'}). نسبة الحضور الحالية: ${rateText}، إجمالي أيام الغياب: ${studentAbsenceAnalysis?.unexcusedDaysCount ?? student.totalAbsences} يوم. يرجى متابعة السجل وتقديم الأعذار المعتمدة عبر المنصة.`
+      : `Dear Guardian of ${student.fullName}: Following up on attendance records at ${schoolProfile?.schoolName || 'School'}. Current attendance: ${rateText}.`;
     openWhatsAppDirect(
       student.guardianPhone,
       message,
@@ -342,7 +345,7 @@ export const StudentAbsenceDrawer: React.FC<StudentAbsenceDrawerProps> = ({
           />
           <AbsenceKpiCards
             isAr={isAr}
-            attendanceRate={studentAbsenceAnalysis?.attendanceRate || 100}
+            attendanceRate={studentAbsenceAnalysis?.attendanceRate ?? rateOrNull(student.attendanceRate)}
             presentDaysCount={studentAbsenceAnalysis?.presentDaysCount || 0}
             unexcusedDaysCount={studentAbsenceAnalysis?.unexcusedDaysCount || 0}
             excusedDaysCount={studentAbsenceAnalysis?.excusedDaysCount || 0}

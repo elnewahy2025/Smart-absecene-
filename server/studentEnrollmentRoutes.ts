@@ -80,7 +80,8 @@ export function registerStudentEnrollmentRoutes({
       tenantId,
       totalAbsences: 0,
       totalLates: 0,
-      attendanceRate: 100,
+      // No sessions yet: unknown, not a fabricated perfect score.
+      attendanceRate: null,
       createdAt: now,
       createdBy: actorUid,
     });

@@ -6,7 +6,7 @@ import { Printer, Download, X, Layers, CheckCircle2, FileText, Loader2 } from 'l
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../../utils/pdfExport';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import { getCountryPreset } from '../../config/countryPresets';
-import { isActiveStudent, rateOrNull } from '../../utils/attendanceMath';
+import { ABSENCE_TIERS, isActiveStudent, rateOrNull } from '../../utils/attendanceMath';
 
 interface Props {
   isOpen: boolean;
@@ -30,7 +30,9 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
 
   const filteredStudents = activeStudents.filter((s) => {
     if (selectedClass !== 'all' && s.className !== selectedClass) return false;
-    if (selectedDocType === 'warning_notice') return s.totalAbsences >= 3;
+    // Warning notices follow the on-page 5+ / 8+ escalation tiers, not the
+    // wider 3+ "chronic" definition used by the on-page cards.
+    if (selectedDocType === 'warning_notice') return s.totalAbsences >= ABSENCE_TIERS.warning;
     return true;
   });
 
@@ -126,7 +128,7 @@ export const BatchPrintCenterModal: React.FC<Props> = ({ isOpen, onClose, studen
                 className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-semibold text-slate-800"
               >
                 <option value="attendance_sheet">كشف رصد الحضور الأسبوعي</option>
-                <option value="warning_notice">إشعارات الإنذار الخطي (3+ أيام)</option>
+                <option value="warning_notice">إشعارات الإنذار الخطي (5+ أيام)</option>
                 <option value="roster">مسير الطلاب الرسمي الشامل</option>
               </select>
             </div>

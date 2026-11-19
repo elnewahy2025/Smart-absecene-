@@ -12,6 +12,7 @@ import {
   dailyFirstRank,
   isActiveStudent,
   latestPeriodRank,
+  localDateKey,
   meanOrNull,
   pickOneRecordPerStudent,
   rateOrNull,
@@ -37,12 +38,21 @@ export function useExecutiveDashboardAnalytics({
   schoolProfile,
   isAr,
 }: UseExecutiveDashboardAnalyticsParams) {
-const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+// Local calendar day: `toISOString()` shifts "today" to yesterday for UTC+3
+// schools between 00:00 and 03:00 local time.
+const todayStr = useMemo(() => localDateKey(), []);
 
 // 1. Session statistics for today
 const todaySessions = useMemo(() => sessions.filter((s) => s.date === todayStr), [sessions, todayStr]);
 const submittedTodaySessions = useMemo(
-  () => todaySessions.filter((s) => s.status === 'submitted'),
+  // Deterministic tie-break for equal-rank sessions (duplicate daily roll-calls
+  // or repeated period numbers), so the picked record never depends on the
+  // order Firestore happened to return.
+  () =>
+    todaySessions
+      .filter((s) => s.status === 'submitted')
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id)),
   [todaySessions]
 );
 
@@ -69,10 +79,13 @@ const todayMetrics = useMemo(() => {
       const totals = summarizeRecords(dailyRecords);
 
       return {
-        presentCount: totals.attendedTotal,
+        presentCount: totals.present,
+        attendedCount: totals.attendedTotal,
+        recordedCount: totals.total,
         absentCount: totals.absentTotal + totals.excusedAbsence + totals.underReview,
         excusedCount: totals.excusedAbsence,
         excusedLeaveCount: totals.excusedLeave,
+        underReviewCount: totals.underReview,
         unexcusedCount: totals.absentTotal,
         lateCount: totals.late,
         attendanceRate: attendedRateRounded(totals),
@@ -94,11 +107,17 @@ const todayMetrics = useMemo(() => {
     const total = sPresent + sAbsent + sLate + sExcused;
     const rate = total > 0 ? Math.round((attended / total) * 100) : null;
 
+    // Legacy sessions without `records` cannot be decomposed: the stored
+    // excusedCount aggregates excused_absence + excused_leave + under_review,
+    // so early dismissals are reported as unknown rather than fabricated as 0.
     return {
-      presentCount: attended,
-      absentCount: sAbsent,
+      presentCount: sPresent,
+      attendedCount: attended,
+      recordedCount: total,
+      absentCount: sAbsent + sExcused,
       excusedCount: sExcused,
-      excusedLeaveCount: 0,
+      excusedLeaveCount: null,
+      underReviewCount: 0,
       unexcusedCount: sAbsent,
       lateCount: sLate,
       attendanceRate: rate,
@@ -116,9 +135,12 @@ const todayMetrics = useMemo(() => {
 
   return {
     presentCount: 0,
+    attendedCount: 0,
+    recordedCount: 0,
     absentCount: 0,
     excusedCount: approvedExcusesToday,
-    excusedLeaveCount: 0,
+    excusedLeaveCount: null,
+    underReviewCount: 0,
     unexcusedCount: 0,
     lateCount: 0,
     attendanceRate: mean !== null ? Math.round(mean) : null,
@@ -138,7 +160,10 @@ const unrecordedClassesCount = Math.max(0, totalClassesCount - recordedClassesCo
 // 4. Classes ranked by highest absence rate (Bottom performers needing attention)
 const classesByAbsence = useMemo(() => {
   return [...classesStats]
-    .filter((c) => c.activeStudents > 0)
+    .filter(
+      (c): c is SchoolClassSummary & { attendanceRate: number } =>
+        c.activeStudents > 0 && c.attendanceRate !== null
+    )
     .map((c) => ({
       ...c,
       absenceRate: Math.max(0, 100 - c.attendanceRate),
@@ -214,10 +239,12 @@ const absenceDecompositionData = useMemo(() => {
 
 // 9. Visual Chart 2: Grade Absence Comparison (Bar Chart - Real Database Derivation)
 const gradeComparisonData = useMemo(() => {
-  // Group non-empty classesStats by Grade weighted by activeStudents
+  // Group non-empty classes with known rates by Grade, weighted by activeStudents.
+  // Classes with an unknown rate are excluded entirely so they neither skew the
+  // average nor inflate the reported student count.
   const gradeMap: Record<string, { totalStudents: number; weightedAbsence: number }> = {};
   classesStats.forEach((c) => {
-    if (c.activeStudents <= 0) return;
+    if (c.activeStudents <= 0 || c.attendanceRate === null) return;
     const gName = c.grade || (isAr ? 'الصف العام' : 'General');
     if (!gradeMap[gName]) {
       gradeMap[gName] = { totalStudents: 0, weightedAbsence: 0 };

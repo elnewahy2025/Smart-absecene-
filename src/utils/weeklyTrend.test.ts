@@ -161,6 +161,9 @@ describe('summarizeWeeklyTrend', () => {
     expect(summarizeWeeklyTrend([point('a', 92)]).yAxisMin).toBe(80);
     expect(summarizeWeeklyTrend([point('a', 85)]).yAxisMin).toBe(70);
     expect(summarizeWeeklyTrend([point('a', 5)]).yAxisMin).toBe(0);
+    // A genuine 0% day must not be mistaken for a missing rate and replaced by 100.
+    expect(summarizeWeeklyTrend([point('a', 0)]).minRate).toBe(0);
+    expect(summarizeWeeklyTrend([point('a', 0)]).yAxisMin).toBe(0);
     expect(summarizeWeeklyTrend([point('a', 100)]).yAxisMin).toBe(90);
   });
 });

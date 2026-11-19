@@ -47,10 +47,10 @@ export const GradeComparisonMatrix: React.FC<GradeComparisonMatrixProps> = ({
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {gradeData.map((item) => {
                 const isSelected = selectedGradeFocus === item.gradeName;
-                const justifiedPercent =
-                  item.totalAbsenceDays > 0
-                    ? clampPercent(Math.round((item.excusedCount / item.totalAbsenceDays) * 100))
-                    : 100;
+                const hasAbsenceDays = item.totalAbsenceDays > 0;
+                const justifiedPercent = hasAbsenceDays
+                  ? clampPercent(Math.round((item.excusedCount / item.totalAbsenceDays) * 100))
+                  : 0;
   
                 return (
                   <tr
@@ -104,19 +104,25 @@ export const GradeComparisonMatrix: React.FC<GradeComparisonMatrixProps> = ({
                             {item.unexcusedCount} {lang === 'ar' ? 'غير مبرر' : 'unexcused'}
                           </span>
                         </div>
-                        {/* Split progress bar */}
-                        <div className="w-full bg-rose-100 rounded-full h-2 overflow-hidden flex">
-                          <div
-                            className="bg-emerald-500 h-full transition-all"
-                            style={{ width: `${justifiedPercent}%` }}
-                            title={`مبرر: ${justifiedPercent}%`}
-                          />
-                          <div
-                            className="bg-rose-500 h-full transition-all"
-                            style={{ width: `${100 - justifiedPercent}%` }}
-                            title={`غير مبرر: ${100 - justifiedPercent}%`}
-                          />
-                        </div>
+                        {/* Split progress bar (no bar when there are no absence days) */}
+                        {hasAbsenceDays ? (
+                          <div className="w-full bg-rose-100 rounded-full h-2 overflow-hidden flex">
+                            <div
+                              className="bg-emerald-500 h-full transition-all"
+                              style={{ width: `${justifiedPercent}%` }}
+                              title={`مبرر: ${justifiedPercent}%`}
+                            />
+                            <div
+                              className="bg-rose-500 h-full transition-all"
+                              style={{ width: `${100 - justifiedPercent}%` }}
+                              title={`غير مبرر: ${100 - justifiedPercent}%`}
+                            />
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-slate-400 font-semibold">
+                            {lang === 'ar' ? '— لا توجد أيام غياب' : '— no absence days'}
+                          </div>
+                        )}
                       </div>
                     </td>
   

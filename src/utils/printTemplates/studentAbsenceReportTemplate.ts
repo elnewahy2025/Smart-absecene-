@@ -27,7 +27,7 @@ export interface StudentAbsenceReportParams {
     end: string;
   };
   analysis: {
-    attendanceRate: number;
+    attendanceRate: number | null;
     unexcusedDaysCount: number;
     excusedDaysCount: number;
     lateDaysCount: number;
@@ -186,7 +186,7 @@ export function generateStudentAbsenceReportHtml(params: StudentAbsenceReportPar
       <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
         <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background-color: #f0fdf4;">
           <div style="font-size: 11px; color: #166534; font-weight: bold;">نسبة الحضور</div>
-          <div style="font-size: 20px; font-weight: 900; color: #15803d;">%${analysis.attendanceRate}</div>
+          <div style="font-size: 20px; font-weight: 900; color: #15803d;">${analysis.attendanceRate !== null ? `%${analysis.attendanceRate}` : '—'}</div>
         </div>
         <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background-color: #fef2f2;">
           <div style="font-size: 11px; color: #991b1b; font-weight: bold;">إجمالي الغياب (بدون عذر)</div>

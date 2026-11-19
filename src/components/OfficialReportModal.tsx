@@ -5,7 +5,7 @@ import { Student } from '../types/attendance';
 import { downloadNativePdfFromHtml, printNativePdfFromHtml } from '../utils/pdfExport';
 import { useModalAccessibility } from '../hooks/useModalAccessibility';
 import { getCountryIdentitySpec, getCountryPreset } from '../config/countryPresets';
-import { isActiveStudent, meanOrNull, rateOrNull } from '../utils/attendanceMath';
+import { meanOrNull, rateOrNull, selectReportStudents } from '../utils/attendanceMath';
 import {
   FileText,
   Printer,
@@ -34,24 +34,10 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Filter active students based on class & tier selection
-  const filteredStudents = students.filter((s) => {
-    if (!isActiveStudent(s)) {
-      return false;
-    }
-    if (selectedClassFilter !== 'all' && s.className !== selectedClassFilter) {
-      return false;
-    }
-    if (reportType === 'chronic_only') {
-      return s.totalAbsences >= 3;
-    }
-    if (reportType === 'tier2_warning') {
-      return s.totalAbsences >= 5 && s.totalAbsences < 8;
-    }
-    if (reportType === 'tier3_critical') {
-      return s.totalAbsences >= 8;
-    }
-    return true;
+  // Filter active students based on class & tier selection (shared scope helper)
+  const filteredStudents = selectReportStudents(students, {
+    className: selectedClassFilter,
+    reportType,
   });
 
   const totalEnrolled = filteredStudents.length;

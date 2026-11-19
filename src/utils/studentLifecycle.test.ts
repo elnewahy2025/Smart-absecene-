@@ -70,7 +70,7 @@ describe('Student Lifecycle & Dynamic School Analytics', () => {
       transferredStudentsCount: transferred.length,
       totalClassesCount: uniqueClasses,
       averageClassSize: uniqueClasses > 0 ? Math.round(active.length / uniqueClasses) : 0,
-      schoolAttendanceRate: active.length > 0 ? Math.round(active.reduce((acc, s) => acc + s.attendanceRate, 0) / active.length) : 100,
+      schoolAttendanceRate: active.length > 0 ? Math.round(active.reduce((acc, s) => acc + (s.attendanceRate ?? 0), 0) / active.length) : 100,
     };
 
     expect(stats.totalStudentsCount).toBe(3);

@@ -2,7 +2,7 @@ import React from 'react';
 
 interface AbsenceKpiCardsProps {
   isAr: boolean;
-  attendanceRate: number;
+  attendanceRate: number | null;
   presentDaysCount: number;
   unexcusedDaysCount: number;
   excusedDaysCount: number;
@@ -27,7 +27,7 @@ export const AbsenceKpiCards: React.FC<AbsenceKpiCardsProps> = ({
             {isAr ? 'نسبة الحضور' : 'Attendance Rate'}
           </div>
           <div className="text-2xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
-            %{attendanceRate}
+            {attendanceRate !== null ? `%${attendanceRate}` : '—'}
           </div>
           <div className="text-[10px] text-emerald-600/80 font-medium">
             {presentDaysCount} {isAr ? 'يوم حضور' : 'days present'}

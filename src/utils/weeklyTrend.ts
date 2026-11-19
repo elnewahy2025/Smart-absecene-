@@ -134,7 +134,9 @@ export function summarizeWeeklyTrend(weeklyData: WeeklyTrendDataPoint[]): Weekly
 
   // Dynamic Y-axis min
   const minRate =
-    recordedDays.length > 0 ? Math.min(...recordedDays.map((d) => d.attendanceRate || 100)) : 80;
+    // `||` would turn a genuine 0% day into 100 and skew the axis; records here
+    // are already null-filtered, so only the nullish fallback is needed.
+    recordedDays.length > 0 ? Math.min(...recordedDays.map((d) => d.attendanceRate ?? 100)) : 80;
   const yAxisMin = Math.max(0, Math.floor((minRate - 10) / 10) * 10);
 
   return { recordedDays, weeklyAverage, highestDay, lowestDay, rateDiff, minRate, yAxisMin };

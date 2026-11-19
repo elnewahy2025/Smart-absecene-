@@ -71,7 +71,7 @@ export function useSchoolAnalytics({
       const classId = cfgClass?.id || stList.find((student) => student.classId?.trim())?.classId || '';
 
       const mean = meanOrNull(activeStudentsList.map((s) => rateOrNull(s.attendanceRate)));
-      const avgRate = mean !== null ? Math.round(mean) : 0;
+      const avgRate = mean !== null ? Math.round(mean) : null;
 
       const assignedTeachersCount = tenantTeachers.filter((t) =>
         t.assignedClasses && t.assignedClasses.includes(className)
@@ -96,7 +96,7 @@ export function useSchoolAnalytics({
     const uniqueClasses = new Set(active.map((s) => s.className)).size;
     const avgSize = uniqueClasses > 0 ? Math.round(active.length / uniqueClasses) : 0;
     const mean = meanOrNull(active.map((s) => rateOrNull(s.attendanceRate)));
-    const avgRate = mean !== null ? Math.round(mean) : 0;
+    const avgRate = mean !== null ? Math.round(mean) : null;
 
     return {
       totalStudentsCount: effectiveTenantStudents.length,

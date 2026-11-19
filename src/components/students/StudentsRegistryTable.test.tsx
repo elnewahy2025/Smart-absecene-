@@ -108,6 +108,14 @@ describe('StudentsRegistryTable', () => {
     expect(screen.getByText('⚠️ بحاجة لتدخل عاجل')).toBeTruthy();
   });
 
+  it('renders an unknown attendance rate neutrally instead of as critical', () => {
+    setup({ students: [student({ attendanceRate: null, totalAbsences: 0 })] });
+    const unknownRate = screen.getByText('—');
+    expect(unknownRate.className).toContain('bg-slate-100');
+    expect(unknownRate.className).not.toContain('rose');
+    expect(screen.queryByText(/إنذار متابعة|تدخل عاجل/)).toBeNull();
+  });
+
   it('summarises behaviour points for the student', () => {
     setup({ behaviourIncidents: [incident('s1', 5), incident('s1', -2)] });
     expect(screen.getByText('+3 (2)')).toBeTruthy();

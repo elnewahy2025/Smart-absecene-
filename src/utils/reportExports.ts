@@ -1,6 +1,13 @@
 import type { Student, Tenant } from '../types/attendance';
 import { getCountryIdentitySpec } from '../config/countryPresets';
 
+/** Renders a stored rate without ever producing the misleading `—%`. */
+function formatRate(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '' || value === '—') return '—';
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? `${n}%` : '—';
+}
+
 // Excel-compatible HTML workbook (RTL, styled) for the filtered student list.
 export function buildExcelReportHtml(
   students: Student[],
@@ -24,7 +31,7 @@ export function buildExcelReportHtml(
           <td>${s.className}</td>
           <td style="color:${s.totalAbsences >= 8 ? '#dc2626' : s.totalAbsences >= 5 ? '#d97706' : '#1e293b'};font-weight:bold;">${s.totalAbsences}</td>
           <td>${s.totalLates}</td>
-          <td style="font-weight:bold;color:#047857;">${s.attendanceRate}%</td>
+          <td style="font-weight:bold;color:#047857;">${formatRate(s.attendanceRate)}</td>
           <td>${s.totalAbsences >= 8 ? 'حرج (8+ أيام - إنذار نهائي)' : s.totalAbsences >= 5 ? 'مرتفع (5+ أيام - إنذار ثان)' : s.totalAbsences >= 3 ? 'تنبيه أولي' : 'منضبط'}</td>
           <td>${s.guardianName}</td>
           <td dir="ltr">${s.guardianPhone}</td>
@@ -73,7 +80,7 @@ export function buildExcelReportHtml(
           <tr><td colspan="13"></td></tr>
           <tr class="summary-card">
             <td colspan="3">إجمالي الطلاب: ${sortedStudents.length}</td>
-            <td colspan="4">متوسط الحضور: ${averageAttendanceRate}%</td>
+            <td colspan="4">متوسط الحضور: ${formatRate(averageAttendanceRate)}</td>
             <td colspan="3">إنذار 5+ أيام: ${sortedStudents.filter((s) => s.totalAbsences >= 5 && s.totalAbsences < 8).length}</td>
             <td colspan="3">إنذار نهائي 8+ أيام: ${sortedStudents.filter((s) => s.totalAbsences >= 8).length}</td>
           </tr>
@@ -134,7 +141,7 @@ export function buildCsvReport(
       `"${s.className}"`,
       s.totalAbsences,
       s.totalLates,
-      `"${s.attendanceRate}%"`,
+      `"${formatRate(s.attendanceRate)}"`,
       `"${s.totalAbsences >= 8 ? 'حرج (8+ أيام)' : s.totalAbsences >= 5 ? 'مرتفع (5+ أيام)' : 'طبيعي'}"`,
       `"${s.guardianName}"`,
       `"${s.guardianPhone}"`,

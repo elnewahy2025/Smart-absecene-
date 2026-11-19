@@ -8,9 +8,12 @@ import {
   dailyFirstRank,
   isActiveStudent,
   latestPeriodRank,
+  localDateKey,
+  matchesAbsenceScope,
   matchesStatusFilter,
   meanOrNull,
   pickOneRecordPerStudent,
+  selectReportStudents,
   rateOrNull,
   recountSession,
   summarizeRecords,
@@ -235,6 +238,15 @@ describe('attendanceMath', () => {
     });
   });
 
+  it('reports a null rate for students with no submitted records, never a fabricated 100', () => {
+    const metrics = computeStudentMetricsFromSessions([], new Set(['std-unknown']));
+    expect(metrics.get('std-unknown')).toEqual({
+      totalAbsences: 0,
+      totalLates: 0,
+      attendanceRate: null,
+    });
+  });
+
   it('deduplicates student records across daily and period sessions according to rank', () => {
     const sessions: AttendanceSession[] = [
       {
@@ -287,5 +299,60 @@ describe('attendanceMath', () => {
     const latestPreferred = pickOneRecordPerStudent(sessions, latestPeriodRank, excluded);
     expect(latestPreferred).toHaveLength(1);
     expect(latestPreferred[0].status).toBe('excused_leave');
+  });
+
+  it('uses the local calendar day for localDateKey (no UTC day shift)', () => {
+    // Constructed from local components: in UTC+3 this is 2026-01-04T21:30Z.
+    // toISOString().slice(0, 10) would wrongly return "2026-01-04".
+    expect(localDateKey(new Date(2026, 0, 5, 0, 30))).toBe('2026-01-05');
+    expect(localDateKey(new Date(2026, 10, 19, 23, 59))).toBe('2026-11-19');
+  });
+
+  it('period-only schools treat the latest period of the day as the daily record', () => {
+    const period = (id: string, periodNumber: number, status: AttendanceRecord['status']) =>
+      ({
+        id,
+        tenantId: 't1',
+        date: '2026-11-05',
+        sessionType: 'period',
+        periodNumber,
+        classId: 'c1',
+        className: '10/A',
+        grade: '10',
+        teacherId: 't1',
+        teacherName: 'T',
+        status: 'submitted',
+        totalStudents: 1,
+        records: [{ ...makeRecord(id, status), studentId: 'std-1' }],
+      }) as AttendanceSession;
+
+    const picked = pickOneRecordPerStudent(
+      [period('p7', 7, 'present'), period('p1', 1, 'absent')],
+      dailyFirstRank
+    );
+    expect(picked).toHaveLength(1);
+    expect(picked[0].status).toBe('present'); // documented policy: latest period wins
+  });
+
+  it('selectReportStudents applies active, class and absence-tier scope in one place', () => {
+    const students = [
+      { id: 'a', className: '1/A', totalAbsences: 0, enrollmentStatus: 'active' },
+      { id: 'b', className: '1/A', totalAbsences: 3, enrollmentStatus: 'active' },
+      { id: 'c', className: '1/A', totalAbsences: 5, enrollmentStatus: 'active' },
+      { id: 'd', className: '1/A', totalAbsences: 8, enrollmentStatus: 'active' },
+      { id: 'e', className: '1/A', totalAbsences: 9, enrollmentStatus: 'transferred' },
+      { id: 'f', className: '2/B', totalAbsences: 9, enrollmentStatus: 'active' },
+    ] as Array<Pick<Student, 'id' | 'className' | 'totalAbsences' | 'enrollmentStatus'>>;
+
+    const ids = (reportType: Parameters<typeof selectReportStudents>[1]['reportType'], className?: string) =>
+      selectReportStudents(students, { reportType, className }).map((s) => s.id);
+
+    expect(ids('full')).toEqual(['a', 'b', 'c', 'd', 'f']);
+    expect(ids('chronic_only')).toEqual(['b', 'c', 'd', 'f']);
+    expect(ids('tier2_warning')).toEqual(['c']);
+    expect(ids('tier3_critical')).toEqual(['d', 'f']);
+    expect(ids('full', '2/B')).toEqual(['f']);
+    expect(matchesAbsenceScope(5, 'tier2_warning')).toBe(true);
+    expect(matchesAbsenceScope(8, 'tier2_warning')).toBe(false);
   });
 });

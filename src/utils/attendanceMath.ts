@@ -22,6 +22,21 @@ export function clampPercent(v: number): number {
   return Math.min(100, Math.max(0, v));
 }
 
+/** Local calendar date key (`YYYY-MM-DD`) — never shifts "today" at UTC offsets. */
+export function localDateKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Absence-tier boundaries shared by reports, exports and batch print. */
+export const ABSENCE_TIERS = {
+  initialAlert: 3,
+  warning: 5,
+  critical: 8,
+} as const;
+
 export interface AttendanceTotals {
   present: number;
   late: number;
@@ -152,10 +167,52 @@ export function isActiveStudent(
   return !student.enrollmentStatus || student.enrollmentStatus === 'active';
 }
 
+export type ReportScope =
+  | 'full'
+  | 'chronic_only'
+  | 'tier2_warning'
+  | 'tier3_critical'
+  | 'sessions';
+
+/**
+ * Absence-tier predicate shared by the on-page report filter and every export,
+ * so a PDF/batch print can never disagree with the list it came from.
+ */
+export function matchesAbsenceScope(
+  totalAbsences: number,
+  reportType: ReportScope
+): boolean {
+  const days = typeof totalAbsences === 'number' && Number.isFinite(totalAbsences) ? totalAbsences : 0;
+  switch (reportType) {
+    case 'chronic_only':
+      return days >= ABSENCE_TIERS.initialAlert;
+    case 'tier2_warning':
+      return days >= ABSENCE_TIERS.warning && days < ABSENCE_TIERS.critical;
+    case 'tier3_critical':
+      return days >= ABSENCE_TIERS.critical;
+    default:
+      return true;
+  }
+}
+
+/** Single source of truth for "which students belong in this report". */
+export function selectReportStudents<T extends Pick<Student, 'className' | 'totalAbsences' | 'enrollmentStatus'>>(
+  students: ReadonlyArray<T>,
+  options: { className?: string; reportType: ReportScope }
+): T[] {
+  const { className = 'all', reportType } = options;
+  return students.filter(
+    (s) =>
+      isActiveStudent(s) &&
+      (className === 'all' || s.className === className) &&
+      matchesAbsenceScope(s.totalAbsences, reportType)
+  );
+}
+
 export interface DerivedStudentMetrics {
   totalAbsences: number;
   totalLates: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
 }
 
 /**
@@ -222,10 +279,12 @@ export function computeStudentMetricsFromSessions(
     acc.absentDates.forEach((date) => {
       if (!acc.attendedDates.has(date)) totalAbsences += 1;
     });
+    // No records means the rate is unknown; reporting 100 would fabricate a
+    // perfect score for a student who was never observed.
     const attendanceRate =
       acc.totalRecords > 0
         ? parseFloat(((acc.attendedRecords / acc.totalRecords) * 100).toFixed(1))
-        : 100;
+        : null;
     result.set(studentId, {
       totalAbsences,
       totalLates: acc.totalLates,
@@ -236,7 +295,7 @@ export function computeStudentMetricsFromSessions(
   if (targetStudentIds) {
     targetStudentIds.forEach((studentId) => {
       if (!result.has(studentId)) {
-        result.set(studentId, { totalAbsences: 0, totalLates: 0, attendanceRate: 100 });
+        result.set(studentId, { totalAbsences: 0, totalLates: 0, attendanceRate: null });
       }
     });
   }
@@ -268,7 +327,12 @@ export function pickOneRecordPerStudent(
   return Array.from(best.values(), (entry) => entry.record);
 }
 
-/** Daily roll-call is authoritative for the day; otherwise the latest period wins. */
+/**
+ * Daily roll-call is authoritative for the day; otherwise the **latest period of
+ * the day** wins. For a period-only school this is an explicit policy choice:
+ * a student absent in periods 1-6 but present in period 7 counts as attended for
+ * the day (the last roll-call is the safest available proxy for the day).
+ */
 export const dailyFirstRank = (s: AttendanceSession): number =>
   s.sessionType === 'daily' ? Number.MAX_SAFE_INTEGER : s.periodNumber ?? 0;
 

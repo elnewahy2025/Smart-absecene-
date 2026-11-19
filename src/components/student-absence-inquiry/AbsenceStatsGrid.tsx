@@ -21,12 +21,14 @@ export function AbsenceStatsGrid({ isAr, analysis, infractionsCount, positivePoi
           <UserCheck className="w-4 h-4 text-primary" />
         </div>
         <div className="text-3xl font-black text-primary">
-          %{analysis?.attendanceRate}
+          {analysis?.attendanceRate != null ? `%${analysis.attendanceRate}` : '—'}
         </div>
         <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
           <div
             className="h-full bg-primary rounded-full"
-            style={{ width: `${Math.min(100, analysis?.attendanceRate || 0)}%` }}
+            style={{
+              width: `${analysis?.attendanceRate != null ? Math.min(100, Math.max(0, analysis.attendanceRate)) : 0}%`,
+            }}
           />
         </div>
         <span className="text-[11px] text-slate-400 mt-2 block">

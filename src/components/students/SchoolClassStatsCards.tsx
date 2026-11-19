@@ -32,9 +32,11 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
   // Group classes by Grade for hierarchical drill-down
   const gradesList = Array.from(new Set(classesStats.map((c) => c.grade))).filter(Boolean);
 
-  // Compute active students attendance rate strictly from active counts
-  const hasOverallData = dataReady && enrollmentStats.activeStudentsCount > 0;
+  // Compute active students attendance rate strictly from active counts.
+  // An unknown rate must stay unknown — never present it as a number.
   const attendanceRate = enrollmentStats.schoolAttendanceRate;
+  const hasOverallData =
+    dataReady && enrollmentStats.activeStudentsCount > 0 && attendanceRate !== null;
 
   // Find currently selected class summary if one is clicked
   const activeClassSummary = classesStats.find((c) => c.className === selectedClass);
@@ -67,7 +69,11 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             {/* Primary Prominent Percentage */}
-            <span className="text-3xl font-black text-teal-800 tracking-tight font-mono">
+            <span
+              className={`text-3xl font-black tracking-tight font-mono ${
+                hasOverallData ? 'text-teal-800' : 'text-slate-400'
+              }`}
+            >
               {hasOverallData ? `%${attendanceRate}` : '—'}
             </span>
             {/* Actual count beside it */}
@@ -120,9 +126,9 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
           <div className="mt-2 flex items-baseline gap-2">
             {/* Prominent Active Percentage */}
             <span className="text-3xl font-black text-emerald-800 tracking-tight font-mono">
-              %{enrollmentStats.totalStudentsCount > 0
-                ? Math.round((enrollmentStats.activeStudentsCount / enrollmentStats.totalStudentsCount) * 100)
-                : 100}
+              {enrollmentStats.totalStudentsCount > 0
+                ? `%${Math.round((enrollmentStats.activeStudentsCount / enrollmentStats.totalStudentsCount) * 100)}`
+                : '—'}
             </span>
             <span className="text-xs text-slate-500 font-semibold">
               ({enrollmentStats.activeStudentsCount} / {enrollmentStats.totalStudentsCount})
@@ -229,13 +235,23 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
             {gradesList.map((grade) => {
               const gradeClasses = classesStats.filter((c) => c.grade === grade);
               const gradeActiveStudents = gradeClasses.reduce((acc, c) => acc + c.activeStudents, 0);
+              // Only classes with a known rate contribute to the weighted average.
+              const classesWithKnownRate = gradeClasses.filter(
+                (c): c is SchoolClassSummary & { attendanceRate: number } => c.attendanceRate !== null
+              );
+              const knownRateStudents = classesWithKnownRate.reduce(
+                (acc, c) => acc + c.activeStudents,
+                0
+              );
               const gradeAvgAttendance =
-                gradeActiveStudents > 0
+                knownRateStudents > 0
                   ? Math.round(
-                      gradeClasses.reduce((acc, c) => acc + c.attendanceRate * c.activeStudents, 0) /
-                        gradeActiveStudents
+                      classesWithKnownRate.reduce(
+                        (acc, c) => acc + c.attendanceRate * c.activeStudents,
+                        0
+                      ) / knownRateStudents
                     )
-                  : 100;
+                  : null;
 
               const isSelected = selectedGradeFilter === grade;
 
@@ -268,7 +284,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                       className="text-base font-black block leading-none"
                       style={{ color: isSelected ? 'var(--app-primary)' : 'var(--app-text-main)' }}
                     >
-                      %{gradeAvgAttendance}
+                      {gradeAvgAttendance === null ? '—' : `%${gradeAvgAttendance}`}
                     </span>
                     <span
                       className="text-[9px]"
@@ -310,7 +326,8 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
             .map((c) => {
               const isSelected = selectedClass === c.className;
               const rate = c.attendanceRate;
-              const hasClassData = dataReady && c.activeStudents > 0;
+              const hasStudents = c.activeStudents > 0;
+              const hasClassData = dataReady && hasStudents && rate !== null;
 
               return (
                 <div
@@ -334,7 +351,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                   <div className="my-1.5 flex items-baseline justify-between">
                     <span
                       className={`text-2xl font-black font-mono tracking-tight ${
-                        !hasClassData
+                        !dataReady || !hasStudents || rate === null
                           ? 'text-slate-400'
                           : rate >= 92
                           ? 'text-emerald-700'
@@ -357,7 +374,9 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                       }`}
                     >
                       {!hasClassData
-                        ? isAr ? 'فارغ' : 'Empty'
+                        ? hasStudents
+                          ? isAr ? 'لا توجد بيانات' : 'No data'
+                          : isAr ? 'فارغ' : 'Empty'
                         : rate >= 92
                         ? isAr ? 'منضبط' : 'Good'
                         : isAr ? 'تدخل' : 'Alert'}
@@ -368,7 +387,7 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        !hasClassData
+                        !dataReady || !hasStudents || rate === null
                           ? 'bg-slate-300'
                           : rate >= 92
                           ? 'bg-emerald-500'
@@ -394,7 +413,11 @@ export const SchoolClassStatsCards: React.FC<SchoolClassStatsCardsProps> = ({
               {isAr
                 ? `أنت الآن تستعرض تفاصيل فصل (${activeClassSummary.className}) - ${activeClassSummary.grade}: نسبة الحضور `
                 : `Currently drilling down into ${activeClassSummary.className} (${activeClassSummary.grade}): Attendance rate `}
-              <strong className="font-mono text-emerald-900 text-sm">%{activeClassSummary.attendanceRate}</strong>
+              <strong className="font-mono text-emerald-900 text-sm">
+                {activeClassSummary.attendanceRate === null
+                  ? '—'
+                  : `%${activeClassSummary.attendanceRate}`}
+              </strong>
               {' '}({activeClassSummary.activeStudents} {isAr ? 'طالب نشط' : 'active students'})
             </span>
           </div>

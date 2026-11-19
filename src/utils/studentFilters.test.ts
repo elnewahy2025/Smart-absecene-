@@ -43,6 +43,14 @@ describe('isInterventionStudent', () => {
     expect(isInterventionStudent(student({ totalAbsences: 3 }), 3)).toBe(true);
     expect(isInterventionStudent(student({ attendanceRate: 90, totalAbsences: 2 }), 3)).toBe(false);
   });
+
+  it('treats an unknown (null) rate as unknown — not 100 and not 0', () => {
+    expect(isInterventionStudent(student({ attendanceRate: null }), 3)).toBe(false);
+    expect(isInterventionStudent(student({ attendanceRate: null, totalAbsences: 3 }), 3)).toBe(true);
+    expect(
+      filterStudents([student({ id: 'u', attendanceRate: null })], criteria({ interventionOnly: true }))
+    ).toEqual([]);
+  });
 });
 
 describe('countActiveStudents / countInterventionStudents', () => {

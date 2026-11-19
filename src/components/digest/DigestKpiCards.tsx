@@ -16,7 +16,7 @@ export const DigestKpiCards: React.FC<DigestKpiCardsProps> = ({ currentDigest, l
           {lang === 'ar' ? 'معدل الحضور التراكمي' : 'Overall Attendance Rate'}
         </span>
         <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
-          {currentDigest.overallAttendanceRate}%
+          {currentDigest.overallAttendanceRate !== null ? `${currentDigest.overallAttendanceRate}%` : '—'}
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
           <span>{lang === 'ar' ? 'إجمالي المقيدين:' : 'Total Students:'}</span>

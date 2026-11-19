@@ -250,16 +250,25 @@ export function useSessionActions({
         })
       );
 
-      // Firestore rules only allow admin/registrar (and the platform owner) to
-      // update students/{id}. Teacher submissions still refresh these metrics:
-      // they are re-derived from the submitted attendance_sessions on every load
-      // (useScopedEntities / useSchoolAnalytics), so no write is attempted here.
-      if (firebaseUser && ['admin', 'registrar', 'super_admin'].includes(currentUser.role)) {
-        computedMetrics.forEach((metrics, studentId) => {
-          void setDoc(doc(db, 'students', studentId), metrics, { merge: true }).catch((error) =>
-            console.error('[SESSIONS] Could not update student attendance metrics:', error)
-          );
-        });
+      // Persist derived counters for every role that may submit a roll-call.
+      // firestore.rules gives admins/registrars full profile edits and lets an
+      // assigned teacher update ONLY these three fields on their own students,
+      // so server-side readers (digests, PDFs) no longer see stale counters.
+      if (firebaseUser && currentUser.role !== 'parent') {
+        const writes = Array.from(computedMetrics, ([studentId, metrics]) =>
+          setDoc(
+            doc(db, 'students', studentId),
+            {
+              totalAbsences: metrics.totalAbsences,
+              totalLates: metrics.totalLates,
+              attendanceRate: metrics.attendanceRate,
+            },
+            { merge: true }
+          ).catch((error) =>
+            console.error(`[SESSIONS] Could not persist metrics for student ${studentId}:`, error)
+          )
+        );
+        void Promise.all(writes);
       }
     }
 

@@ -54,7 +54,7 @@ export function buildStudentAbsenceAnalysis({
       excusedDaysCount: 0,
       unexcusedDaysCount: 0,
       totalMinutesLate: 0,
-      attendanceRate: 0,
+      attendanceRate: null,
       records: [] as AbsenceAnalysisRecord[],
       isRejected: true,
       rejectionReason: customDateValidation.error,
@@ -193,7 +193,8 @@ export function buildStudentAbsenceAnalysis({
       excusedDaysCount: 0,
       unexcusedDaysCount: 0,
       totalMinutesLate: 0,
-      attendanceRate: 100,
+      // No sessions in the selected horizon: unknown, not a perfect score.
+      attendanceRate: null,
       records: [],
     };
   }

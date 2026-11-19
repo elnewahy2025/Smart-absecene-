@@ -134,7 +134,7 @@ export function useFirestoreDataSync({
                 bloodType: data.bloodType || '',
                 totalAbsences: typeof data.totalAbsences === 'number' ? data.totalAbsences : 0,
                 totalLates: typeof data.totalLates === 'number' ? data.totalLates : 0,
-                attendanceRate: typeof data.attendanceRate === 'number' ? data.attendanceRate : 100,
+                attendanceRate: typeof data.attendanceRate === 'number' ? data.attendanceRate : null,
                 enrollmentStatus: data.enrollmentStatus,
               });
             });

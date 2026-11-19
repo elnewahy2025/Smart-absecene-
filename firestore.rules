@@ -57,7 +57,8 @@ service cloud.firestore {
              data.tenantId is string && data.tenantId.size() <= 50 &&
              (!('nationalId' in data) || (data.nationalId is string && data.nationalId.size() <= 30)) &&
              (!('totalAbsences' in data) || data.totalAbsences is number) &&
-             (!('attendanceRate' in data) || data.attendanceRate is number);
+             // null means "no submitted sessions yet", not a fabricated 100%.
+             (!('attendanceRate' in data) || data.attendanceRate is number || data.attendanceRate == null);
     }
 
     function isValidAttendanceSession(data) {
@@ -173,6 +174,16 @@ service cloud.firestore {
         ));
     }
 
+    // An assigned teacher may refresh the three derived attendance counters on
+    // a student after submitting a roll-call. Uses `.get()` so a profile with no
+    // assignedClasses field fails closed instead of raising a rules error.
+    function isTeacherAssignedToStudent(student) {
+      return isTenantRole(student.tenantId, ['teacher']) && (
+        ('classId' in student && student.classId in getUserData().get('assignedClasses', [])) ||
+        ('className' in student && student.className in getUserData().get('assignedClasses', []))
+      );
+    }
+
     // A parent may only file an excuse for a student who is actually their
     // child in the same tenant (phone, email, or guardianUid on the student record).
     function isGuardianOfStudentInTenant(studentId, tenantId) {
@@ -265,9 +276,16 @@ service cloud.firestore {
       // Admin and Registrar may still edit profile fields, but cannot move a
       // record between schools or change its enrollment status directly.
       allow update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming()) &&
-                    isTenantRole(resource.data.tenantId, ['admin', 'registrar']) &&
                     incoming().tenantId == resource.data.tenantId &&
-                    incoming().get('enrollmentStatus', 'active') == resource.data.get('enrollmentStatus', 'active');
+                    incoming().get('enrollmentStatus', 'active') == resource.data.get('enrollmentStatus', 'active') && (
+                      isTenantRole(resource.data.tenantId, ['admin', 'registrar']) ||
+                      // Submitted roll-calls must persist derived metrics for every
+                      // submitting role, otherwise server readers (digests, PDFs)
+                      // keep showing stale counters after a teacher submits.
+                      (isTeacherAssignedToStudent(resource.data) &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['totalAbsences', 'totalLates', 'attendanceRate']))
+                    );
     }
 
     // 4. Attendance Sessions Collection

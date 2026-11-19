@@ -8,6 +8,7 @@ import {
   DailyEmailDigestItem,
   DailyEmailDigestConfig,
 } from '../types/attendance';
+import { meanOrNull, rateOrNull } from './attendanceMath';
 
 export function computeDailyDigestData(params: {
   tenantId: string;
@@ -21,12 +22,11 @@ export function computeDailyDigestData(params: {
   const { tenantId, students, sessions, justifications, config, dateStr } = params;
   const today = dateStr || new Date().toISOString().split('T')[0];
 
-  // 1. Overall attendance rate
+  // 1. Overall attendance rate — unknown/non-numeric rates are excluded from
+  // the mean rather than counted as a perfect 100.
   const totalStudents = students.length;
-  const overallAttendanceRate =
-    totalStudents > 0
-      ? parseFloat((students.reduce((acc, s) => acc + s.attendanceRate, 0) / totalStudents).toFixed(1))
-      : 100.0;
+  const overallMean = meanOrNull(students.map((s) => rateOrNull(s.attendanceRate)));
+  const overallAttendanceRate = overallMean !== null ? parseFloat(overallMean.toFixed(1)) : null;
 
   // 2. Detect Anomalies
   const anomalies: DailyDigestAnomaly[] = [];
@@ -128,7 +128,10 @@ export function computeDailyDigestData(params: {
 
   // 3. High-Risk Students (Chronic absence threshold)
   const highRiskStudents: DailyDigestHighRiskStudent[] = students
-    .filter((s) => s.totalAbsences >= (config.chronicAbsenceThreshold || 5) || s.attendanceRate < 85)
+    .filter((s) => {
+      const rate = rateOrNull(s.attendanceRate);
+      return s.totalAbsences >= (config.chronicAbsenceThreshold || 5) || (rate !== null && rate < 85);
+    })
     .sort((a, b) => b.totalAbsences - a.totalAbsences)
     .map((s) => {
       let riskTier: DailyDigestHighRiskStudent['riskTier'] = 'tier_3_plus';
@@ -152,7 +155,7 @@ export function computeDailyDigestData(params: {
         className: s.className,
         totalAbsences: s.totalAbsences,
         totalLates: s.totalLates,
-        attendanceRate: s.attendanceRate,
+        attendanceRate: rateOrNull(s.attendanceRate),
         riskTier,
         guardianName: s.guardianName,
         guardianPhone: s.guardianPhone,
@@ -294,7 +297,7 @@ export function generateHtmlEmailTemplate(digest: DailyEmailDigestItem, tenantNa
               <td style="padding: 8px 10px; font-weight: bold; color: #0f172a;">${s.name}</td>
               <td style="padding: 8px 10px; color: #475569;">${s.className}</td>
               <td style="padding: 8px 10px; font-weight: bold; color: ${s.totalAbsences >= 8 ? '#dc2626' : '#d97706'}; font-size: 13px;">${s.totalAbsences} يوم</td>
-              <td style="padding: 8px 10px; font-weight: bold; color: #047857;">${s.attendanceRate}%</td>
+              <td style="padding: 8px 10px; font-weight: bold; color: #047857;">${s.attendanceRate !== null ? `${s.attendanceRate}%` : '—'}</td>
               <td style="padding: 8px 10px;">
                 ${
                   s.riskTier === 'tier_8_plus'
@@ -357,7 +360,7 @@ export function generateHtmlEmailTemplate(digest: DailyEmailDigestItem, tenantNa
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 28px; background-color: #ffffff;">
       <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; text-align: center;">
         <div style="font-size: 11px; color: #166534; font-weight: bold;">نسبة الحضور التراكمية</div>
-        <div style="font-size: 22px; font-weight: bold; color: #15803d; margin-top: 4px;">${digest.overallAttendanceRate}%</div>
+        <div style="font-size: 22px; font-weight: bold; color: #15803d; margin-top: 4px;">${digest.overallAttendanceRate !== null ? `${digest.overallAttendanceRate}%` : '—'}</div>
       </div>
       <div style="background-color: ${digest.anomaliesCount > 0 ? '#fef2f2' : '#f8fafc'}; border: 1px solid ${digest.anomaliesCount > 0 ? '#fecaca' : '#e2e8f0'}; border-radius: 8px; padding: 12px; text-align: center;">
         <div style="font-size: 11px; color: ${digest.anomaliesCount > 0 ? '#991b1b' : '#64748b'}; font-weight: bold;">الشذوذات والتناقضات</div>
