@@ -80,6 +80,10 @@ export function useFirestoreDataSync({
       onSnapshot(
         qStudents,
         (snapshot) => {
+          if (snapshot.empty && !isParentUser) {
+            setAllStudents([]);
+            return;
+          }
           if (!snapshot.empty) {
             const remoteStudents: Student[] = [];
             snapshot.forEach((docSnap) => {
