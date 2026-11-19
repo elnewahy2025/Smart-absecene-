@@ -13,37 +13,68 @@ import { subscribeConnectionStatus, ConnectionStatus } from './lib/firebase';
 import { WifiOff, Database, RefreshCw } from 'lucide-react';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 
+const CHUNK_RELOAD_KEY = 'smart_school_chunk_reload';
+
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      }
+      return mod;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isChunkError =
+        /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk .* failed|ChunkLoadError/i.test(
+          message
+        );
+      if (isChunkError && typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+        const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || '0');
+        if (Date.now() - lastReload > 10_000) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+          window.location.reload();
+          return new Promise<{ default: T }>(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+
 // Code-Splitting: Lazy load views on-demand to reduce initial bundle size by >80%
-const ExecutiveDashboardView = lazy(() =>
+const ExecutiveDashboardView = lazyWithRetry(() =>
   import('./components/ExecutiveDashboardView').then((m) => ({ default: m.ExecutiveDashboardView }))
 );
-const AttendanceSessionsView = lazy(() =>
+const AttendanceSessionsView = lazyWithRetry(() =>
   import('./components/AttendanceSessionsView').then((m) => ({ default: m.AttendanceSessionsView }))
 );
-const StudentManagementView = lazy(() =>
+const StudentManagementView = lazyWithRetry(() =>
   import('./components/StudentManagementView').then((m) => ({ default: m.StudentManagementView }))
 );
-const CommunicationsView = lazy(() =>
+const CommunicationsView = lazyWithRetry(() =>
   import('./components/communications/CommunicationsView').then((m) => ({ default: m.CommunicationsView }))
 );
-const ReportsView = lazy(() =>
+const ReportsView = lazyWithRetry(() =>
   import('./components/ReportsView').then((m) => ({ default: m.ReportsView }))
 );
-const AuditSettingsView = lazy(() =>
+const AuditSettingsView = lazyWithRetry(() =>
   import('./components/AuditSettingsView').then((m) => ({ default: m.AuditSettingsView }))
 );
-const GeminiChatbotView = lazy(() =>
+const GeminiChatbotView = lazyWithRetry(() =>
   import('./components/GeminiChatbotView').then((m) => ({ default: m.GeminiChatbotView }))
 );
-const ParentPortalView = lazy(() =>
+const ParentPortalView = lazyWithRetry(() =>
   import('./components/ParentPortalView').then((m) => ({ default: m.ParentPortalView }))
 );
 
 // Backward-compatible fallback views
-const DailyEmailDigestView = lazy(() =>
+const DailyEmailDigestView = lazyWithRetry(() =>
   import('./components/DailyEmailDigestView').then((m) => ({ default: m.DailyEmailDigestView }))
 );
-const EmergencyRosterView = lazy(() =>
+const EmergencyRosterView = lazyWithRetry(() =>
   import('./components/EmergencyRosterView').then((m) => ({ default: m.EmergencyRosterView }))
 );
 
