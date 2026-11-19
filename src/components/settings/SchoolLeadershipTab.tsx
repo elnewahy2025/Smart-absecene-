@@ -3,6 +3,7 @@ import { TenantSchoolProfile } from '../../types/attendance';
 import { Users, UserCheck, ShieldAlert, HeartHandshake } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { getCountryPreset, getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { resolveCallingCodeForProfile } from '../../config/countryCodes';
 
 interface Props {
   profile: TenantSchoolProfile;
@@ -13,7 +14,7 @@ interface Props {
 export const SchoolLeadershipTab: React.FC<Props> = ({ profile, onChange, disabled }) => {
   const { lang } = useAttendance();
   const leadership = profile.leadership || ({} as Partial<TenantSchoolProfile['leadership']>);
-  const dialCode = profile.countryCallingCode || profile.address?.countryCallingCode || '+965';
+  const dialCode = resolveCallingCodeForProfile(profile);
   const countryPreset = getCountryPreset(profile.address?.country || dialCode);
   const phonePlaceholder = `${dialCode} ${getLocalPhonePlaceholder(profile.address?.country || dialCode)}`;
   void countryPreset;

@@ -15,6 +15,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { openWhatsAppDirect } from '../../utils/whatsappUtils';
+import { resolveCallingCodeForProfile } from '../../config/countryCodes';
 import { useStudentAbsenceRange } from '../../hooks/useStudentAbsenceRange';
 import { AbsenceHorizonSelector } from './AbsenceHorizonSelector';
 import { AbsenceKpiCards } from './AbsenceKpiCards';
@@ -143,7 +144,7 @@ export const StudentAbsenceDrawer: React.FC<StudentAbsenceDrawerProps> = ({
     openWhatsAppDirect(
       student.guardianPhone,
       message,
-      schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+966'
+      resolveCallingCodeForProfile(schoolProfile)
     );
   };
 

@@ -16,6 +16,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { openWhatsAppDirect } from '../utils/whatsappUtils';
+import { resolveCallingCodeForProfile } from '../config/countryCodes';
 import { BatchNotificationModal } from './notifications/BatchNotificationModal';
 import { SingleComposeModal } from './notifications/SingleComposeModal';
 
@@ -388,7 +389,7 @@ export const NotificationOutboxView: React.FC = () => {
                                 openWhatsAppDirect(
                                   notif.recipientPhone,
                                   notif.messageText,
-                                  schoolProfile?.countryCallingCode || '+965'
+                                  resolveCallingCodeForProfile(schoolProfile)
                                 );
                               }}
                               className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"

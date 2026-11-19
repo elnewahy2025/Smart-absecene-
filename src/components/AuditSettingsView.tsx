@@ -24,6 +24,7 @@ import { HolidaysAndWeekendsCard } from './settings/HolidaysAndWeekendsCard';
 import { SchoolMessagingGatewaysTab } from './settings/SchoolMessagingGatewaysTab';
 import { AuditLogPanel } from './settings/AuditLogPanel';
 import { getAuditSearchHaystack } from '../utils/auditLogI18n';
+import { resolveCallingCodeForProfile } from '../config/countryCodes';
 import { SchoolPolicySettingsForm } from './settings/SchoolPolicySettingsForm';
 
 export const AuditSettingsView: React.FC = () => {
@@ -491,7 +492,7 @@ export const AuditSettingsView: React.FC = () => {
           onSave={updateMessagingGateway}
           isSuperAdmin={isSuperAdmin}
           schoolName={schoolProfile.schoolName || currentTenant.name}
-          defaultCallingCode={schoolProfile.countryCallingCode || schoolProfile.address?.countryCallingCode || '+965'}
+          defaultCallingCode={resolveCallingCodeForProfile(schoolProfile)}
         />
       )}
 

@@ -3,6 +3,7 @@ import {
   COUNTRIES_LIST,
   findCountryByName,
   getCallingCodeForCountry,
+  resolveCallingCodeForProfile,
   cleanDialCode,
 } from '../config/countryCodes';
 import { TenantSchoolProfile, SchoolProvisionInput } from '../types/attendance';
@@ -129,6 +130,27 @@ describe('Universal Country Selection & Dynamic International Calling Code Syste
       expect(cleanDialCode('20')).toBe('+20');
       expect(cleanDialCode('+ 971 ')).toBe('+971');
       expect(cleanDialCode('abc')).toBe('+966'); // fallback when no digits
+    });
+
+    it('resolves a school dial code from the configured country, not a stale stored code', () => {
+      const profile = {
+        countryCallingCode: '+965', // stale Kuwait code left on the profile
+        address: { country: 'جمهورية مصر العربية', countryCallingCode: '+965' },
+      };
+      expect(resolveCallingCodeForProfile(profile)).toBe('+20');
+    });
+
+    it('honours a stored calling code for a free-text/unlisted country', () => {
+      const profile = {
+        countryCallingCode: '+1',
+        address: { country: 'Atlantis' },
+      };
+      expect(resolveCallingCodeForProfile(profile)).toBe('+1');
+    });
+
+    it('returns an empty string when neither country nor code is known', () => {
+      expect(resolveCallingCodeForProfile(undefined)).toBe('');
+      expect(resolveCallingCodeForProfile({ address: { country: 'Atlantis' } })).toBe('');
     });
   });
 

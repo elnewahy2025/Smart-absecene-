@@ -4,6 +4,7 @@ import { UserPlus, X, Check } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 import { getCountryIdentitySpec, getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { resolveCallingCodeForProfile } from '../../config/countryCodes';
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalAccessibility({ isOpen, onClose, containerRef: dialogRef });
   const { schoolProfile } = useAttendance();
-  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
+  const dialCode = resolveCallingCodeForProfile(schoolProfile);
   const localPhoneExample = getLocalPhonePlaceholder(schoolProfile?.address?.country || dialCode);
   const idSpec = getCountryIdentitySpec(schoolProfile?.address?.country || dialCode);
 

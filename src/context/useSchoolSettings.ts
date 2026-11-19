@@ -6,6 +6,7 @@ import type {
   UserProfile,
 } from '../types/attendance';
 import { getDefaultSchoolProfile } from '../config/tenantSettings';
+import { getCallingCodeForCountry } from '../config/countryCodes';
 import { getDefaultSchoolSettings } from '../config/defaultSettings';
 import { localCache } from '../utils/localCache';
 import { authenticatedFetch } from '../lib/api';
@@ -71,24 +72,31 @@ export function useSchoolSettings({
     }
     setSchoolProfilesMap((prev) => {
       const current = prev[tenantId] || getDefaultSchoolProfile(tenantId);
+      const nextCountry = newProfile.address?.country ?? current.address?.country;
+      const countryChanged =
+        newProfile.address?.country !== undefined &&
+        newProfile.address.country !== current.address?.country;
+      // The configured country is the source of truth for the dial code. When
+      // the country changes and no explicit code was supplied, derive it from
+      // the country so a stale code can never linger on the profile.
+      const countryDerivedCode = countryChanged
+        ? getCallingCodeForCountry(nextCountry || '', '')
+        : '';
+      const resolvedCode =
+        newProfile.countryCallingCode ||
+        newProfile.address?.countryCallingCode ||
+        countryDerivedCode ||
+        current.countryCallingCode ||
+        current.address?.countryCallingCode ||
+        '';
       const updated: TenantSchoolProfile = {
         ...current,
         ...newProfile,
-        countryCallingCode:
-          newProfile.countryCallingCode ||
-          newProfile.address?.countryCallingCode ||
-          current.countryCallingCode ||
-          current.address?.countryCallingCode ||
-          '+966',
+        countryCallingCode: resolvedCode,
         address: {
           ...current.address,
           ...(newProfile.address || {}),
-          countryCallingCode:
-            newProfile.address?.countryCallingCode ||
-            newProfile.countryCallingCode ||
-            current.address?.countryCallingCode ||
-            current.countryCallingCode ||
-            '+966',
+          countryCallingCode: resolvedCode,
         },
         leadership: {
           ...current.leadership,

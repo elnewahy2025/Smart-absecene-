@@ -20,6 +20,7 @@ import {
 import { UserProfile, UserRole } from '../../types/attendance';
 import { useAttendance } from '../../context/AttendanceContext';
 import { getCountryIdentitySpec, getLocalPhonePlaceholder } from '../../config/countryPresets';
+import { resolveCallingCodeForProfile } from '../../config/countryCodes';
 
 interface Props {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export const UserEditModal: React.FC<Props> = ({
   lang,
 }) => {
   const { schoolProfile } = useAttendance();
-  const dialCode = schoolProfile?.countryCallingCode || schoolProfile?.address?.countryCallingCode || '+965';
+  const dialCode = resolveCallingCodeForProfile(schoolProfile);
   const localPhoneExample = getLocalPhonePlaceholder(schoolProfile?.address?.country || dialCode);
   const { domainSuffix } = getCountryIdentitySpec(schoolProfile?.address?.country || dialCode);
 

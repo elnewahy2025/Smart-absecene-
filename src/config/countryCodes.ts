@@ -339,3 +339,26 @@ export function getCallingCodeForCountry(countryName: string, fallback = '+966')
   const match = findCountryByName(countryName);
   return match ? match.dialCode : fallback;
 }
+
+/**
+ * Resolve the calling code a school should use for phone numbers.
+ *
+ * The country configured in the school profile is the source of truth, so a
+ * stored `countryCallingCode` that is out of sync with `address.country`
+ * (for example after the country was changed in settings) can never leak a
+ * wrong prefix into phone inputs. A stored code is honoured only for
+ * free-text/unlisted countries where no code can be derived from the name.
+ */
+export function resolveCallingCodeForProfile(profile?: {
+  address?: { country?: string; countryCallingCode?: string } | null;
+  countryCallingCode?: string;
+} | null): string {
+  const country = profile?.address?.country || '';
+  const fromCountry = findCountryByName(country);
+  if (fromCountry) return fromCountry.dialCode;
+  return (
+    profile?.address?.countryCallingCode ||
+    profile?.countryCallingCode ||
+    ''
+  );
+}
