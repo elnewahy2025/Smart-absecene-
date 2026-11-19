@@ -100,6 +100,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
   const [currentUserRole, setCurrentUserRoleState] = useState<UserRole>('parent');
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   const setTenantId = (id: string) => {
     setTenantIdState(id);
@@ -110,9 +111,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
 
   const setUserRole = (role: UserRole) => {
     setCurrentUserRoleState(role);
-    if (typeof localCache !== 'undefined') {
-      localCache.setItem('school_current_user_role', role);
-    }
   };
 
   const {
@@ -159,6 +157,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     setAuthenticatedPhone,
     setAllUsers,
     setFirebaseUser,
+    setAuthLoading,
   });
 
   useFirestoreDataSync({
@@ -403,6 +402,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode; initialTe
     <AttendanceContext.Provider
       value={{
         firebaseUser,
+        authLoading,
         signInWithGoogle,
         signOutGoogle,
         signInWithCredentials,

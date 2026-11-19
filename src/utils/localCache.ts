@@ -13,7 +13,6 @@
 
 const PERSISTED_KEYS = new Set<string>([
   'school_current_tenant_id',
-  'school_current_user_role',
   'school_dynamic_tenants',
 ]);
 

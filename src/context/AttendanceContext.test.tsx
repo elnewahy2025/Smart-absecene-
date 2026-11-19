@@ -59,6 +59,7 @@ const EXPECTED_CONTEXT_KEYS = [
   'addBehaviourIncident',
   'addStudent',
   'auditLogs',
+  'authLoading',
   'behaviourIncidents',
   'canDispatchDigest',
   'canEditSession',

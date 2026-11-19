@@ -37,7 +37,6 @@ describe('localCache (M-7 privacy-safe cache)', () => {
   it('only persists the non-sensitive allowlist to disk', () => {
     expect([...PERSISTED_CACHE_KEYS]).toEqual([
       'school_current_tenant_id',
-      'school_current_user_role',
       'school_dynamic_tenants',
     ]);
     for (const key of PERSISTED_CACHE_KEYS) {

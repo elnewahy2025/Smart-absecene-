@@ -17,6 +17,7 @@ interface AuthStateSyncDeps {
   setAuthenticatedPhone: (phone: string) => void;
   setAllUsers: React.Dispatch<React.SetStateAction<UserProfile[]>>;
   setFirebaseUser: (user: FirebaseUser | null) => void;
+  setAuthLoading?: (loading: boolean) => void;
 }
 
 /**
@@ -33,6 +34,7 @@ export function useAuthStateSync({
   setAuthenticatedPhone,
   setAllUsers,
   setFirebaseUser,
+  setAuthLoading,
 }: AuthStateSyncDeps) {
   // Listen to Firebase Auth redirect results (for production deployments like Vercel & mobile browsers)
   useEffect(() => {
@@ -51,6 +53,7 @@ export function useAuthStateSync({
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
+      setAuthLoading?.(false);
       if (user) {
         const userEmail = (user.email || '').toLowerCase();
 

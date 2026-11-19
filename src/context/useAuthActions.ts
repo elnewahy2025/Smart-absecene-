@@ -184,11 +184,6 @@ export function useAuthActions({
 
       if (finalRole) {
         setUserRole(finalRole);
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem('school_current_user_role', finalRole);
-          } catch {}
-        }
       }
 
       const userProfile: UserProfile = {

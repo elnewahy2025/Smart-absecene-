@@ -106,6 +106,7 @@ export interface UserAccountResult {
 export interface AttendanceContextType {
   // Firebase Auth
   firebaseUser: FirebaseUser | null;
+  authLoading?: boolean;
   signInWithGoogle: (useRedirect?: boolean) => Promise<UserCredential | undefined>;
   signOutGoogle: () => Promise<void>;
   signInWithCredentials: (

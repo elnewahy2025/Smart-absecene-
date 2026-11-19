@@ -85,7 +85,7 @@ const getInitialTab = (isParent: boolean, isTeacher: boolean): ActiveTab => {
 };
 
 const MainAppContent: React.FC = () => {
-  const { lang, currentTenant, currentUser, setUserRole, firebaseUser, signOutGoogle, subscriptionAccess } = useAttendance();
+  const { lang, currentTenant, currentUser, setUserRole, firebaseUser, authLoading, signOutGoogle, subscriptionAccess } = useAttendance();
   const isParent = currentUser.role === 'parent';
   const isTeacher = currentUser.role === 'teacher';
   const isRegistrar = currentUser.role === 'registrar';
@@ -210,6 +210,15 @@ const MainAppContent: React.FC = () => {
       }
     }
   }, [isParent, isTeacher, isRegistrar, activeTab]);
+
+  // Wait for Firebase Auth initial state before rendering LoginPage to avoid login flash on reload
+  if (authLoading && !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" dir="rtl">
+        <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" aria-label="Loading" />
+      </div>
+    );
+  }
 
   // If not authenticated, render the school-specific LoginPage
   if (!isAuthenticated) {
