@@ -191,7 +191,7 @@ export function useSessionActions({
       updatedCount: affectedCount,
       message:
         studentIds && studentIds.length > 0
-          ? `تم تمييز ${studentIds.length} طالب باعتبارهم حاضرون.`
+          ? `تم تمييز ${studentIds.length} طالب باعتبارهم حاضرون بنجاح.`
           : `تم تمييز جميع الطلاب في الكشف باعتبارهم حاضرون. تم حفظ الدفعة بنجاح.`,
     };
   };
