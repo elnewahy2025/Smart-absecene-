@@ -12,8 +12,10 @@ describe('PDF renderer security hardening', () => {
     expect(isAllowedPdfRequest('https://cdn.tailwindcss.com/')).toBe(false);
   });
 
-  it('allows only data: documents and Google Fonts stylesheets/assets', () => {
-    expect(isAllowedPdfRequest('data:text/html;charset=utf-8,hello')).toBe(true);
+  it('allows embedded images and Google Fonts stylesheets/assets, but not data documents', () => {
+    expect(isAllowedPdfRequest('data:image/png;base64,iVBORw0KGgo=')).toBe(true);
+    expect(isAllowedPdfRequest('data:text/html;charset=utf-8,hello')).toBe(false);
+    expect(isAllowedPdfRequest('data:text/javascript,alert(1)')).toBe(false);
     expect(isAllowedPdfRequest('https://fonts.googleapis.com/css2?family=Cairo')).toBe(true);
     expect(isAllowedPdfRequest('https://fonts.gstatic.com/s/cairo/v1/font.woff2')).toBe(true);
   });
